@@ -52,22 +52,29 @@ type
   SweetLexerError* = object of CatchableError
 
 proc isDelimiterPunct(c: char): bool {.inline.} =
+  # Common delimiter punctuation characters, this can be customized per language if needed
   c in {'{','}','(',')','[',']',',',';'}
 
 proc isOperatorPunct(c: char): bool {.inline.} =
+  # Common operator characters, this can be customized per language if needed
   c in {':','.','?','~','+','-','*','/','%','<','>','=','!','&','|','^','#'}
 
 proc isAnyPunct(c: char): bool {.inline.} =
+  # Delimiter and operator punctuation are often treated differently in languages
   isDelimiterPunct(c) or isOperatorPunct(c)
 
 proc charAt(l: SweetLexer, idx: int): char {.inline.} =
+  # Returns the character at the given index, or '\0' if out of bounds
   if idx < 0 or idx >= l.len: return '\0'
   if l.data != nil: l.data[idx] else: l.input[idx]
 
 proc peek(l: SweetLexer, offset: int = 1): char {.inline.} =
+  # Lookahead character at current position + offset, returns '\0' if out of bounds
   l.charAt(l.pos + offset)
 
 proc advance(l: var SweetLexer): char {.inline.} =
+  # Move to the next character, updating line and column info,
+  # returns the current char before advancing or '\0' if at end of input
   result = l.current
   if l.current == '\0':
     return
@@ -80,10 +87,12 @@ proc advance(l: var SweetLexer): char {.inline.} =
   l.current = l.charAt(l.pos)
 
 proc isUtf8Cont(c: char): bool {.inline.} =
+  # Checks if the character is a UTF-8 continuation byte (10xxxxxx)
   let b = uint8(ord(c))
   (b and 0b1100_0000'u8) == 0b1000_0000'u8
 
 proc utf8SeqLen(c: char): int {.inline.} =
+  # Determines the length of a UTF-8 sequence based on the lead byte
   let b = uint8(ord(c))
   if b < 0b1000_0000'u8: 1
   elif (b and 0b1110_0000'u8) == 0b1100_0000'u8: 2
@@ -121,6 +130,7 @@ proc skipLineContinuation(l: var SweetLexer) =
       discard l.advance() # '\n'
 
 proc skipWhitespace(l: var SweetLexer) =
+  # Skips over whitespace characters and line continuations, updating position accordingly
   while true:
     if l.current in {' ', '\t', '\r'}:
       discard l.advance()
@@ -132,13 +142,13 @@ proc skipWhitespace(l: var SweetLexer) =
       break
 
 proc getLexeme*(l: SweetLexer, startPos, stopPos: int): string =
+  # Extracts the substring from startPos to stopPos (exclusive) as the lexeme for the current token.
   if l.data != nil:
     let n = stopPos - startPos
     result = newString(n)
     copyMem(addr result[0], addr l.data[startPos], n)
   else:
     result = l.input[startPos..<stopPos]
-
 
 proc getFullInput(l: SweetLexer): string =
   ## Returns full source text as string (needed for regex filters).
@@ -150,10 +160,12 @@ proc getFullInput(l: SweetLexer): string =
     result = l.input
 
 proc addAttrOnce(attrs: var seq[string], a: string) {.inline.} =
+  # Adds an attribute to the list if it's not already present, ensuring no duplicates.
   if a.len > 0 and a notin attrs:
     attrs.add(a)
 
 proc overlap(aStart, aStop, bStart, bStop: int): bool {.inline.} =
+  # Checks if the ranges [aStart, aStop) and [bStart, bStop) overlap
   aStart < bStop and bStart < aStop
 
 proc lookupAttrByLexeme(tbl: Table[string, string], lexeme: string): string =
@@ -168,6 +180,7 @@ proc lookupAttrByLexeme(tbl: Table[string, string], lexeme: string): string =
   ""
 
 proc resolveGroupRange(m: MatchResult, groupIdx: int): tuple[s, e: int] =
+  # Given a regex match result and a group index, returns the start and end positions of that group.
   if groupIdx <= 0:
     return (m.start, m.stop)
 
@@ -186,8 +199,8 @@ proc cmpFilterHit(a, b: FilterHit): int =
   if result == 0:
     result = cmp(a.stop, b.stop)
 
-
 proc prepareFilters(l: SweetLexer) =
+  # Prepares the filter hits by running all regex filters against the input and storing their matches.
   if l.filtersReady:
     return
 
@@ -273,7 +286,7 @@ proc makeRange(l: SweetLexer, k: SweetTokenKind, startPos, startLine, startCol: 
 
 proc getToken*(l: var SweetLexer): SweetTokenRange =
   ## Retrieve the next token from the input stream, advancing the lexer's position
-  l.prepareFilters()
+  # l.prepareFilters()
   l.skipWhitespace()
 
   let startPos = l.pos
@@ -282,7 +295,6 @@ proc getToken*(l: var SweetLexer): SweetTokenRange =
 
   if l.current == '\0':
     return SweetTokenRange(kind: tkEOF, line: startLine, col: startCol, pos: startPos, start: startPos, stop: startPos)
-
 
   if isIdentStart(l.current) or ord(l.current) >= 0x80:
     if ord(l.current) >= 0x80:

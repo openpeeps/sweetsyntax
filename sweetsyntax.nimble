@@ -2,7 +2,7 @@
 
 version       = "0.1.0"
 author        = "George Lemon"
-description   = "A generic syntax highlighter"
+description   = "A generic syntax highlighter and tokenizer"
 license       = "MIT"
 srcDir        = "src"
 
