@@ -4,7 +4,7 @@
 #          Made by Humans from OpenPeeps
 #          https://github.com/openpeeps/sweetsyntax
 
-import std/[strutils, memfiles, tables, algorithm]
+import std/[strutils, memfiles, tables, algorithm, options]
 import pkg/openparser/regex
 
 import ./config
@@ -32,15 +32,18 @@ type
     mf: MemFile
     data: ptr UncheckedArray[char]
     len: int
-    line, col, pos: int
-    current: char
+    line*, col*, pos*: int # meta information for error reporting and token metadata
+    current*: char
     usingMemFile: bool
-    spec: SweetSpec
+    spec*: SweetSpec
+      ## The syntax specification that defines how to tokenize the input, including
+      ## the symbols, identifiers, and filters to apply.
+    enableFilters: bool
     filtersReady: bool
     filterHits: seq[FilterHit]
     filterScanIdx: int
 
-  SweetTokenRange* = ref object
+  Token* = ref object
     ## Represents a token with its kind, position, and
     ## optional attributes
     kind*: SweetTokenKind
@@ -50,6 +53,36 @@ type
       # Optional, user-defined attributes for this token, e.g. keyword type or operator name
 
   SweetLexerError* = object of CatchableError
+
+proc charAt(l: SweetLexer, idx: int): char {.inline.} =
+  # Returns the character at the given index, or '\0' if out of bounds
+  if idx < 0 or idx >= l.len: return '\0'
+  if l.data != nil: l.data[idx] else: l.input[idx]
+
+proc getContext*(l: SweetLexer, posOverride: int = -1): string =
+  # Show the full current line and place caret at exact token position.
+  let rawPos = if posOverride >= 0: posOverride else: l.pos
+  let atPos = max(0, min(rawPos, l.len))
+
+  var lineStart = atPos
+  while lineStart > 0 and l.charAt(lineStart - 1) != '\n':
+    dec lineStart
+
+  var lineEnd = atPos
+  while lineEnd < l.len and l.charAt(lineEnd) notin {'\n', '\r'}:
+    inc lineEnd
+
+  var snippet: string
+  if l.input.len > 0:
+    snippet = l.input[lineStart ..< lineEnd]
+  else:
+    snippet = newStringOfCap(max(0, lineEnd - lineStart))
+    for i in lineStart ..< lineEnd:
+      snippet.add(l.charAt(i))
+
+  let markerPos = max(0, min(snippet.len, atPos - lineStart))
+  result = snippet & "\n" & " ".repeat(markerPos) & "^"
+
 
 proc isDelimiterPunct(c: char): bool {.inline.} =
   # Common delimiter punctuation characters, this can be customized per language if needed
@@ -62,11 +95,6 @@ proc isOperatorPunct(c: char): bool {.inline.} =
 proc isAnyPunct(c: char): bool {.inline.} =
   # Delimiter and operator punctuation are often treated differently in languages
   isDelimiterPunct(c) or isOperatorPunct(c)
-
-proc charAt(l: SweetLexer, idx: int): char {.inline.} =
-  # Returns the character at the given index, or '\0' if out of bounds
-  if idx < 0 or idx >= l.len: return '\0'
-  if l.data != nil: l.data[idx] else: l.input[idx]
 
 proc peek(l: SweetLexer, offset: int = 1): char {.inline.} =
   # Lookahead character at current position + offset, returns '\0' if out of bounds
@@ -150,6 +178,10 @@ proc getLexeme*(l: SweetLexer, startPos, stopPos: int): string =
   else:
     result = l.input[startPos..<stopPos]
 
+proc getTokenValue*(l: SweetLexer, tok: Token): string {.inline.} =
+  ## Returns the source text for the given token.
+  l.getLexeme(tok.start, tok.stop)
+
 proc getFullInput(l: SweetLexer): string =
   ## Returns full source text as string (needed for regex filters).
   if l.data != nil:
@@ -169,9 +201,9 @@ proc overlap(aStart, aStop, bStart, bStop: int): bool {.inline.} =
   aStart < bStop and bStart < aStop
 
 proc lookupAttrByLexeme(tbl: Table[string, string], lexeme: string): string =
-  ## Supports both YAML styles:
-  ## - lexeme -> attr
-  ## - attr   -> lexeme
+  # Supports both YAML styles:
+  # - lexeme -> attr
+  # - attr   -> lexeme
   if tbl.hasKey(lexeme):
     return tbl[lexeme]
   for k, v in tbl.pairs:
@@ -200,9 +232,9 @@ proc cmpFilterHit(a, b: FilterHit): int =
     result = cmp(a.stop, b.stop)
 
 proc prepareFilters(l: SweetLexer) =
-  # Prepares the filter hits by running all regex filters against the input and storing their matches.
-  if l.filtersReady:
-    return
+  # Prepares the filter hits by running all regex filters against the
+  # input and storing their matches
+  if l.filtersReady: return
 
   l.filtersReady = true
   l.filterHits.setLen(0)
@@ -241,7 +273,7 @@ proc prepareFilters(l: SweetLexer) =
     l.filterHits.sort(cmpFilterHit)
 
 
-proc applyFilterAttrs(l: SweetLexer, tok: var SweetTokenRange) =
+proc applyFilterAttrs(l: SweetLexer, tok: var Token) =
   if l.filterHits.len == 0:
     return
 
@@ -255,8 +287,8 @@ proc applyFilterAttrs(l: SweetLexer, tok: var SweetTokenRange) =
       tok.attr.addAttrOnce(h.attr)
     inc i
 
-proc makeRange(l: SweetLexer, k: SweetTokenKind, startPos, startLine, startCol: int): SweetTokenRange {.inline.} =
-  result = SweetTokenRange(
+proc makeRange(l: SweetLexer, k: SweetTokenKind, startPos, startLine, startCol: int): Token {.inline.} =
+  result = Token(
     kind: k,
     line: startLine,
     col: startCol,
@@ -265,15 +297,32 @@ proc makeRange(l: SweetLexer, k: SweetTokenKind, startPos, startLine, startCol: 
     stop: l.pos
   )
 
-  let lexeme =
-    block:
-      let stopPos = l.pos
-      if stopPos <= startPos:
-        ""
-      else:
-        l.getLexeme(startPos, stopPos)
-
-  if k == tkIdentifier:
+  let stopPos = l.pos
+  var lexeme =
+    if stopPos <= startPos:
+      ""
+    else:
+      l.getLexeme(startPos, stopPos)
+  # For comments, store the comment content without the syntax markers
+  if k == tkComment:
+    # Strip inline comment syntax (e.g., "//")
+    if l.spec.inlineComment.isSome():
+      let commentSyntax = l.spec.inlineComment.get()
+      if lexeme.startsWith(commentSyntax):
+        # Store only the comment text, not the "//"
+        result.start = startPos + commentSyntax.len
+        # also, ensure the comment line does not start with whitespace
+        while result.start < stopPos and l.charAt(result.start) == ' ':
+          inc result.start
+  elif k == tkDocComment:
+    # Strip block comment syntax (e.g., "/**" and "*/")
+    let startSyntax = l.spec.blockComment[0]
+    let endSyntax = l.spec.blockComment[1]
+    if lexeme.startsWith(startSyntax):
+      result.start = startPos + startSyntax.len
+    if lexeme.endsWith(endSyntax):
+      result.stop = result.stop - endSyntax.len
+  elif k == tkIdentifier:
     let identAttr = lookupAttrByLexeme(l.spec.identifiers, lexeme)
     if identAttr.len > 0:
       result.attr.addAttrOnce(identAttr)
@@ -284,9 +333,9 @@ proc makeRange(l: SweetLexer, k: SweetTokenKind, startPos, startLine, startCol: 
 
   l.applyFilterAttrs(result)
 
-proc getToken*(l: var SweetLexer): SweetTokenRange =
+proc getToken*(l: var SweetLexer): Token =
   ## Retrieve the next token from the input stream, advancing the lexer's position
-  # l.prepareFilters()
+  if l.enableFilters: l.prepareFilters() # Ensure filters are prepared if enabled
   l.skipWhitespace()
 
   let startPos = l.pos
@@ -294,7 +343,7 @@ proc getToken*(l: var SweetLexer): SweetTokenRange =
   let startCol = l.col
 
   if l.current == '\0':
-    return SweetTokenRange(kind: tkEOF, line: startLine, col: startCol, pos: startPos, start: startPos, stop: startPos)
+    return Token(kind: tkEOF, line: startLine, col: startCol, pos: startPos, start: startPos, stop: startPos)
 
   if isIdentStart(l.current) or ord(l.current) >= 0x80:
     if ord(l.current) >= 0x80:
@@ -346,6 +395,73 @@ proc getToken*(l: var SweetLexer): SweetTokenRange =
       discard l.advance()
     return l.makeRange(tkString, startPos, startLine, startCol) # unterminated, but safe
 
+  # Check for block comments FIRST (before inline comments and operators)
+  if l.spec.blockComment[0].len > 0 and l.current == l.spec.blockComment[0][0]:
+    let commentStart = l.pos
+    let startSyntax = l.spec.blockComment[0]
+    let endSyntax = l.spec.blockComment[1]
+    var matchesStart = true
+    for i in 0 ..< startSyntax.len:
+      if l.charAt(l.pos + i) != startSyntax[i]:
+        matchesStart = false
+        break
+    if matchesStart:
+      # Check if this is a doc comment (/** or /*!)
+      let isDocComment = startSyntax == "/*" and (l.peek(2) == '*' or l.peek(2) == '!')
+      
+      # Consume start syntax
+      for i in 0 ..< startSyntax.len:
+        discard l.advance()
+      
+      # Find end syntax
+      while l.current != '\0':
+        var matchesEnd = false
+        if l.current == endSyntax[0]:
+          matchesEnd = true
+          for j in 0 ..< endSyntax.len:
+            if l.charAt(l.pos + j) != endSyntax[j]:
+              matchesEnd = false
+              break
+        
+        if matchesEnd:
+          # Consume end syntax
+          for i in 0 ..< endSyntax.len:
+            discard l.advance()
+          return l.makeRange(
+            if isDocComment: tkDocComment else: tkComment,
+            commentStart, startLine, startCol
+          )
+        discard l.advance()
+      
+      # Unterminated block comment
+      return l.makeRange(
+        if isDocComment: tkDocComment else: tkComment,
+        commentStart, startLine, startCol
+      )
+
+  # Check for inline comments (must come before operator check!)
+  if l.spec.inlineComment.isSome():
+    let commentSyntax = l.spec.inlineComment.get()
+    if commentSyntax.len > 0 and l.current == commentSyntax[0]:
+      var matchesSyntax = true
+      for i in 0 ..< commentSyntax.len:
+        if l.charAt(l.pos + i) != commentSyntax[i]:
+          matchesSyntax = false
+          break
+      
+      if matchesSyntax:
+        let commentStart = l.pos
+        # Consume the comment syntax
+        for i in 0 ..< commentSyntax.len:
+          discard l.advance()
+        
+        # Consume rest of line
+        while l.current != '\0' and l.current != '\n':
+          discard l.advance()
+        
+        return l.makeRange(tkComment, commentStart, startLine, startCol)
+
+  # Check for punctuation
   if isDelimiterPunct(l.current):
     discard l.advance()
     return l.makeRange(tkPunct, startPos, startLine, startCol)
@@ -359,7 +475,7 @@ proc getToken*(l: var SweetLexer): SweetTokenRange =
   discard l.advanceUtf8Char()
   return l.makeRange(tkPunct, startPos, startLine, startCol)
 
-proc initLexerFromFile*(spec: SweetSpec, path: string): SweetLexer =
+proc initLexerFromFile*(spec: SweetSpec, path: string, enableFilters: bool = false): SweetLexer =
   ## Initialize lexer from a file using memfiles for efficient access.
   result = SweetLexer(
     input: path,
@@ -370,6 +486,7 @@ proc initLexerFromFile*(spec: SweetSpec, path: string): SweetLexer =
     col: 1,
     pos: 0,
     spec: spec,
+    enableFilters: enableFilters,
     usingMemFile: true,
     filtersReady: false,
     filterHits: @[],
@@ -379,7 +496,7 @@ proc initLexerFromFile*(spec: SweetSpec, path: string): SweetLexer =
   result.len = result.mf.size
   result.current = result.charAt(0)
 
-proc initLexer*(spec: SweetSpec, input: sink string): SweetLexer =
+proc initLexer*(spec: SweetSpec, input: sink string, enableFilters: bool = false): SweetLexer =
   ## Initialize lexer from raw source text, this is efficient for small inputs
   result = SweetLexer(
     input: input,
@@ -390,6 +507,7 @@ proc initLexer*(spec: SweetSpec, input: sink string): SweetLexer =
     pos: 0,
     current: '\0',
     spec: spec,
+    enableFilters: enableFilters,
     filtersReady: false,
     filterHits: @[],
     filterScanIdx: 0
