@@ -5,6 +5,11 @@ extension:
   - ts
   - tsx
 
+inline_comment: '//'
+block_comment:
+  - '/*'
+  - '*/'
+
 symbols:
   plus: '+'
   minus: '-'
@@ -85,6 +90,8 @@ identifiers:
   while: "while"
   with: "with"
   yield: "yield"
+  true: "true"
+  false: "false"
 
 filters:
   - name: class_decl
@@ -147,3 +154,9 @@ filters:
     pattern: '/([^/\\]*(?:\\.[^/\\]*)*)/[gimsuy]*'
     group: 0
     attr: regex
+
+definitions:
+  - name: import
+    pattern:
+      - [string]
+      - [from, string]
