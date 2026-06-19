@@ -2,6 +2,15 @@ name: C
 extension:
   - c
   - h
+  - c99
+  - c11
+  - c17
+  - c23
+
+inline_comment: '//'
+block_comment:
+  - '/*'
+  - '*/'
 
 symbols:
   plus: '+'
@@ -99,7 +108,138 @@ identifiers:
   _Noreturn: "_Noreturn"
   _Static_assert: "_Static_assert"
   _Thread_local: "_Thread_local"
+  _Pragma: "_Pragma"
   __func__: "__func__"
+  __VA_ARGS__: "__VA_ARGS__"
   true: "true"
   false: "false"
   NULL: "NULL"
+
+blocks:
+  open: "{"
+  close: "}"
+
+features:
+  regex_literals: false
+  async_await: false
+  generators: false
+  arrow_functions: false
+  template_literals: false
+  labeled_statements: true
+
+operators:
+  prefix:
+    - tokens: ["+", "-", "!", "~", "++", "--"]
+    - tokens: ["sizeof"]
+      is_keyword: true
+    - tokens: ["*"]
+      handler: dereference
+    - tokens: ["&"]
+      handler: address_of
+
+  postfix:
+    - tokens: ["++", "--"]
+    - tokens: ["."]
+      handler: dot
+    - tokens: ["->"]
+      handler: arrow
+    - tokens: ["("]
+      handler: call
+    - tokens: ["["]
+      handler: bracket
+
+  infix:
+    - precedence: 1
+      tokens: ["||"]
+    - precedence: 2
+      tokens: ["&&"]
+    - precedence: 3
+      tokens: ["|"]
+    - precedence: 4
+      tokens: ["^"]
+    - precedence: 5
+      tokens: ["&"]
+    - precedence: 6
+      tokens: ["==", "!="]
+    - precedence: 7
+      tokens: ["<", ">", "<=", ">="]
+    - precedence: 8
+      tokens: ["<<", ">>"]
+    - precedence: 9
+      tokens: ["+", "-"]
+    - precedence: 10
+      tokens: ["*", "/", "%"]
+    - precedence: 11
+      tokens: ["."]
+      handler: dot
+    - precedence: 11
+      tokens: ["->"]
+      handler: arrow
+    - precedence: 11
+      tokens: ["["]
+      handler: bracket
+    - precedence: 12
+      tokens: ["("]
+      handler: call
+
+  assignment:
+    tokens: ["=", "+=", "-=", "*=", "/=", "%=",
+             "<<=", ">>=", "&=", "^=", "|="]
+
+  ternary:
+    token: "?"
+    separator: ":"
+    precedence: 1
+
+statements:
+  if_stmt:
+    keyword: "if"
+    handler: conditional
+  while_stmt:
+    keyword: "while"
+    handler: loop
+  do_while_stmt:
+    keyword: "do"
+    handler: do_loop
+  for_stmt:
+    keyword: "for"
+    handler: for_loop
+  switch_stmt:
+    keyword: "switch"
+    handler: switch
+  case_stmt:
+    keyword: "case"
+    handler: case
+  return_stmt:
+    keyword: "return"
+    handler: return
+  break_stmt:
+    keyword: "break"
+    handler: break
+  continue_stmt:
+    keyword: "continue"
+    handler: continue
+  goto_stmt:
+    keyword: "goto"
+    handler: goto
+  typedef_stmt:
+    keyword: "typedef"
+    handler: typedef
+  struct_decl:
+    keyword: "struct"
+    handler: struct
+  union_decl:
+    keyword: "union"
+    handler: union
+  enum_decl:
+    keyword: "enum"
+    handler: enum
+  var_decl:
+    keywords: ["auto", "register", "static", "extern", "const", "volatile", "inline", "restrict"]
+    handler: declarator
+  static_assert_stmt:
+    keyword: "_Static_assert"
+    handler: static_assert
+  sizeof_expr:
+    keyword: "sizeof"
+    handler: sizeof

@@ -81,3 +81,7 @@ identifiers:
   true: "true"
   false: "false"
   nil: "nil"
+
+definitions:
+  - name: import
+    pattern: [import, string, ]

@@ -4,7 +4,10 @@
 #          Made by Humans from OpenPeeps
 #          https://github.com/openpeeps/sweetsyntax
 
-import std/[tables, options, strutils, strformat, os]
+## This module defines the core data structures and parsing logic for the SweetSyntax library,
+## which provides a flexible syntax specification system for parsing and analyzing programming languages based on YAML configuration files.
+
+import std/[tables, options, strutils, strformat, os, sets]
 import pkg/openparser/[json, yaml]
 
 type
@@ -13,13 +16,21 @@ type
   IdentsTable* = Table[string, string]
     ## A table mapping identifier names to their literal representations
   
+  AstNode* = object
+    kind: string
+    `from`: string
+
+  Pattern* = object
+    match: seq[string]
+    produces: seq[AstNode]
+
   Definition* = ref object
     ## A definition represents a more complex token pattern that may
     ## involve multiple symbols or identifiers.
     name*: string
       ## the name of the definition. Should match
       ## the name used in the `identifiers` table for the relevant token(s)
-    patterns*: seq[seq[string]]
+    patterns*: seq[Pattern]
       ## a list of patterns, where each pattern is a sequence of
       ## symbol/identifier names. For example: `[["string"], ["from", "string"]]`
 
@@ -32,6 +43,89 @@ type
     pattern*: string
     group*: int
     attr*: string
+
+
+  AssocKind* = enum
+    assocLeft = "left"
+    assocRight = "right"
+
+  InfixGroup* = ref object
+    precedence*: int
+    tokens*: seq[string]
+    keywords*: seq[string]
+    assoc*: AssocKind
+    handler*: string       # "dot", "bracket", "call", "ternary", "" (normal)
+
+  PrefixGroup* = ref object
+    tokens*: seq[string]
+    isKeyword*: bool
+    handler*: string
+
+  PostfixGroup* = ref object
+    tokens*: seq[string]
+
+  AssignmentDef* = ref object
+    tokens*: seq[string]
+
+  TernaryDef* = ref object
+    token*: string
+    separator*: string
+    precedence*: int
+
+  OperatorsSpec* = ref object
+    ## Specification of operators, including their tokens, precedence, associativity, and handler types.
+    prefix*: seq[PrefixGroup]
+      ## Groups of prefix operators, each with its own handler type (e.g. "dot" for member access, "call" for function calls, etc.)
+    postfix*: seq[PostfixGroup]
+      ## Groups of postfix operators, each with its own handler type
+    infix*: seq[InfixGroup]
+      ## Groups of infix operators, each with its own precedence, associativity, and handler type
+    assignment*: AssignmentDef
+      ## Definition of assignment operators, which may have special handling in the parser
+    ternary*: TernaryDef
+      ## Definition of ternary operators, which may have special handling in the parser
+
+  StatementSpec* = ref object
+    ## Specification for a statement type, including its handler function and associated keywords/tokens.
+    handler*: string
+      ## the name of the handler function to use for this statement type, e.g. "ifHandler", "forHandler", etc.
+    keyword*: string            # single keyword (for simple statements)
+    keywords*: seq[string]      # multiple keywords (for var/let/const)
+    tokens*: seq[string]
+
+  StatementsSpec* = Table[string, StatementSpec]
+    ## Mapping of statement types to their specifications, e.g. "if", "for", "while", etc.
+
+  BlocksSpec* = ref object
+    ## Specification for block delimiters, which may be used for defining the syntax of code blocks in the language.
+    open*: string
+      ## the token that opens a block, e.g. "{" for C-like languages
+    close*: string
+      ## the token that closes a block, e.g. "}" for C-like languages
+
+  FeaturesSpec* = ref object
+    ## A set of language features that may require special
+    ## handling in the parser, e.g. async/await, generators, etc.
+    regexLiterals*: bool
+      ## whether the language supports regex literals (e.g. /regex/ in JavaScript)
+    asyncAwait*: bool
+      ## whether the language supports async/await syntax
+    generators*: bool
+      ## whether the language supports generator functions (e.g. function* in JavaScript)
+    arrowFunctions*: bool
+      ## whether the language supports arrow function syntax (e.g. () => {} in JavaScript)
+    templateLiterals*: bool
+      ## whether the language supports template literals (e.g. `template ${expr}` in JavaScript)
+    labeledStatements*: bool
+      ## whether the language supports labeled statements (e.g. label: statement in JavaScript)
+
+  LanguageFeature* = enum
+    featRegex = "regex_literals"
+    featAsync = "async_await"
+    featGenerators = "generators"
+    featArrowFn = "arrow_functions"
+    featTemplateLit = "template_literals"
+    featLabeledStmt = "labeled_statements"
 
   SweetSpec* = ref object
     name*: string
@@ -50,14 +144,24 @@ type
       ## list of filters that define regex patterns for token matching
     definitions*: Definitions
       ## mapping of definition names to their details, used for more complex token patterns
+    operators*: OperatorsSpec
+      ## specification of operators, including their tokens, precedence, associativity, and handler types
+    statements*: StatementsSpec
+      ## mapping of statement types to their specifications, e.g. "if", "for", "while", etc.
+    blocks*: BlocksSpec
+      ## the syntax for block delimiters, e.g. open: "{", close: "}"
+    features*: FeaturesSpec
+      ## a set of language features that may require special handling in the parser, e.g. async/await, generators, etc.
+    open_tag*: Option[string]   # e.g. "<?php"
+    close_tag*: Option[string]  # e.g. "?>"
 
   KnownSyntax* = enum
-    js = "javascript"
-    py = "python"
+    js = "js"
+    py = "py"
     nim = "nim"
     c = "c"
-    rust = "rust"
-    ruby = "ruby"
+    rust = "rs"
+    ruby = "rb"
     php = "php"
     go = "go"
     d = "d"
@@ -68,7 +172,7 @@ type
 
 const
   knownSyntaxTable* = {
-    "javascript": staticRead(currentSourcePath().parentDir / "syntaxes" / "javascript.yaml"),
+    "js": staticRead(currentSourcePath().parentDir / "syntaxes" / "js.yaml"),
     "python": staticRead(currentSourcePath().parentDir / "syntaxes" / "python.yaml"),
     "nim": staticRead(currentSourcePath().parentDir / "syntaxes" / "nim.yaml"),
     "c": staticRead(currentSourcePath().parentDir / "syntaxes" / "c.yaml"),
@@ -133,6 +237,29 @@ proc parseHook*(p: var YamlParser, v: var SweetFilter) =
     of "attr": p.parseHook(v.attr)
     else:
       p.error(&"Unknown filter property: {key}")
+
+proc parseHook*(p: var YamlParser, v: var PrefixGroup) =
+  ## Parse a YAML mapping into PrefixGroup, which may include
+  ## tokens, is_keyword flag, and handler type
+  if v.isNil: v = PrefixGroup()
+  parseYamlMappingPairs do:
+    case key
+    of "tokens":     p.parseHook(v.tokens)
+    of "is_keyword": p.parseHook(v.isKeyword)   # ← this mapping
+    of "handler":    p.parseHook(v.handler)
+    else: discard  
+
+proc parseHook*(p: var YamlParser, v: var StatementSpec) =
+  ## Parse a YAML mapping into StatementSpec, which may include a
+  ## handler and associated keywords/tokens for a particular statement type.
+  if v.isNil: v = StatementSpec()
+  parseYamlMappingPairs do:
+    case key
+    of "handler":   p.parseHook(v.handler)
+    of "keyword":   p.parseHook(v.keyword)
+    of "keywords":  p.parseHook(v.keywords)
+    of "tokens":    p.parseHook(v.tokens)
+    else: discard
 
 proc newSyntax*(specPath: string): SweetSyntax =
   ## Initialize a new Syntax for the given YAML specification file path

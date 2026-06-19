@@ -2,6 +2,9 @@ name: Crystal
 extension:
   - cr
 
+inline_comment: '#'
+block_comment: []
+
 symbols:
   plus: '+'
   minus: '-'
@@ -115,3 +118,190 @@ identifiers:
   while: "while"
   with: "with"
   yield: "yield"
+  # Additional Crystal keywords
+  and: "and"
+  not: "not"
+  or: "or"
+  nilable: "nilable"
+  offsetOf: "offsetOf"
+
+blocks:
+  open: "{"
+  close: "}"
+
+features:
+  regex_literals: true
+  async_await: false
+  generators: false
+  arrow_functions: true
+  template_literals: false
+  labeled_statements: false
+  generics: true
+  macros: true
+  annotations: true
+  type_restrictions: true
+  union_types: true
+  nilable_types: true
+  pointers: true
+  unsafe: true
+  crystal_ffi: true
+
+operators:
+  prefix:
+    - tokens: ["+", "-", "!", "~", "++", "--"]
+    - tokens: ["sizeof", "instance_sizeof", "pointerof", "typeof", "offsetof"]
+      is_keyword: true
+    - tokens: ["*"]
+      handler: dereference
+    - tokens: ["&"]
+      handler: address_of
+
+  postfix:
+    - tokens: ["++", "--"]
+    - tokens: ["?"]
+      handler: nilable
+    - tokens: ["!"]
+      handler: not_nil
+
+  infix:
+    - precedence: 1
+      tokens: ["||"]
+    - precedence: 2
+      tokens: ["&&"]
+    - precedence: 3
+      tokens: ["|"]
+    - precedence: 4
+      tokens: ["^"]
+    - precedence: 5
+      tokens: ["&"]
+    - precedence: 6
+      tokens: ["==", "!=", "===", "!==", "=~", "!~", "<=>"]
+    - precedence: 7
+      tokens: ["<", ">", "<=", ">="]
+      keywords: ["is_a?", "respond_to?", "in"]
+    - precedence: 8
+      tokens: ["<<", ">>"]
+    - precedence: 9
+      tokens: ["+", "-"]
+    - precedence: 10
+      tokens: ["*", "/", "%"]
+    - precedence: 11
+      tokens: ["**"]
+      assoc: right
+    - precedence: 12
+      tokens: ["..", "..."]
+    - precedence: 14
+      tokens: ["."]
+      handler: dot
+    - precedence: 14
+      tokens: ["."]
+      handler: call
+    - precedence: 14
+      tokens: ["["]
+      handler: bracket
+
+  assignment:
+    tokens: ["=", "+=", "-=", "*=", "/=", "%=", "**=",
+             "&=", "|=", "^=", "<<=", ">>=", "&&=", "||="]
+
+  ternary:
+    token: "?"
+    separator: ":"
+    precedence: 1
+
+statements:
+  if_stmt:
+    keyword: "if"
+    handler: conditional
+  unless_stmt:
+    keyword: "unless"
+    handler: conditional
+  while_stmt:
+    keyword: "while"
+    handler: loop
+  until_stmt:
+    keyword: "until"
+    handler: loop
+  do_while_stmt:
+    keyword: "do"
+    handler: do_loop
+  for_stmt:
+    keyword: "for"
+    handler: for_loop
+  case_stmt:
+    keyword: "case"
+    handler: case
+  return_stmt:
+    keyword: "return"
+    handler: return
+  break_stmt:
+    keyword: "break"
+    handler: break
+  next_stmt:
+    keyword: "next"
+    handler: next
+  yield_stmt:
+    keyword: "yield"
+    handler: yield
+  raise_stmt:
+    keyword: "raise"
+    handler: raise
+  macro_decl:
+    keyword: "macro"
+    handler: macro
+  def_decl:
+    keyword: "def"
+    handler: function
+  macro_def_decl:
+    keyword: "macro"
+    handler: macro
+  class_decl:
+    keyword: "class"
+    handler: class
+  struct_decl:
+    keyword: "struct"
+    handler: struct
+  enum_decl:
+    keyword: "enum"
+    handler: enum
+  module_decl:
+    keyword: "module"
+    handler: module
+  lib_decl:
+    keyword: "lib"
+    handler: lib
+  annotation_decl:
+    keyword: "annotation"
+    handler: annotation
+  begin_stmt:
+    keyword: "begin"
+    handler: begin
+  rescue_stmt:
+    keyword: "rescue"
+    handler: rescue
+  ensure_stmt:
+    keyword: "ensure"
+    handler: ensure
+  include_stmt:
+    keyword: "include"
+    handler: include
+  extend_stmt:
+    keyword: "extend"
+    handler: extend
+  alias_stmt:
+    keyword: "alias"
+    handler: alias
+  abstract_decl:
+    keyword: "abstract"
+    handler: abstract
+  var_decl:
+    keywords: ["def", "class", "struct", "module", "lib"]
+    handler: declarator
+
+  expect_regex_after:
+    tokens: ["=", "+=", "-=", "*=", "/=", "%=", "**=",
+             "(", "[", "{", ",", ";", ":",
+             "!=", "==", "return"]
+    keywords: ["return", "typeof", "sizeof",
+               "instanceof", "is_a?",
+               "require"]

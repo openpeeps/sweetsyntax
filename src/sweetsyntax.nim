@@ -4,68 +4,29 @@
 #          Made by Humans from OpenPeeps
 #          https://github.com/openpeeps/sweetsyntax
 
+import std/tables
 import ./sweetsyntax/[config, sweetlexer]
+
 export config, sweetlexer
 
 when isMainModule:
-  import std/[terminal, strformat, strutils]
-
-  import ./sweetsyntax/renderers/htmlrenderer
-  import ./sweetsyntax/renderers/asciirenderer
-
-  block:
-    type RenderMode = enum
-      rmAnsi, rmHtml
-
-    proc parseMode(s: string): RenderMode =
-      case s.toLowerAscii()
-      of "html": rmHtml
-      else: rmAnsi
-
-    proc renderOutput(spec: SweetSpec, buffer: string, mode: RenderMode) =
-      eraseScreen()
-      setCursorPos(0, 0)
-
-      stdout.writeLine("SweetSyntax live renderer")
-      stdout.writeLine("ESC/Ctrl-C/Ctrl-D: quit | Enter: newline | Backspace: delete")
-      stdout.writeLine("")
-      stdout.writeLine("Input:")
-      stdout.writeLine(buffer)
-      stdout.writeLine("")
-      stdout.writeLine("Output:")
-
-      var lx = initLexer(spec, buffer)
-      case mode
-      of rmHtml:
-        stdout.writeLine(highlightHtml(lx))
-      of rmAnsi:
-        stdout.writeLine(highlightAscii(lx, useColor = true))
-
-    proc runLive(specPath: string, mode: RenderMode) =
-      let syntax = newSyntax(specPath)
-      var buffer = ""
-
-      hideCursor()
-      defer:
-        showCursor()
-        stdout.writeLine("")
-
-      renderOutput(syntax.spec, buffer, mode)
-
-      while true:
-        let ch = getch()
-        case ch
-        of '\x1b', '\x03', '\x04':
-          break
-        of '\x7f', '\b':
-          if buffer.len > 0:
-            buffer.setLen(buffer.len - 1)
-        of '\r', '\n':
-          buffer.add('\n')
-        else:
-          if ch >= ' ':
-            buffer.add(ch)
-
-        renderOutput(syntax.spec, buffer, mode)
-
-    runLive("./src/sweetsyntax/syntaxes/javascript.yaml", rmHtml)
+  import std/[strformat, strutils]
+  # example tokenizing javascript
+  let jsSyntax = getKnownSyntax(KnownSyntax.js)
+  # let jsCode = """var x = 10;"""
+  let jsCode = readFile("./react.development.js")
+  var lexer = initLexer(jsSyntax.spec, jsCode)
+  var defs: seq[tuple[kind: SweetTokenKind, ident: string, value: string, line: int, col: int]] = @[]
+  while true:
+    let token = lexer.getToken()
+    if token.kind == tkEOF:
+      break
+    let val = lexer.getTokenValue(token)
+    if token.kind == tkPunct and jsSyntax.spec.symbols.hasKey(val):
+      defs.add((token.kind, jsSyntax.spec.symbols[val], val, token.line, token.col))
+    else:
+      if jsSyntax.spec.identifiers.hasKey(val):
+        defs.add((token.kind, jsSyntax.spec.identifiers[val], val, token.line, token.col))
+      else:
+        defs.add((token.kind, "", val, token.line, token.col))
+  # echo defs

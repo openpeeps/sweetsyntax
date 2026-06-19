@@ -7,12 +7,21 @@ extension:
   - php5
   - phps
 
+inline_comment: '//'
+block_comment:
+  - '/*'
+  - '*/'
+
+open_tag: "<?php"
+close_tag: "?>"
+
 symbols:
   plus: '+'
   minus: '-'
   multiply: '*'
   divide: '/'
   modulo: '%'
+  power: '**'
   assign: '='
   eq: '=='
   eqStrict: '==='
@@ -37,6 +46,7 @@ symbols:
   multiplyAssign: '*='
   divideAssign: '/='
   moduloAssign: '%='
+  powerAssign: '**='
   concatAssign: '.='
   and: '&'
   pipe: '|'
@@ -138,9 +148,156 @@ identifiers:
   while: "while"
   xor: "xor"
   yield: "yield"
-  yieldFrom: "yield from"
   true: "true"
   false: "false"
   null: "null"
   self: "self"
   parent: "parent"
+
+blocks:
+  open: "{"
+  close: "}"
+
+features:
+  arrow_functions: true
+  generators: true
+
+operators:
+  prefix:
+    - tokens: ["!", "~", "@", "-", "+"]
+    - tokens: ["..."]
+
+  postfix:
+    - tokens: ["++", "--"]
+
+  infix:
+    - precedence: 1
+      tokens: ["??"]
+    - precedence: 2
+      tokens: ["||"]
+    - precedence: 3
+      keywords: ["or"]
+    - precedence: 4
+      tokens: ["&&"]
+    - precedence: 5
+      keywords: ["and"]
+    - precedence: 6
+      keywords: ["xor"]
+    - precedence: 7
+      tokens: ["|"]
+    - precedence: 8
+      tokens: ["^"]
+    - precedence: 9
+      tokens: ["&"]
+    - precedence: 10
+      tokens: ["==", "!=", "===", "!==", "<=>"]
+      keywords: ["instanceof"]
+    - precedence: 11
+      tokens: ["<", ">", "<=", ">="]
+    - precedence: 12
+      tokens: ["<<", ">>"]
+    - precedence: 13
+      tokens: ["+", "-"]
+    - precedence: 14
+      tokens: ["*", "/", "%"]
+    - precedence: 15
+      tokens: ["**"]
+      assoc: right
+    - precedence: 16
+      tokens: ["."]
+    - precedence: 17
+      tokens: ["->"]
+      handler: dot
+    - precedence: 17
+      tokens: ["?->"]
+      handler: dot
+    - precedence: 17
+      tokens: ["::"]
+      handler: dot
+    - precedence: 18
+      tokens: ["["]
+      handler: bracket
+    - precedence: 19
+      tokens: ["("]
+      handler: call
+
+  assignment:
+    tokens: ["=", "+=", "-=", "*=", "/=", "%=", "**=",
+             ".=", "&=", "|=", "^=", "<<=", ">>=", "??="]
+
+  ternary:
+    token: "?"
+    separator: ":"
+    precedence: 1
+
+statements:
+  var_decl:
+    keywords: ["var"]
+    handler: declarator
+  const_decl:
+    keyword: "const"
+    handler: const_decl
+  function_decl:
+    keyword: "function"
+    handler: function
+  if_stmt:
+    keyword: "if"
+    handler: conditional
+  while_stmt:
+    keyword: "while"
+    handler: loop
+  do_while_stmt:
+    keyword: "do"
+    handler: do_loop
+  for_stmt:
+    keyword: "for"
+    handler: for_loop
+  foreach_stmt:
+    keyword: "foreach"
+    handler: foreach_loop
+  return_stmt:
+    keyword: "return"
+    handler: return
+  throw_stmt:
+    keyword: "throw"
+    handler: throw
+  break_stmt:
+    keyword: "break"
+    handler: break
+  continue_stmt:
+    keyword: "continue"
+    handler: continue
+  try_stmt:
+    keyword: "try"
+    handler: try_catch
+  switch_stmt:
+    keyword: "switch"
+    handler: switch
+  class_decl:
+    keyword: "class"
+    handler: class
+  interface_decl:
+    keyword: "interface"
+    handler: interface
+  trait_decl:
+    keyword: "trait"
+    handler: trait
+  enum_decl:
+    keyword: "enum"
+    handler: enum
+  echo_stmt:
+    keyword: "echo"
+    handler: echo
+  include_stmt:
+    keywords: ["include", "include_once", "require", "require_once"]
+    handler: include
+  use_stmt:
+    keyword: "use"
+    handler: use
+
+  expect_regex_after:
+    tokens: ["=", "+=", "-=", "*=", "/=", "%=",
+             "(", "[", "{", ",", ";", ":",
+             "!", "~", "&&", "||", "??", "?"]
+    keywords: ["return", "echo", "throw", "new",
+               "case", "in", "of", "yield"]

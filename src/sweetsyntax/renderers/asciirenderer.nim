@@ -13,20 +13,20 @@ import std/strutils
 const
   ansiReset = "\e[0m"
 
-proc hasAttr(tok: SweetTokenRange, name: string): bool {.inline.} =
+proc hasAttr(tok: Token, name: string): bool {.inline.} =
   let want = toLowerAscii(name)
   for a in tok.attr:
     if toLowerAscii(a) == want:
       return true
   false
 
-proc hasAnyAttr(tok: SweetTokenRange, names: openArray[string]): bool {.inline.} =
+proc hasAnyAttr(tok: Token, names: openArray[string]): bool {.inline.} =
   for n in names:
     if tok.hasAttr(n):
       return true
   false
 
-proc colorForToken(tok: SweetTokenRange): string =
+proc colorForToken(tok: Token): string =
   ## Prefer semantic attrs, then strong kind fallback.
   if tok.hasAnyAttr(["comment", "doc", "documentation"]): return "\e[90m" # bright black
   if tok.hasAnyAttr(["string", "str", "char"]): return "\e[32m"           # green
@@ -50,7 +50,7 @@ proc colorForToken(tok: SweetTokenRange): string =
 
   return "\e[97m" # default bright white so tokens are visibly styled
 
-proc tokenToAscii*(lexer: SweetLexer, tok: SweetTokenRange, useColor = true): string =
+proc tokenToAscii*(lexer: SweetLexer, tok: Token, useColor = true): string =
   let lexeme = lexer.getLexeme(tok.start, tok.stop)
   if not useColor:
     return lexeme

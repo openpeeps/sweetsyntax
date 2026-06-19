@@ -1,0 +1,221 @@
+name: JavaScript
+extension: 
+  - js
+  - jsx
+  - ts
+  - tsx
+
+inline_comment: '//'
+block_comment:
+  - '/*'
+  - '*/'
+
+symbols:
+  plus: '+'
+  minus: '-'
+  multiply: '*'
+  divide: '/'
+  modulo: '%'
+  assign: '='
+  eq: '=='
+  eqStrict: '==='
+  ne: '!='
+  dne: '!!'
+  neStrict: '!=='
+  or: '||'
+  gt: '>'
+  gte: '>='
+  lt: '<'
+  lte: '<='
+  tilde: '~'
+  hash: '#'
+  pipe: '|'
+  and: '&'
+  andand: '&&'
+  andeq: '&='
+  not: '!'
+  parl: '('
+  parr: ')'
+  sqbl: '['
+  sqbr: ']'
+  curl: '{'
+  curr: '}'
+  squote: "'"
+  quote: '\"'
+  colon: ':'
+  scolon: ';'
+  question: '?'
+  comma: ','
+  dot: '.'
+
+identifiers:
+  await: "await" 
+  bool: "true"
+  break: "break"
+  case: "case"
+  catch: "catch"
+  class: "class"
+  const: "const"
+  continue: "continue"
+  debugger: "debugger"
+  default: "default"
+  delete: "delete"
+  do: "do"
+  echo: "echo"
+  else: "else"
+  export: "export"
+  extends: "extends"
+  finally: "finally"
+  for: "for"
+  from: "from"
+  function: "function"
+  if: "if"
+  import: "import"
+  in: "in"
+  instanceof: "instanceof"
+  implements: "implements"
+  let: "let"
+  new: "new"
+  public: "public"
+  protected: "protected"
+  private: "private"
+  return: "return"
+  super: "super"
+  switch: "switch"
+  this: "this"
+  throw: "throw"
+  try: "try"
+  typeof: "typeof"
+  var: "var"
+  void: "void"
+  while: "while"
+  with: "with"
+  yield: "yield"
+  true: "true"
+  false: "false"
+
+blocks:
+  open: "{"
+  close: "}"
+
+features:
+  regex_literals: true
+  async_await: true
+  generators: true
+  arrow_functions: true
+  template_literals: true
+  labeled_statements: true
+
+operators:
+  prefix:
+    - tokens: ["+", "-", "!", "~", "++", "--"]
+    - tokens: ["typeof", "void", "delete"]
+      is_keyword: true
+    - tokens: ["..."]
+      handler: spread       # hint for the parser
+
+  postfix:
+    - tokens: ["++", "--"]
+
+  infix:
+    - precedence: 1
+      tokens: ["??"]
+    - precedence: 2
+      tokens: ["||"]
+    - precedence: 3
+      tokens: ["&&"]
+    - precedence: 4
+      tokens: ["|"]
+    - precedence: 5
+      tokens: ["^"]
+    - precedence: 6
+      tokens: ["&"]
+    - precedence: 7
+      tokens: ["==", "!=", "===", "!=="]
+    - precedence: 8
+      tokens: ["<", ">", "<=", ">="]
+      keywords: ["instanceof", "in"]
+    - precedence: 9
+      tokens: ["<<", ">>", ">>>"]
+    - precedence: 10
+      tokens: ["+", "-"]
+    - precedence: 11
+      tokens: ["*", "/", "%"]
+    - precedence: 12
+      tokens: ["**"]
+      assoc: right
+    - precedence: 14
+      tokens: ["."]
+      handler: dot
+    - precedence: 14
+      tokens: ["["]
+      handler: bracket
+    - precedence: 15
+      tokens: ["("]
+      handler: call
+
+  assignment:
+    tokens: ["=", "+=", "-=", "*=", "/=", "%=", "**=",
+             "&=", "|=", "^=", "<<=", ">>=", ">>>=",
+             "&&=", "||=", "??="]
+
+  ternary:
+    token: "?"
+    separator: ":"
+    precedence: 1
+
+statements:
+  var_decl:
+    keywords: ["var", "let", "const"]
+    handler: declarator
+  function_decl:
+    keyword: "function"
+    handler: function
+  if_stmt:
+    keyword: "if"
+    handler: conditional
+  while_stmt:
+    keyword: "while"
+    handler: loop
+  do_while_stmt:
+    keyword: "do"
+    handler: do_loop
+  for_stmt:
+    keyword: "for"
+    handler: for_loop
+  return_stmt:
+    keyword: "return"
+    handler: return
+  throw_stmt:
+    keyword: "throw"
+    handler: throw
+  break_stmt:
+    keyword: "break"
+    handler: break
+  continue_stmt:
+    keyword: "continue"
+    handler: continue
+  try_stmt:
+    keyword: "try"
+    handler: try_catch
+  switch_stmt:
+    keyword: "switch"
+    handler: switch
+  class_decl:
+    keyword: "class"
+    handler: class
+  import_stmt:
+    keyword: "import"
+    handler: import
+  export_stmt:
+    keyword: "export"
+    handler: export
+
+  expect_regex_after:
+    tokens: ["=", "+=", "-=", "*=", "/=", "%=",
+             "(", "[", "{", ",", ";", ":",
+             "!", "~", "&&", "||", "??", "?", "=>"]
+    keywords: ["return", "typeof", "instanceof",
+               "delete", "void", "throw", "new",
+               "case", "in", "of", "yield", "await",
+               "var", "let", "const"]

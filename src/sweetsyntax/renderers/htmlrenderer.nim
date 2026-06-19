@@ -14,7 +14,7 @@ import ../sweetlexer
 proc htmlEscape(s: string): string =
   result = s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
 
-proc tokenToHtml*(lexer: var SweetLexer, tok: SweetTokenRange): string =
+proc tokenToHtml*(lexer: var SweetLexer, tok: Token): string =
   let lexeme = lexer.getLexeme(tok.start, tok.stop)
   let kindClass = $tok.kind
   let attrClasses = tok.attr.join(" ")

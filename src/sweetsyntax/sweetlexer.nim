@@ -4,6 +4,10 @@
 #          Made by Humans from OpenPeeps
 #          https://github.com/openpeeps/sweetsyntax
 
+## This module implements a generic lexer for tokenizing source code based on a syntax specification.
+## The lexer supports various token kinds, including identifiers, literals, punctuation, comments, and regexes.
+## It also allows for user-defined attributes and filters to enhance token classification.
+
 import std/[strutils, memfiles, tables, algorithm, options]
 import pkg/openparser/regex
 
@@ -16,11 +20,16 @@ type
     tkIdentifier = "ident"
     tkInt = "int"
     tkFloat = "float"
+    tkHex         ## hex literal: 0xFF
+    tkOctal       ## octal literal: 0o777
+    tkBinary      ## binary literal: 0b1010
+    tkBigInt      ## bigint literal: 42n, 0xFFn
     tkChar = "char"
     tkString = "string"
     tkPunct = "punct"
     tkComment = "comment"
     tkDocComment = "doc_comment"
+    tkRegex = "regex"
 
   FilterHit = object
     start, stop: int  # stop is exclusive
@@ -42,6 +51,7 @@ type
     filtersReady: bool
     filterHits: seq[FilterHit]
     filterScanIdx: int
+    expectRegex*: bool
 
   Token* = ref object
     ## Represents a token with its kind, position, and
@@ -53,6 +63,8 @@ type
       # Optional, user-defined attributes for this token, e.g. keyword type or operator name
 
   SweetLexerError* = object of CatchableError
+    ## Represents an error that can occur during lexing,
+    ## such as invalid UTF-8 sequences or unterminated strings
 
 proc charAt(l: SweetLexer, idx: int): char {.inline.} =
   # Returns the character at the given index, or '\0' if out of bounds
@@ -90,7 +102,7 @@ proc isDelimiterPunct(c: char): bool {.inline.} =
 
 proc isOperatorPunct(c: char): bool {.inline.} =
   # Common operator characters, this can be customized per language if needed
-  c in {':','.','?','~','+','-','*','/','%','<','>','=','!','&','|','^','#'}
+  c in {':','.','?','~','+','-','*','/','%','<','>','=','!','&','|','^','#', '\\'}
 
 proc isAnyPunct(c: char): bool {.inline.} =
   # Delimiter and operator punctuation are often treated differently in languages
@@ -330,6 +342,8 @@ proc makeRange(l: SweetLexer, k: SweetTokenKind, startPos, startLine, startCol: 
     let symAttr = lookupAttrByLexeme(l.spec.symbols, lexeme)
     if symAttr.len > 0:
       result.attr.addAttrOnce(symAttr)
+  # elif k == tkRegex:
+    # echo "Matched regex: '", lexeme, "' at line ", startLine, " col ", startCol
 
   l.applyFilterAttrs(result)
 
@@ -341,6 +355,28 @@ proc getToken*(l: var SweetLexer): Token =
   let startPos = l.pos
   let startLine = l.line
   let startCol = l.col
+
+
+  # Skip open tags (e.g. `<?php`) — transparently consumed
+  if l.spec.open_tag.isSome and l.current == l.spec.open_tag.get[0]:
+    let tag = l.spec.open_tag.get
+    var matches = true
+    for i in 0 ..< tag.len:
+      if l.charAt(l.pos + i) != tag[i]: matches = false; break
+    if matches:
+      for i in 0 ..< tag.len: discard l.advance()
+      l.skipWhitespace()
+      return l.getToken() # recurse — parser only sees the real tokens
+
+  # Close tags (e.g. `?>`) — treat as EOF
+  if l.spec.close_tag.isSome and l.current == l.spec.close_tag.get[0]:
+    let tag = l.spec.close_tag.get
+    var matches = true
+    for i in 0 ..< tag.len:
+      if l.charAt(l.pos + i) != tag[i]: matches = false; break
+    if matches:
+      return Token(kind: tkEOF, line: startLine, col: startCol,
+                   pos: startPos, start: startPos, stop: startPos)
 
   if l.current == '\0':
     return Token(kind: tkEOF, line: startLine, col: startCol, pos: startPos, start: startPos, stop: startPos)
@@ -359,22 +395,73 @@ proc getToken*(l: var SweetLexer): Token =
         break
     return l.makeRange(tkIdentifier, startPos, startLine, startCol)
 
-  if l.current.isDigit:
-    var isFloat = false
-    while l.current.isDigit: discard l.advance()
-    if l.current == '.' and l.peek().isDigit:
-      isFloat = true
+  # numbers
+  if l.current.isDigit() or (l.current == '.' and l.peek().isDigit()):
+    let startPos = l.pos
+    let startLine = l.line
+    let startCol = l.col
+
+    if l.current == '0':
       discard l.advance()
-      while l.current.isDigit: discard l.advance()
-    if l.current in {'e', 'E'}:
-      let p = l.peek()
-      let p2 = l.peek(2)
-      if p.isDigit or ((p == '+' or p == '-') and p2.isDigit):
-        isFloat = true
+      case l.current
+      of 'x', 'X':
         discard l.advance()
-        if l.current == '+' or l.current == '-': discard l.advance()
-        while l.current.isDigit: discard l.advance()
-    return l.makeRange(if isFloat: tkFloat else: tkInt, startPos, startLine, startCol)
+        while l.current in {'0'..'9', 'a'..'f', 'A'..'F', '_'}:
+          discard l.advance()
+        let isBigInt = l.current == 'n'
+        if isBigInt: discard l.advance()
+        return l.makeRange(
+          if isBigInt: tkBigInt else: tkHex,
+          startPos, startLine, startCol)
+      of 'o', 'O':
+        discard l.advance()
+        while l.current in {'0'..'7', '_'}:
+          discard l.advance()
+        let isBigInt = l.current == 'n'
+        if isBigInt: discard l.advance()
+        return l.makeRange(
+          if isBigInt: tkBigInt else: tkOctal,
+          startPos, startLine, startCol)
+      of 'b', 'B':
+        discard l.advance()
+        while l.current in {'0', '1', '_'}:
+          discard l.advance()
+        let isBigInt = l.current == 'n'
+        if isBigInt: discard l.advance()
+        return l.makeRange(
+          if isBigInt: tkBigInt else: tkBinary,
+          startPos, startLine, startCol)
+      else:
+        discard # fall through to decimal scanning
+
+    # decimal integer or float
+    while l.current.isDigit() or l.current == '_':
+      discard l.advance()
+
+    var isFloat = false
+    # fractional part
+    if l.current == '.' and l.peek().isDigit():
+      isFloat = true
+      discard l.advance() # consume '.'
+      while l.current.isDigit() or l.current == '_':
+        discard l.advance()
+
+    # exponent
+    if l.current in {'e', 'E'}:
+      isFloat = true
+      discard l.advance() # consume 'e'/'E'
+      if l.current in {'+', '-'}:
+        discard l.advance()
+      while l.current.isDigit():
+        discard l.advance()
+
+    # BigInt suffix
+    if l.current == 'n':
+      discard l.advance()
+
+    return l.makeRange(
+      if isFloat: tkFloat else: tkInt,
+      startPos, startLine, startCol)
 
   if l.current == '"' or l.current == '\'':
     let quote = l.current
@@ -461,19 +548,69 @@ proc getToken*(l: var SweetLexer): Token =
         
         return l.makeRange(tkComment, commentStart, startLine, startCol)
 
+  # Template literals (backtick strings)
+  if l.current == '`':
+    discard l.advance() # consume opening '`'
+    while l.current != '\0':
+      if l.current == '\\':
+        discard l.advance() # consume '\'
+        if l.current != '\0': discard l.advance() # consume escaped char
+      elif l.current == '`':
+        discard l.advance() # consume closing '`'
+        break
+      elif l.current == '$' and l.peek() == '{':
+        # template expression ${...} — consume as part of the string token
+        # for now treat the whole template literal as one string token
+        discard l.advance() # '$'
+        discard l.advance() # '{'
+        var depth = 1
+        while l.current != '\0' and depth > 0:
+          if l.current == '{': inc depth
+          elif l.current == '}': dec depth
+          discard l.advance()
+      else:
+        discard l.advance()
+    return l.makeRange(tkString, startPos, startLine, startCol)
+
   # Check for punctuation
   if isDelimiterPunct(l.current):
     discard l.advance()
     return l.makeRange(tkPunct, startPos, startLine, startCol)
 
   if isOperatorPunct(l.current):
+    if l.current == '/':
+      # Only treat as regex when the parser explicitly signals it.
+      # Otherwise fall through to normal operator scanning (division).
+      if l.expectRegex:
+        l.expectRegex = false  # consume the hint
+        discard l.advance() # consume opening '/'
+        var inCharClass = false
+        while l.current != '\0':
+          if l.current == '\\':
+            discard l.advance()
+            if l.current != '\0': discard l.advance()
+          elif l.current == '[' and not inCharClass:
+            inCharClass = true
+            discard l.advance()
+          elif l.current == ']' and inCharClass:
+            inCharClass = false
+            discard l.advance()
+          elif l.current == '/' and not inCharClass:
+            discard l.advance()
+            while l.current in {'g', 'i', 'm', 's', 'u', 'v', 'y', 'd'}:
+              discard l.advance()
+            break
+          elif l.current in {'\n', '\r'}:
+            break
+          else:
+            discard l.advance()
+        return l.makeRange(tkRegex, startPos, startLine, startCol)
+      # else: fall through to normal operator scanning below
+
+    # Normal operator scanning (handles /=, /, >=, etc.)
     while isOperatorPunct(l.current):
       discard l.advance()
     return l.makeRange(tkPunct, startPos, startLine, startCol)
-
-  # Fallback: consume one UTF-8 char so lexer never stalls or returns nil
-  discard l.advanceUtf8Char()
-  return l.makeRange(tkPunct, startPos, startLine, startCol)
 
 proc initLexerFromFile*(spec: SweetSpec, path: string, enableFilters: bool = false): SweetLexer =
   ## Initialize lexer from a file using memfiles for efficient access.
