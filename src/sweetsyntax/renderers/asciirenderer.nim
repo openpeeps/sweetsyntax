@@ -1,6 +1,7 @@
-# A generic syntax highlighter
+# A powerful generic parser and AST explorer for analyzing
+# programming languages!
 #
-# (c) 2025 George Lemon | LGPL-v3 License
+# (c) 2026 George Lemon | LGPL-v3 License
 #          Made by Humans from OpenPeeps
 #          https://github.com/openpeeps/sweetsyntax
 

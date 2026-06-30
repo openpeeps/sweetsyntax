@@ -1,8 +1,9 @@
-# A high-performance generic parser driven by YAML syntax specifications.
+# A powerful generic parser and AST explorer for analyzing
+# programming languages!
 #
-#   (c) 2026 George Lemon | LGPL-v3 License
-#       Made by Humans from OpenPeeps
-#       https://github.com/openpeeps/openast
+# (c) 2026 George Lemon | LGPL-v3 License
+#          Made by Humans from OpenPeeps
+#          https://github.com/openpeeps/sweetsyntax
 
 ## This module implements a Pratt parser that can be configured via a YAML specification.
 ## The specification defines the syntax of a language, including operator precedence,

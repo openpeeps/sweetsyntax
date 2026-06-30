@@ -1,3 +1,10 @@
+# A powerful generic parser and AST explorer for analyzing
+# programming languages!
+#
+# (c) 2026 George Lemon | LGPL-v3 License
+#          Made by Humans from OpenPeeps
+#          https://github.com/openpeeps/sweetsyntax
+
 import std/[tables, strutils]
 import pkg/sweetsyntax/[config, sweetlexer]
 

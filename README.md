@@ -13,10 +13,14 @@
 </p>
 
 ## 😍 Key Features
-- Fast and efficient syntax highlighting engine
-- Generic Syntax highlighter for any language
-- HTML renderer for ready-to-use syntax-highlighted code snippets
+- Fast, compiled and efficient ([check benchmarks section](#benchmarks))
+- Generic parser & AST explorer
+- **Embeddable in other languages** via FFI — Lua, JavaScript (N-API), Ruby, Python, PHP
 - Easy-to-use API for integration into various applications
+- Built-in syntax support for: C, Crystal, D lang, Go, JavaScript, Nim, PHP, Python, Ruby, and Rust
+- Zero-copy parsing using MemFiles
+- **Context-aware error** reporting while parsing
+- Written in Nim
 
 ## What's this for?
 SweetSyntax is a powerful and flexible generic parser and AST explorer for analyzing programming languages! It is designed to be integrated into other applications, such as code editors, documentation generators, linting tools and other sweet things!
@@ -27,7 +31,6 @@ Key capabilities:
 - **Lexer**: Generic tokenizer handling identifiers, literals (int, float, hex, octal, binary, bigint, string, regex), comments, and operators
 - **Parser**: Pratt (precedence-climbing) parser with configurable operator precedence and associativity
 - **AST**: Typed node tree with support for statements, expressions, infix/prefix/postfix operations, function declarations, and more
-- **Renderers**: Built-in ASCII and HTML renderers for syntax-highlighted output
 - **YAML-driven**: Language syntaxes are pure YAML — no code changes needed to add a new language
 
 ### Embeddable SweetSyntax
@@ -74,12 +77,6 @@ proc myHandlers(p: var GenericParser) =
 
 let program = parseScript("file.ext", myHandlers,
   features = {featAsync, featArrowFn})
-```
-
-### Rendering to HTML
-
-```nim
-let html = renderHtml(program)
 ```
 
 ### Benchmarks

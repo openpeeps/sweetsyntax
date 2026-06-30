@@ -1,32 +1,22 @@
-# A generic syntax highlighter
+# A powerful generic parser and AST explorer for analyzing
+# programming languages!
 #
-# (c) 2025 George Lemon | LGPL-v3 License
+# (c) 2026 George Lemon | LGPL-v3 License
 #          Made by Humans from OpenPeeps
 #          https://github.com/openpeeps/sweetsyntax
 
-import std/tables
-import ./sweetsyntax/[config, sweetlexer]
+## SweetSyntax is a powerful YAML-based generic parser and AST explorer for analyzing
+## programming languages.
+## 
+## Written in Nim, it provides a flexible foundation for building high-level parsers,
+## syntax highlighters, domain-specific languages, bundlers, minifiers, obfuscators, linters,
+## or any sweet tool that requires a structured representation of source code.
 
-export config, sweetlexer
+import std/[tables, strutils]
+import ./sweetsyntax/[config, sweetlexer]
+import ./sweetsyntax/engine/[ast, parser]
 
 when isMainModule:
-  import std/[strformat, strutils]
-  # example tokenizing javascript
-  let jsSyntax = getKnownSyntax(KnownSyntax.js)
-  # let jsCode = """var x = 10;"""
-  let jsCode = readFile("./react.development.js")
-  var lexer = initLexer(jsSyntax.spec, jsCode)
-  var defs: seq[tuple[kind: SweetTokenKind, ident: string, value: string, line: int, col: int]] = @[]
-  while true:
-    let token = lexer.getToken()
-    if token.kind == tkEOF:
-      break
-    let val = lexer.getTokenValue(token)
-    if token.kind == tkPunct and jsSyntax.spec.symbols.hasKey(val):
-      defs.add((token.kind, jsSyntax.spec.symbols[val], val, token.line, token.col))
-    else:
-      if jsSyntax.spec.identifiers.hasKey(val):
-        defs.add((token.kind, jsSyntax.spec.identifiers[val], val, token.line, token.col))
-      else:
-        defs.add((token.kind, "", val, token.line, token.col))
-  # echo defs
+  import pkg/openparser/json
+  include ./sweetsyntax/languages/js
+  discard parseJavaScript("d3.js")

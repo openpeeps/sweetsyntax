@@ -3,11 +3,6 @@
 #       Made by Humans from OpenPeeps
 #       https://github.com/openpeeps/openast
 
-## This module defines the core data structures and types for representing an 
-## abstract syntax tree (AST) in a generic way. It provides a flexible foundation for
-## building parsers, syntax analyzers for various programming languages or domain-specific languages,
-## bundlers, minifiers, obfuscators, linters, or any tool that requires a structured representation of source code.
-
 import std/sequtils
 import ../tokenizer
 
