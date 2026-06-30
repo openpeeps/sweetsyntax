@@ -1,6 +1,6 @@
 <p align="center">
   <img src="https://raw.githubusercontent.com/openpeeps/sweetsyntax/main/.github/sweetsyntax.png" alt="SweetSyntax - Generic parser, AST explorer and analyzer" width="120px" height="120px"><br>
-  A generic parser, AST explorer and analyzer
+  SweetSyntax 🍭 A generic parser and AST explorer for analyzing programming languages 
 </p>
 
 <p align="center">
@@ -34,7 +34,7 @@ Key capabilities:
 - **YAML-driven**: Language syntaxes are pure YAML, allowing for custom statement handlers
 
 ### Embeddable SweetSyntax
-SweetSyntax is written in Nim, and thanks to Nim's versatile compilation model, can be embedded natively into a wide range of host languages
+SweetSyntax is written in Nim, and thanks to Nim's versatile compilation model, can be embedded natively into a wide range of host languages. This is WIP via https://github.com/openpeeps/clue toolkit
 
 | Language | Integration |
 |----------|------------|

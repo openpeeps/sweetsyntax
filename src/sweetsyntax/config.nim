@@ -119,6 +119,8 @@ type
       ## whether the language supports template literals (e.g. `template ${expr}` in JavaScript)
     labeledStatements*: bool
       ## whether the language supports labeled statements (e.g. label: statement in JavaScript)
+    commandSyntax*: bool
+      ## whether the language supports command call syntax (e.g. Nim's `command arg1, arg2:`)
 
   LanguageFeature* = enum
     featRegex = "regex_literals"
@@ -127,6 +129,7 @@ type
     featArrowFn = "arrow_functions"
     featTemplateLit = "template_literals"
     featLabeledStmt = "labeled_statements"
+    featCommandSyntax = "command_syntax"
 
   SweetSpec* = ref object
     name*: string
@@ -249,6 +252,20 @@ proc parseHook*(p: var YamlParser, v: var PrefixGroup) =
     of "is_keyword": p.parseHook(v.isKeyword)   # ← this mapping
     of "handler":    p.parseHook(v.handler)
     else: discard  
+
+proc parseHook*(p: var YamlParser, v: var FeaturesSpec) =
+  ## Parse a YAML mapping into FeaturesSpec
+  if v.isNil: v = FeaturesSpec()
+  parseYamlMappingPairs do:
+    case key
+    of "regex_literals":      p.parseHook(v.regexLiterals)
+    of "async_await":         p.parseHook(v.asyncAwait)
+    of "generators":          p.parseHook(v.generators)
+    of "arrow_functions":     p.parseHook(v.arrowFunctions)
+    of "template_literals":   p.parseHook(v.templateLiterals)
+    of "labeled_statements":  p.parseHook(v.labeledStatements)
+    of "command_syntax":      p.parseHook(v.commandSyntax)
+    else: discard
 
 proc parseHook*(p: var YamlParser, v: var StatementSpec) =
   ## Parse a YAML mapping into StatementSpec, which may include a

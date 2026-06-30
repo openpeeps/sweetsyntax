@@ -118,10 +118,10 @@ identifiers:
   shl: "shl"
   shr: "shr"
   static: "static"
+  type: "type"
   template: "template"
   try: "try"
   tuple: "tuple"
-  type: "type"
   var: "var"
   when: "when"
   while: "while"
@@ -148,10 +148,11 @@ features:
   arrow_functions: false
   template_literals: false
   labeled_statements: false
+  command_syntax: true
 
 operators:
   prefix:
-    - tokens: ["+", "-", "~"]
+    - tokens: ["+", "-", "~", "@", "^", "?"]
     - tokens: ["not"]
       is_keyword: true
     - tokens: ["sizeof", "typeof", "addr", "spawn", "await"]
@@ -170,7 +171,7 @@ operators:
       tokens: ["==", "!=", "<", "<=", ">", ">="]
       keywords: ["in", "notin", "is", "isnot", "of"]
     - precedence: 4
-      tokens: ["..", "..<"]
+      tokens: ["..", "..<", "..^"]
     - precedence: 5
       tokens: ["&"]
     - precedence: 6
@@ -200,12 +201,6 @@ operators:
 statements:
   if_stmt:
     keyword: "if"
-    handler: conditional
-  elif_stmt:
-    keyword: "elif"
-    handler: conditional
-  else_stmt:
-    keyword: "else"
     handler: conditional
   when_stmt:
     keyword: "when"
@@ -290,7 +285,7 @@ statements:
     handler: declarator
   type_decl:
     keyword: "type"
-    handler: type
+    handler: type_handler
   static_stmt:
     keyword: "static"
     handler: declarator

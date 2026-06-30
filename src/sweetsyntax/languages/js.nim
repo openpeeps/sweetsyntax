@@ -9,7 +9,7 @@ import std/[tables, strutils]
 import ../[config, sweetlexer]
 import ../engine/[ast, parser]
 
-proc jsHandlers(p: var GenericParser) =
+proc jsHandlers*(p: var GenericParser) =
   # Register Nim-specific statement handlers.
 
   template expectSemiColonNewLine() =
@@ -735,6 +735,8 @@ proc jsHandlers(p: var GenericParser) =
     ## end — explicit block terminator (Nim optional style)
     walk p # consume 'end'
     result = newEmptyNode()
+
+  p.braceHandler = parseObjectLiteral
 
 proc parseJavaScript*(path: string): OpenAstProgram =
   ## Parse a JavaScript file

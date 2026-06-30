@@ -113,11 +113,11 @@ proc getContext*(l: SweetLexer, posOverride: int = -1, maxContext: int = 80): st
 
 proc isDelimiterPunct(c: char): bool {.inline.} =
   # Common delimiter punctuation characters, this can be customized per language if needed
-  c in {'{','}','(',')','[',']',',',';',':'}
+  c in {'{','}','(',')','[',']',',',';',':','#'}
 
 proc isOperatorPunct(c: char): bool {.inline.} =
   # Common operator characters, this can be customized per language if needed
-  c in {'.','?','~','+','-','*','/','%','<','>','=','!','&','|','^','#', '\\'}
+  c in {'.','?','~','+','-','*','/','%','<','>','=','!','&','|','^','\\', '@'}
 
 proc isAnyPunct(c: char): bool {.inline.} =
   # Delimiter and operator punctuation are often treated differently in languages
@@ -474,6 +474,12 @@ proc getToken*(l: var SweetLexer): Token =
     if l.current == 'n':
       discard l.advance()
 
+    # Nim type suffix like 0'i32, 1'u64, etc.
+    if l.current == '\'':
+      discard l.advance()
+      while l.current.isIdentPart():
+        discard l.advance()
+
     return l.makeRange(
       if isFloat: tkFloat else: tkInt,
       startPos, startLine, startCol)
@@ -481,6 +487,12 @@ proc getToken*(l: var SweetLexer): Token =
   if l.current == '"' or l.current == '\'':
     let quote = l.current
     discard l.advance()
+    # Check for triple-quoted string """"""
+    var isTriple = false
+    if quote == '"' and l.current == '"' and l.peek() == '"':
+      isTriple = true
+      discard l.advance() # consume second "
+      discard l.advance() # consume third "
     var escaped = false
     while l.current != '\0':
       if escaped:
@@ -491,7 +503,13 @@ proc getToken*(l: var SweetLexer): Token =
         escaped = true
         discard l.advance()
         continue
-      if l.current == quote:
+      if isTriple:
+        if l.current == '"' and l.peek() == '"' and l.charAt(l.pos + 2) == '"':
+          discard l.advance() # consume first "
+          discard l.advance() # consume second "
+          discard l.advance() # consume third "
+          return l.makeRange(tkString, startPos, startLine, startCol)
+      elif l.current == quote:
         discard l.advance()
         return l.makeRange(tkString, startPos, startLine, startCol)
       discard l.advance()
@@ -541,7 +559,7 @@ proc getToken*(l: var SweetLexer): Token =
         commentStart, startLine, startCol
       )
 
-  # Check for inline comments (must come before operator check!)
+  # Check for inline comments
   if l.spec.inlineComment.isSome():
     let commentSyntax = l.spec.inlineComment.get()
     if commentSyntax.len > 0 and l.current == commentSyntax[0]:
