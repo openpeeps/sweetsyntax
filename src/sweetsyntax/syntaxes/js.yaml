@@ -47,6 +47,8 @@ symbols:
   question: '?'
   comma: ','
   dot: '.'
+  ellipsis: '...'
+  arrow: '=>'
 
 identifiers:
   await: "await" 
@@ -108,8 +110,8 @@ features:
 
 operators:
   prefix:
-    - tokens: ["+", "-", "!", "~", "++", "--"]
-    - tokens: ["typeof", "void", "delete"]
+    - tokens: ["+", "-", "!", "!!", "~", "++", "--"]
+    - tokens: ["typeof", "void", "delete", "new"]
       is_keyword: true
     - tokens: ["..."]
       handler: spread       # hint for the parser

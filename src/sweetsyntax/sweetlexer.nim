@@ -71,8 +71,9 @@ proc charAt(l: SweetLexer, idx: int): char {.inline.} =
   if idx < 0 or idx >= l.len: return '\0'
   if l.data != nil: l.data[idx] else: l.input[idx]
 
-proc getContext*(l: SweetLexer, posOverride: int = -1): string =
-  # Show the full current line and place caret at exact token position.
+proc getContext*(l: SweetLexer, posOverride: int = -1, maxContext: int = 80): string =
+  ## Show a window around the error position, capped to `maxContext` chars on each side.
+  ## Prevents dumping entire minified files on error.
   let rawPos = if posOverride >= 0: posOverride else: l.pos
   let atPos = max(0, min(rawPos, l.len))
 
@@ -84,25 +85,38 @@ proc getContext*(l: SweetLexer, posOverride: int = -1): string =
   while lineEnd < l.len and l.charAt(lineEnd) notin {'\n', '\r'}:
     inc lineEnd
 
+  # Cap the window around the error position
+  let windowStart = max(lineStart, atPos - maxContext)
+  let windowEnd = min(lineEnd, atPos + maxContext)
+
   var snippet: string
   if l.input.len > 0:
-    snippet = l.input[lineStart ..< lineEnd]
+    snippet = l.input[windowStart ..< windowEnd]
   else:
-    snippet = newStringOfCap(max(0, lineEnd - lineStart))
-    for i in lineStart ..< lineEnd:
+    snippet = newStringOfCap(max(0, windowEnd - windowStart))
+    for i in windowStart ..< windowEnd:
       snippet.add(l.charAt(i))
 
-  let markerPos = max(0, min(snippet.len, atPos - lineStart))
-  result = snippet & "\n" & " ".repeat(markerPos) & "^"
+  let markerPos = max(0, min(snippet.len, atPos - windowStart))
+
+  # Add ellipsis if we truncated
+  var prefix = ""
+  var suffix = ""
+  if windowStart > lineStart:
+    prefix = "... "
+  if windowEnd < lineEnd:
+    suffix = " ..."
+
+  result = prefix & snippet & suffix & "\n" & " ".repeat(prefix.len + markerPos) & "^"
 
 
 proc isDelimiterPunct(c: char): bool {.inline.} =
   # Common delimiter punctuation characters, this can be customized per language if needed
-  c in {'{','}','(',')','[',']',',',';'}
+  c in {'{','}','(',')','[',']',',',';',':'}
 
 proc isOperatorPunct(c: char): bool {.inline.} =
   # Common operator characters, this can be customized per language if needed
-  c in {':','.','?','~','+','-','*','/','%','<','>','=','!','&','|','^','#', '\\'}
+  c in {'.','?','~','+','-','*','/','%','<','>','=','!','&','|','^','#', '\\'}
 
 proc isAnyPunct(c: char): bool {.inline.} =
   # Delimiter and operator punctuation are often treated differently in languages
@@ -608,7 +622,40 @@ proc getToken*(l: var SweetLexer): Token =
       # else: fall through to normal operator scanning below
 
     # Normal operator scanning (handles /=, /, >=, etc.)
+    var opAccum = newStringOfCap(8)
     while isOperatorPunct(l.current):
+      let nextCh = l.current
+      # First character is always consumed; subsequent chars checked against known operators
+      if opAccum.len > 0:
+        let candidate = opAccum & nextCh
+        var found = false
+        for sym in l.spec.symbols.keys:
+          if sym.startsWith(candidate):
+            found = true
+            break
+        if not found and l.spec.operators != nil:
+          for g in l.spec.operators.prefix:
+            for tok in g.tokens:
+              if tok.startsWith(candidate):
+                found = true; break
+            if found: break
+          if not found:
+            for g in l.spec.operators.infix:
+              for tok in g.tokens:
+                if tok.startsWith(candidate):
+                  found = true; break
+              if found: break
+          if not found and l.spec.operators.assignment != nil:
+            for tok in l.spec.operators.assignment.tokens:
+              if tok.startsWith(candidate):
+                found = true; break
+          if not found and l.spec.operators.ternary != nil:
+            if l.spec.operators.ternary.token.startsWith(candidate):
+              found = true
+        # Also allow `=>` (arrow function) which is handled at the parser level
+        if not found and candidate != "=>":
+          break
+      opAccum.add(nextCh)
       discard l.advance()
     return l.makeRange(tkPunct, startPos, startLine, startCol)
 
