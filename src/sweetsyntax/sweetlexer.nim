@@ -581,29 +581,38 @@ proc getToken*(l: var SweetLexer): Token =
         
         return l.makeRange(tkComment, commentStart, startLine, startCol)
 
-  # Template literals (backtick strings)
+  # Backtick-quoted identifiers (Nim) or template literals (JS)
   if l.current == '`':
-    discard l.advance() # consume opening '`'
-    while l.current != '\0':
-      if l.current == '\\':
-        discard l.advance() # consume '\'
-        if l.current != '\0': discard l.advance() # consume escaped char
-      elif l.current == '`':
-        discard l.advance() # consume closing '`'
-        break
-      elif l.current == '$' and l.peek() == '{':
-        # template expression ${...} — consume as part of the string token
-        # for now treat the whole template literal as one string token
-        discard l.advance() # '$'
-        discard l.advance() # '{'
-        var depth = 1
-        while l.current != '\0' and depth > 0:
-          if l.current == '{': inc depth
-          elif l.current == '}': dec depth
+    # Check if this is a template literal language
+    let isTemplateLit = l.spec.features != nil and l.spec.features.templateLiterals
+    if isTemplateLit:
+      discard l.advance() # consume opening '`'
+      while l.current != '\0':
+        if l.current == '\\':
+          discard l.advance() # consume '\'
+          if l.current != '\0': discard l.advance() # consume escaped char
+        elif l.current == '`':
+          discard l.advance() # consume closing '`'
+          break
+        elif l.current == '$' and l.peek() == '{':
+          discard l.advance() # '$'
+          discard l.advance() # '{'
+          var depth = 1
+          while l.current != '\0' and depth > 0:
+            if l.current == '{': inc depth
+            elif l.current == '}': dec depth
+            discard l.advance()
+        else:
           discard l.advance()
-      else:
+      return l.makeRange(tkString, startPos, startLine, startCol)
+    else:
+      # Nim backtick-quoted identifier: `+`, `<-`, etc.
+      discard l.advance() # consume opening '`'
+      while l.current != '\0' and l.current != '`':
         discard l.advance()
-    return l.makeRange(tkString, startPos, startLine, startCol)
+      if l.current == '`':
+        discard l.advance() # consume closing '`'
+      return l.makeRange(tkIdentifier, startPos, startLine, startCol)
 
   # Check for punctuation
   if isDelimiterPunct(l.current):

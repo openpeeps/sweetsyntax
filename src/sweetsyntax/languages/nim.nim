@@ -155,9 +155,15 @@ proc nimHandlers*(p: var GenericParser) =
     let condCol = p.prev.col
     var children: seq[Node]
     if p.curr.kind == tkPunct and p.curr.value == "(":
-      walk p
-      children.add(parseExpression(p))
-      p.expectWalk(")")
+      children.add(parseGroupExpr(p))
+      # Continue parsing infix operators after `)` (e.g., `(a) != 0`)
+      if p.curr.kind in {tkPunct, tkIdentifier}:
+        let op = p.curr.value
+        if (p.curr.kind == tkPunct and op in ["!=", "==", "<", "<=", ">", ">=", "and", "or", "xor"]) or
+           (p.curr.kind == tkIdentifier and op in ["in", "notin", "is", "isnot", "of", "and", "or", "xor"]):
+          walk p
+          children[^1] = Node(kind: nkInfix,
+            children: @[Node(kind: nkIdent, name: op), children[^1], parseExpression(p)])
     else:
       children.add(parseExpression(p, 1))
     let colonLine = p.curr.line
@@ -246,7 +252,6 @@ proc nimHandlers*(p: var GenericParser) =
     ##   else: body
     ## In brace mode: case (expr) { of (pat1) { body } else { body } }
     walk p # consume 'case'
-    # Use high minPrec to avoid consuming `of` as a binary infix operator
     let scrutinee = parseExpression(p, 6)
     result = Node(kind: nkStatement,
       children: @[Node(kind: nkIdent, name: "case"), scrutinee])
@@ -259,10 +264,10 @@ proc nimHandlers*(p: var GenericParser) =
           walk p
           let pattern = Node(kind: nkStatement)
           pattern.children.add(Node(kind: nkIdent, name: "of"))
-          pattern.children.add(parseExpression(p))
+          pattern.children.add(parseExpression(p, 6))
           while p.curr.kind == tkPunct and p.curr.value == ",":
             walk p
-            pattern.children.add(parseExpression(p))
+            pattern.children.add(parseExpression(p, 6))
           p.expectWalk(":")
           pattern.children.add(
             if p.curr.kind == tkPunct and p.curr.value == "{": parseBlock(p)
@@ -292,14 +297,12 @@ proc nimHandlers*(p: var GenericParser) =
         if isOf:
           let pattern = Node(kind: nkStatement)
           pattern.children.add(Node(kind: nkIdent, name: "of"))
-          pattern.children.add(parseExpression(p))
+          pattern.children.add(parseExpression(p, 6))
           while p.curr.kind == tkPunct and p.curr.value == ",":
             walk p
-            pattern.children.add(parseExpression(p))
+            pattern.children.add(parseExpression(p, 6))
           if p.curr.kind == tkPunct and p.curr.value == ":":
             walk p
-          # Temporarily remove `of` and `else` from infixTable to prevent
-          # them from being consumed as binary infix operators in case branch bodies
           var savedOf: Option[InfixEntry]
           var savedElse: Option[InfixEntry]
           if p.infixTable.hasKey("of"):
@@ -313,7 +316,7 @@ proc nimHandlers*(p: var GenericParser) =
             if p.curr.kind in {tkComment, tkDocComment}:
               body.children.add(parseCommentGeneric(p))
               continue
-            body.children.add(parseExpression(p, 0))
+            body.children.add(parseStatement(p))
           if savedOf.isSome: p.infixTable["of"] = savedOf.get
           if savedElse.isSome: p.infixTable["else"] = savedElse.get
           pattern.children.add(body)
@@ -334,7 +337,7 @@ proc nimHandlers*(p: var GenericParser) =
             if p.curr.kind in {tkComment, tkDocComment}:
               body.children.add(parseCommentGeneric(p))
               continue
-            body.children.add(parseExpression(p, 0))
+            body.children.add(parseStatement(p))
           if savedOf2.isSome: p.infixTable["of"] = savedOf2.get
           if savedElse2.isSome: p.infixTable["else"] = savedElse2.get
           let elseBranch = Node(kind: nkStatement)
@@ -397,8 +400,14 @@ proc nimHandlers*(p: var GenericParser) =
         lbl
       else:
         Node(kind: nkEmpty)
+    let blockCol = p.prev.col
+    let body =
+      if p.curr.kind == tkPunct and p.curr.value == "{": parseBlock(p)
+      elif p.curr.kind == tkPunct and p.curr.value == ":":
+        walk p; parseBlock(p, blockCol)
+      else: parseBlock(p, blockCol)
     result = Node(kind: nkStatement,
-      children: @[Node(kind: nkIdent, name: "block"), labelNode, parseBlock(p)])
+      children: @[Node(kind: nkIdent, name: "block"), labelNode, body])
 
   stmtHandler p, "import":
     ## import module/path, module2/path
@@ -479,6 +488,49 @@ proc nimHandlers*(p: var GenericParser) =
       p.walkOpt(",")
     p.expectWalk("}")
 
+  # Expression handlers
+  exprHandler p, "afterPrefix":
+    ## Nim export marker `*` after identifiers, and command call syntax
+    if lhs.kind != nkIdent:
+      return nil
+    # Export marker: `name*` (not followed by expression start)
+    if p.curr.kind == tkPunct and p.curr.value == "*" and
+       p.next.kind notin {tkIdentifier, tkInt, tkFloat, tkString, tkHex, tkOctal, tkBinary, tkBigInt} and
+       not (p.next.kind == tkPunct and p.next.value in ["(", "[", "{", "+", "-", "~", "!", "@", "^", "?"]):
+      result = Node(kind: nkPostfix,
+        children: @[lhs, Node(kind: nkIdent, name: "*")])
+      walk p
+      return
+    # Command call: `ident arg1, arg2: body` (must be on same line, not followed by comment)
+    # Exclude infix operators as command names (e.g., `of`/`else` in case branches)
+    # Exclude `:` as first arg — otherwise `x: int` in params is treated as a command call
+    if minPrec == 0 and
+       p.curr.kind notin {tkEOF, tkComment, tkDocComment} and
+       p.curr.line == p.prev.line and
+       not (p.curr.kind == tkPunct and p.curr.value != ":") and
+       not (p.curr.kind == tkPunct and p.curr.value == ":") and
+       not (p.curr.kind == tkIdentifier and p.infixTable.hasKey(p.curr.value)) and
+       not p.infixTable.hasKey(lhs.name):
+      var args: seq[Node] = @[lhs]
+      while p.curr.kind notin {tkEOF}:
+        if p.curr.kind in {tkComment, tkDocComment}:
+          args.add(parseCommentGeneric(p)); continue
+        if p.curr.kind == tkPunct and p.curr.value == ":":
+          walk p
+          let body = if p.curr.kind == tkPunct and p.curr.value == p.blockOpen:
+                       parseBlock(p)
+                     else:
+                       parseExpression(p, 0)
+          args.add(body)
+          break
+        if p.curr.kind == tkPunct and p.curr.value in [")", "]", "}", ";"]:
+          break
+        if p.curr.kind == tkPunct and p.curr.value == ",":
+          walk p; continue
+        args.add(parseExpression(p, 0))
+      return Node(kind: nkCall, children: args)
+    return nil
+
   p.braceHandler = parseNimBrace
 
   stmtHandler p, "function":
@@ -501,6 +553,17 @@ proc nimHandlers*(p: var GenericParser) =
       result.children.add(fnName)
     else:
       result.children.add(Node(kind: nkEmpty))
+    # generic params: [T, U, ...]
+    if p.curr.kind == tkPunct and p.curr.value == "[":
+      walk p
+      let genericParams = Node(kind: nkBracketExpr)
+      while not (p.curr.kind == tkPunct and p.curr.value == "]"):
+        if p.curr.kind == tkEOF: error(p, "Unexpected EOF in generic params")
+        genericParams.children.add(Node(kind: nkIdent, name: p.curr.value))
+        walk p
+        p.walkOpt(",")
+      p.expectWalk("]")
+      result.children.add(genericParams)
     # Nim pragma before params (e.g., `proc name {.pragma.}(params)`)
     while p.curr.kind == tkPunct and p.curr.value == "{" and
           p.next.kind == tkPunct and p.next.value == ".":
@@ -573,15 +636,27 @@ proc nimHandlers*(p: var GenericParser) =
       result.children.add(fnName)
     else:
       result.children.add(Node(kind: nkEmpty))
-    # params
-    let params = Node(kind: nkIdentDefs)
-    p.expectWalk("(")
-    while not (p.curr.kind == tkPunct and p.curr.value == ")"):
-      if p.curr.kind == tkEOF: error(p, "Unexpected EOF in params")
-      params.children.add(Node(kind: nkIdent, name: p.curr.value))
+    # generic params: [T, U, ...]
+    if p.curr.kind == tkPunct and p.curr.value == "[":
       walk p
-      p.walkOpt(",")
-    p.expectWalk(")")
+      let genericParams = Node(kind: nkBracketExpr)
+      while not (p.curr.kind == tkPunct and p.curr.value == "]"):
+        if p.curr.kind == tkEOF: error(p, "Unexpected EOF in generic params")
+        genericParams.children.add(Node(kind: nkIdent, name: p.curr.value))
+        walk p
+        p.walkOpt(",")
+      p.expectWalk("]")
+      result.children.add(genericParams)
+    # params (optional — Nim allows `proc name = body`)
+    let params = Node(kind: nkIdentDefs)
+    if p.curr.kind == tkPunct and p.curr.value == "(":
+      walk p
+      while not (p.curr.kind == tkPunct and p.curr.value == ")"):
+        if p.curr.kind == tkEOF: error(p, "Unexpected EOF in params")
+        params.children.add(Node(kind: nkIdent, name: p.curr.value))
+        walk p
+        p.walkOpt(",")
+      p.expectWalk(")")
     result.children.add(params)
     # return type: `: ReturnType`
     if p.curr.kind == tkPunct and p.curr.value == ":":
@@ -609,6 +684,144 @@ proc nimHandlers*(p: var GenericParser) =
     else:
       result.children.add(Node(kind: nkEmpty))
 
+  proc parseObjectBody(p: var GenericParser, indent: int): Node =
+    ## Parse the body of an object type (fields, object variants, doc comments).
+    ## Handles patterns like:
+    ##   ln*, col*: int
+    ##   case kind*: NodeKind
+    ##     of nkLitBigInt: valBigInt*: string
+    ##     of nkIdent: name*: string
+    ##     else:
+    ##       children*: seq[Node]
+    ##         ## doc comment
+    result = Node(kind: nkBlock)
+    while p.curr.kind != tkEOF and p.curr.col >= indent:
+      if p.curr.kind in {tkComment, tkDocComment}:
+        result.children.add(parseCommentGeneric(p))
+        continue
+      if p.curr.kind == tkIdentifier:
+        let key = p.curr.value
+        if key == "case":
+          walk p
+          let caseNode = Node(kind: nkStatement)
+          caseNode.children.add(Node(kind: nkIdent, name: "case"))
+          var disc = Node(kind: nkIdent, name: p.curr.value)
+          walk p
+          if p.curr.kind == tkPunct and p.curr.value == "*":
+            disc = Node(kind: nkPostfix,
+              children: @[disc, Node(kind: nkIdent, name: "*")])
+            walk p
+          # Save/restore of/else from infixTable BEFORE parsing discriminant
+          var savedOf: Option[InfixEntry]
+          var savedElse: Option[InfixEntry]
+          if p.infixTable.hasKey("of"):
+            savedOf = some(p.infixTable["of"])
+            p.infixTable.del("of")
+          if p.infixTable.hasKey("else"):
+            savedElse = some(p.infixTable["else"])
+            p.infixTable.del("else")
+          if p.curr.kind == tkPunct and p.curr.value == ":":
+            walk p
+            let discExpr = parseExpression(p, 6)
+            caseNode.children.add(Node(kind: nkInfix,
+              children: @[Node(kind: nkIdent, name: ":"), disc, discExpr]))
+          else:
+            caseNode.children.add(disc)
+          if p.curr.kind == tkPunct and p.curr.value == ":":
+            walk p
+          var branches = Node(kind: nkBlock)
+          while p.curr.kind == tkIdentifier and p.curr.value in ["of", "else"]:
+            let branchCol = p.curr.col
+            let isOf = p.curr.value == "of"
+            walk p
+            if isOf:
+              let pattern = Node(kind: nkStatement)
+              pattern.children.add(Node(kind: nkIdent, name: "of"))
+              pattern.children.add(parseExpression(p, 6))
+              while p.curr.kind == tkPunct and p.curr.value == ",":
+                walk p
+                pattern.children.add(parseExpression(p, 6))
+              if p.curr.kind == tkPunct and p.curr.value == ":":
+                walk p
+              pattern.children.add(parseObjectBody(p, branchCol + 2))
+              branches.children.add(pattern)
+            else:
+              if p.curr.kind == tkPunct and p.curr.value == ":":
+                walk p
+              let elseBranch = Node(kind: nkStatement)
+              elseBranch.children.add(Node(kind: nkIdent, name: "else"))
+              elseBranch.children.add(parseObjectBody(p, branchCol + 2))
+              branches.children.add(elseBranch)
+          if savedOf.isSome: p.infixTable["of"] = savedOf.get
+          if savedElse.isSome: p.infixTable["else"] = savedElse.get
+          caseNode.children.add(branches)
+          result.children.add(caseNode)
+          continue
+        elif p.stmtKeywords.hasKey(key):
+          result.children.add(parseStatement(p))
+          continue
+        # Parse field definition
+        # Parse field definition
+        var fieldName = Node(kind: nkIdent, name: p.curr.value)
+        walk p
+        if p.curr.kind == tkPunct and p.curr.value == "*":
+          fieldName = Node(kind: nkPostfix,
+            children: @[fieldName, Node(kind: nkIdent, name: "*")])
+          walk p
+        # Handle Nim pragma {.xxx.} after field name
+        while p.curr.kind == tkPunct and p.curr.value == "{" and
+              p.next.kind == tkPunct and p.next.value == ".":
+          walk p
+          result.children.add(parsePragma(p))
+        if p.curr.kind == tkPunct and p.curr.value == ",":
+          result.children.add(fieldName)
+          walk p
+        elif p.curr.kind == tkPunct and p.curr.value in ["=", ":"]:
+          walk p
+          result.children.add(Node(kind: nkInfix,
+            children: @[Node(kind: nkIdent, name: p.curr.value),
+                       fieldName,
+                       parseExpression(p)]))
+        else:
+          result.children.add(fieldName)
+      else:
+        result.children.add(parseStatement(p))
+
+  proc parseEnumBody(p: var GenericParser, indent: int): Node =
+    ## Parse the body of an enum type.
+    ## Handles patterns like:
+    ##   one = "value"
+    ##   two
+    ##   three
+    ##   four # comment
+    result = Node(kind: nkBlock)
+    while p.curr.kind != tkEOF and p.curr.col >= indent:
+      if p.curr.kind in {tkComment, tkDocComment}:
+        result.children.add(parseCommentGeneric(p))
+        continue
+      if p.curr.kind == tkIdentifier:
+        var memberName = Node(kind: nkIdent, name: p.curr.value)
+        walk p
+        if p.curr.kind == tkPunct and p.curr.value == "*":
+          memberName = Node(kind: nkPostfix,
+            children: @[memberName, Node(kind: nkIdent, name: "*")])
+          walk p
+        if p.curr.kind == tkPunct and p.curr.value == "=":
+          walk p
+          result.children.add(Node(kind: nkInfix,
+            children: @[Node(kind: nkIdent, name: "="),
+                       memberName,
+                       parseExpression(p)]))
+          if p.curr.kind == tkPunct and p.curr.value == ",":
+            walk p
+        elif p.curr.kind == tkPunct and p.curr.value == ",":
+          result.children.add(memberName)
+          walk p
+        else:
+          result.children.add(memberName)
+      else:
+        result.children.add(parseStatement(p))
+
   stmtHandler p, "type_handler":
     ## type Name = object
     ##   field: Type
@@ -629,20 +842,81 @@ proc nimHandlers*(p: var GenericParser) =
           body.children.add(parseCommentGeneric(p))
           continue
         if p.curr.kind == tkIdentifier:
+          # Dispatch statement keywords (proc, func, etc.) to their handlers
+          if p.stmtKeywords.hasKey(p.curr.value):
+            body.children.add(parseStatement(p, indent))
+            continue
           var fieldName = Node(kind: nkIdent, name: p.curr.value)
           walk p
           if p.curr.kind == tkPunct and p.curr.value == "*":
             fieldName = Node(kind: nkPostfix,
               children: @[fieldName, Node(kind: nkIdent, name: "*")])
             walk p
+          # Handle Nim pragma {.xxx.} after field/type name
+          while p.curr.kind == tkPunct and p.curr.value == "{" and
+                p.next.kind == tkPunct and p.next.value == ".":
+            walk p # consume '{'
+            body.children.add(parsePragma(p))
           # Handle comma-separated fields: prev*, curr*: Type
           if p.curr.kind == tkPunct and p.curr.value == ",":
             body.children.add(fieldName)
             walk p
-          elif p.curr.kind == tkPunct and p.curr.value in ["=", ":"]:
+          elif p.curr.kind == tkPunct and p.curr.value == "=":
+            walk p
+            let rhsStart = p.curr.value
+            if rhsStart == "object":
+              body.children.add(Node(kind: nkInfix,
+                children: @[Node(kind: nkIdent, name: "="),
+                           fieldName,
+                           Node(kind: nkIdent, name: "object")]))
+              let objIndent = p.curr.col
+              walk p
+              if p.curr.kind == tkIdentifier and p.curr.value == "of":
+                walk p
+                body.children.add(Node(kind: nkIdent, name: p.curr.value))
+                walk p
+              body.children.add(parseObjectBody(p, objIndent))
+            elif rhsStart == "ref" and p.next.kind == tkIdentifier and
+                 p.next.value == "object":
+              walk p
+              body.children.add(Node(kind: nkInfix,
+                children: @[Node(kind: nkIdent, name: "="),
+                           fieldName,
+                           Node(kind: nkIdent, name: "ref object")]))
+              walk p # consume 'object'
+              let objIndent = p.curr.col
+              if p.curr.kind == tkIdentifier and p.curr.value == "of":
+                walk p
+                body.children.add(Node(kind: nkIdent, name: p.curr.value))
+                walk p
+              body.children.add(parseObjectBody(p, objIndent))
+            elif rhsStart == "ptr" and p.next.kind == tkIdentifier and
+                 p.next.value == "object":
+              walk p
+              body.children.add(Node(kind: nkInfix,
+                children: @[Node(kind: nkIdent, name: "="),
+                           fieldName,
+                           Node(kind: nkIdent, name: "ptr object")]))
+              walk p # consume 'object'
+              let objIndent = p.curr.col
+              body.children.add(parseObjectBody(p, objIndent))
+            elif rhsStart == "enum":
+              body.children.add(Node(kind: nkInfix,
+                children: @[Node(kind: nkIdent, name: "="),
+                           fieldName,
+                           Node(kind: nkIdent, name: "enum")]))
+              walk p
+              let enumIndent = p.curr.col
+              body.children.add(parseEnumBody(p, enumIndent))
+            else:
+              body.children.add(Node(kind: nkInfix,
+                children: @[Node(kind: nkIdent, name: "="),
+                           fieldName,
+                           parseExpression(p)]))
+          elif p.curr.kind == tkPunct and p.curr.value == ":":
             walk p
             body.children.add(Node(kind: nkInfix,
-              children: @[Node(kind: nkIdent, name: p.curr.value),
+              children: @[Node(kind: nkIdent, name: ":"),
                          fieldName,
                          parseExpression(p)]))
           else:
@@ -654,8 +928,13 @@ proc nimHandlers*(p: var GenericParser) =
   stmtHandler p, "defer":
     ## defer: body
     walk p # consume 'defer'
+    let defCol = p.prev.col
     result = Node(kind: nkStatement,
-      children: @[Node(kind: nkIdent, name: "defer"), parseBlock(p)])
+      children: @[Node(kind: nkIdent, name: "defer"),
+        if p.curr.kind == tkPunct and p.curr.value == "{": parseBlock(p)
+        elif p.curr.kind == tkPunct and p.curr.value == ":":
+          walk p; parseBlock(p, defCol)
+        else: parseBlock(p, defCol)])
 
   stmtHandler p, "raise":
     ## raise newException(...)  or  raise expr

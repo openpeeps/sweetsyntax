@@ -1,5 +1,5 @@
-# A powerful generic parser and AST explorer for analyzing
-# programming languages!
+# A powerful generic parser and AST explorer
+# for analyzing programming languages!
 #
 # (c) 2026 George Lemon | LGPL-v3 License
 #          Made by Humans from OpenPeeps
@@ -35,6 +35,7 @@ type
 
   PrefixHandler* = proc(p: var GenericParser, minPrec: int = 0): Node {.closure.}
   StmtHandler* = proc(p: var GenericParser, parentCol: int = -1): Node {.closure.}
+  ExpressionHandler* = proc(p: var GenericParser, lhs: Node, minPrec: int): Node {.nimcall.}
 
   GenericParser* = object
     lexer*: SweetLexer
@@ -53,6 +54,8 @@ type
     stmtHandlers*: Table[string, StmtHandler]
     # Prefix handler registry (for special constructs)
     prefixHandlers*: Table[string, PrefixHandler]
+    # Expression handler registry (for language-specific expression transformations)
+    expressionHandlers*: Table[string, ExpressionHandler]
     # Language-specific brace `{ }` handler (object literal, set literal, etc.)
     braceHandler*: proc(p: var GenericParser, minPrec: int = 0): Node {.nimcall.}
     expectRegexTokens*: seq[string]
@@ -153,7 +156,7 @@ proc parseCommentGeneric*(p: var GenericParser, minPrec: int = 0): Node =
   result = case p.curr.kind
     of tkComment: newInlineComment(p.curr.value)
     of tkDocComment: newDocComment(p.curr.value)
-    else: Node(kind: nkEmpty)
+    else: nil
   walk p
 
 proc parseBoolOrIdent(p: var GenericParser, minPrec: int = 0): Node =
@@ -180,10 +183,17 @@ proc parsePrefixOp(p: var GenericParser, minPrec: int = 0): Node =
   # Use 13 — one above the highest binary precedence (12 for **),
   # but below member access (14–15) so typeof obj.prop works.
   const prefixPrec = 13
-  let operand = parseExpression(p, prefixPrec)
+  # For type-taking keywords like sizeof, typeof, check if `(` follows
+  # and consume the whole group as the operand (e.g., sizeof(T), typeof(x.y))
+  let operand =
+    if op in ["sizeof", "typeof"] and
+       p.curr.kind == tkPunct and p.curr.value == "(":
+      parseExpression(p, 0)
+    else:
+      parseExpression(p, prefixPrec)
   result = Node(kind: nkPrefix, children: @[Node(kind: nkIdent, name: op), operand])
 
-proc parseGroupExpr(p: var GenericParser, minPrec: int = 0): Node =
+proc parseGroupExpr*(p: var GenericParser, minPrec: int = 0): Node =
   ## Generic grouping: (expr) or (expr, expr, ...) for IIFE/comma operator.
   ## If the closing ')' is immediately followed by '(' or another call infix
   ## operator, it must be parsed as a comma-expression to allow IIFE pattern.
@@ -331,37 +341,11 @@ proc parseExpression*(p: var GenericParser, minPrec: int = 0): Node =
   # Get prefix via dedicated dispatch
   var lhs = parsePrefix(p, minPrec)
 
-  # Handle Nim export marker `*` after identifiers (before infix loop)
-  if featCommandSyntax in p.features and
-     p.curr.kind == tkPunct and p.curr.value == "*":
-    lhs = Node(kind: nkPostfix,
-      children: @[lhs, Node(kind: nkIdent, name: "*")])
-    walk p
-
-  # Nim command call inside expressions: identifier arg1, arg2: body
-  if minPrec == 0 and featCommandSyntax in p.features and lhs.kind == nkIdent and
-     p.curr.kind notin {tkEOF} and
-     not (p.curr.kind == tkPunct and p.curr.value != ":") and
-     not (p.curr.kind == tkIdentifier and p.infixTable.hasKey(p.curr.value)):
-    # Only trigger when the next token is a command-eligible expression start or ':'
-    var args: seq[Node] = @[lhs]
-    while p.curr.kind notin {tkEOF}:
-      if p.curr.kind in {tkComment, tkDocComment}:
-        args.add(parseCommentGeneric(p)); continue
-      if p.curr.kind == tkPunct and p.curr.value == ":":
-        walk p
-        let body = if p.curr.kind == tkPunct and p.curr.value == p.blockOpen:
-                     parseBlock(p)
-                   else:
-                     parseExpression(p, 0)
-        args.add(body)
-        break
-      if p.curr.kind == tkPunct and p.curr.value in [")", "]", "}", ";"]:
-        break
-      if p.curr.kind == tkPunct and p.curr.value == ",":
-        walk p; continue
-      args.add(parseExpression(p, 0))
-    return Node(kind: nkCall, children: args)
+  # After-prefix expression handler hook (language-specific, e.g. Nim export marker, command call)
+  if p.expressionHandlers.hasKey("afterPrefix"):
+    let handled = p.expressionHandlers["afterPrefix"](p, lhs, minPrec)
+    if handled != nil:
+      return handled
 
   # Pratt infix/postfix loop (unchanged from here down)
   while true:
@@ -398,13 +382,14 @@ proc parseExpression*(p: var GenericParser, minPrec: int = 0): Node =
             params.children.add(lhs)
         else:
           params.children.add(lhs)
+        
         # Parse body: { block } or expression
-        let body = if p.curr.kind == tkPunct and p.curr.value == p.blockOpen:
-          parseBlock(p)
-        else:
-          parseExpression(p, 0)
-        lhs = Node(kind: nkFunction,
-          children: @[Node(kind: nkEmpty), params, body])
+        let body =
+          if p.curr.kind == tkPunct and p.curr.value == p.blockOpen:
+            parseBlock(p)
+          else:
+            parseExpression(p, 0)
+        lhs = Node(kind: nkFunction, children: @[Node(kind: nkEmpty), params, body])
         continue
 
       # Postfix operators
@@ -449,10 +434,32 @@ proc parseExpression*(p: var GenericParser, minPrec: int = 0): Node =
         let entry = p.infixTable[op]
         if entry.precedence < minPrec: break
         walk p
-        var items = @[parseExpression(p, 0)]
+        # Handle empty brackets `[]` (pointer dereference in Nim)
+        if p.curr.kind == tkPunct and p.curr.value == "]":
+          walk p
+          lhs = Node(kind: nkBracketExpr, children: @[lhs, Node(kind: nkEmpty)])
+          continue
+        # Handle Nim generic instantiation `[:type]`
+        if p.curr.kind == tkPunct and p.curr.value == ":":
+          walk p
+          var items = @[Node(kind: nkEmpty), parseExpression(p, 0)]
+          while p.curr.kind == tkPunct and p.curr.value == ",":
+            walk p
+            items.add(parseExpression(p, 0))
+          p.expectWalk("]")
+          lhs = Node(kind: nkBracketExpr, children: @[lhs] & items)
+          continue
+        var items: seq[Node]
+        proc parseBracketItem(p: var GenericParser): Node =
+          result = parseExpression(p, 0)
+          if p.curr.kind == tkPunct and p.curr.value == ":":
+            walk p
+            let fieldType = parseExpression(p, 0)
+            result = Node(kind: nkColonExpr, children: @[result, fieldType])
+        items.add(parseBracketItem(p))
         while p.curr.kind == tkPunct and p.curr.value == ",":
           walk p
-          items.add(parseExpression(p, 0))
+          items.add(parseBracketItem(p))
         p.expectWalk("]")
         lhs = if items.len == 1: Node(kind: nkBracketExpr, children: @[lhs, items[0]])
               else: Node(kind: nkBracketExpr, children: @[lhs] & items)
@@ -510,7 +517,15 @@ proc parseExpression*(p: var GenericParser, minPrec: int = 0): Node =
         continue
       break
 
-    else: break
+    else: discard
+
+    # Infix expression handler hook (language-specific)
+    if p.expressionHandlers.hasKey("infix"):
+      let handled = p.expressionHandlers["infix"](p, lhs, minPrec)
+      if handled != nil:
+        lhs = handled
+        continue
+    break
 
   result = lhs
   # Prepend any leading comments
@@ -611,8 +626,7 @@ proc parseIndentBlock*(p: var GenericParser): Node =
     result.children.add(parseStatement(p))
 
 proc parseStatement*(p: var GenericParser, parentCol: int = -1): Node =
-  if p.curr.kind == tkEOF:
-    return Node(kind: nkEmpty)
+  if p.curr.kind == tkEOF: return
   if p.curr.kind in {tkComment, tkDocComment}:
     return parseCommentGeneric(p)
   if p.curr.kind == tkIdentifier:
@@ -623,7 +637,6 @@ proc parseStatement*(p: var GenericParser, parentCol: int = -1): Node =
         return p.stmtHandlers[handlerName](p, parentCol)
 
   if p.curr.kind == tkPunct and p.curr.value == p.blockOpen:
-    # Check for Nim pragma {.xxx.} before treating as block
     if p.next.kind == tkPunct and p.next.value == ".":
       if p.braceHandler != nil:
         discard p.braceHandler(p)
@@ -634,7 +647,7 @@ proc parseStatement*(p: var GenericParser, parentCol: int = -1): Node =
 
   if p.curr.kind == tkPunct and p.curr.value == ";":
     walk p
-    return Node(kind: nkEmpty)
+    return
 
   # Generator method: *name(params) { body } — used in class/object bodies
   if p.curr.kind == tkPunct and p.curr.value == "*":
@@ -670,9 +683,11 @@ proc parseStatement*(p: var GenericParser, parentCol: int = -1): Node =
     return
 
   # Nim command call: identifier arg1, arg2: body
+  # Exclude `ident: ...` (type annotation, not command call)
   if featCommandSyntax in p.features and p.curr.kind == tkIdentifier and
      not (p.next.kind == tkPunct and
-          p.next.value in [".", "*", "=", "+=", "-=", "*=", "/=", "%=", "&=", "|=", "^=", "<<=", ">>="]):
+          p.next.value in [".", "*", "=", "+=", "-=", "*=", "/=", "%=", "&=", "|=", "^=", "<<=", ">>=", ":"]) and
+     not p.infixTable.hasKey(p.curr.value):
     # Only trigger command syntax when not followed by a field access, colon, or assignment
     # (those are regular expressions/assignments/labeled-stmts, not command calls)
 
@@ -697,6 +712,11 @@ proc parseStatement*(p: var GenericParser, parentCol: int = -1): Node =
         break
       if p.curr.kind == tkPunct and p.curr.value == ",":
         walk p; continue
+      if p.curr.kind == tkIdentifier and
+         (p.stmtKeywords.hasKey(p.curr.value) or
+          p.infixTable.hasKey(p.curr.value) or
+          p.curr.value in ["else", "of", "elif", "except", "finally"]):
+        break
       result.children.add(parseExpression(p))
     if not gotBody:
       p.walkOpt(";")
@@ -811,6 +831,11 @@ template prefixHandler*(parser: untyped, name: string, body: untyped) {.dirty.} 
   `parser`.prefixHandlers[name] =
     proc (p: var GenericParser, minPrec: int = 0): Node =
       body
+
+template exprHandler*(parser: untyped, name: string, body: untyped) {.dirty.} =
+  ## Helper macro to define expression handlers with cleaner syntax.
+  `parser`.expressionHandlers[name] =
+    proc(p: var GenericParser, lhs: Node, minPrec: int): Node {.nimcall.} = body
 
 proc parseScript*(path: string, parsingCallback: ParsingCallback = nil,
             features: set[LanguageFeature] = {}): OpenAstProgram {.discardable.} =

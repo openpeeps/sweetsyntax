@@ -181,9 +181,9 @@ operators:
     - precedence: 8
       tokens: ["<<", ">>"]
     - precedence: 9
-      tokens: ["+", "-"]
+      tokens: ["+", "-", "+%", "-%"]
     - precedence: 10
-      tokens: ["*", "/", "div", "mod", "shl", "shr"]
+      tokens: ["*", "/", "div", "mod", "shl", "shr", "%", "*%"]
     - precedence: 14
       tokens: ["."]
       handler: dot
