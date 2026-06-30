@@ -15,7 +15,7 @@
 ## 😍 Key Features
 - Fast, compiled and efficient ([check benchmarks section](#benchmarks))
 - Generic parser & AST explorer
-- **Embeddable in other languages** via FFI — Lua, JavaScript (N-API), Ruby, Python, PHP
+- **Embeddable in other languages** via FFI 👉 Lua, JavaScript (N-API), Ruby, Python, PHP
 - Easy-to-use API for integration into various applications
 - Built-in syntax support for: C, Crystal, D lang, Go, JavaScript, Nim, PHP, Python, Ruby, and Rust
 - Zero-copy parsing using MemFiles
@@ -25,16 +25,16 @@
 ## What's this for?
 SweetSyntax is a powerful and flexible generic parser and AST explorer for analyzing programming languages! It is designed to be integrated into other applications, such as code editors, documentation generators, linting tools and other sweet things!
 
-Parse any language by defining its grammar in a YAML specification file — tokens, operators (prefix, infix, postfix, assignment), statement keywords, block delimiters, and feature flags (arrow functions, generators, async/await, template literals). The parser uses a **Pratt parsing** approach with a language-agnostic core and per-language statement handlers.
+Parse any language by defining its grammar in a YAML specification file: **tokens**, **operators** (prefix, infix, postfix, assignment), **statement keywords**, block delimiters, and **feature flags** (arrow functions, generators, async/await, template literals). The parser uses a **Pratt parsing** approach with a language-agnostic core and per-language statement handlers.
 
 Key capabilities:
 - **Lexer**: Generic tokenizer handling identifiers, literals (int, float, hex, octal, binary, bigint, string, regex), comments, and operators
 - **Parser**: Pratt (precedence-climbing) parser with configurable operator precedence and associativity
 - **AST**: Typed node tree with support for statements, expressions, infix/prefix/postfix operations, function declarations, and more
-- **YAML-driven**: Language syntaxes are pure YAML — no code changes needed to add a new language
+- **YAML-driven**: Language syntaxes are pure YAML, allowing for custom statement handlers
 
 ### Embeddable SweetSyntax
-SweetSyntax is written in Nim, and thanks to Nim's versatile compilation model, its sweetness can be embedded natively into a wide range of host languages — no subprocesses, no IPC, just a shared library call away.
+SweetSyntax is written in Nim, and thanks to Nim's versatile compilation model, can be embedded natively into a wide range of host languages
 
 | Language | Integration |
 |----------|------------|
@@ -44,7 +44,7 @@ SweetSyntax is written in Nim, and thanks to Nim's versatile compilation model, 
 | **Python** | Call through Python's CFFI or `ctypes` |
 | **PHP** | Expose as a PHP extension written in C |
 
-The Nim library compiles to a small, self-contained shared object that any FFI-capable language can load — making SweetSyntax a portable parsing engine for your polyglot projects.
+The Nim library compiles to a small, self-contained shared object that any FFI-capable language can load, making SweetSyntax a portable parsing engine for your polyglot projects.
 
 ## Examples
 
@@ -79,8 +79,16 @@ let program = parseScript("file.ext", myHandlers,
   features = {featAsync, featArrowFn})
 ```
 
+### Error Reporting
+SweetSyntax has built-in support for context-aware reporting. For example:
+```
+  return a == null || b == null ## NaN : a < b ? -1 : a > b ? 1 : a >= b ? 0 : NaN;
+                                ^
+Error (2:33) Unexpected prefix token: '#'
+```
+
 ### Benchmarks
-SweetSyntax is built for speed. Below is a **hyperfine** benchmark parsing and validating a full copy of **d3.js** (v7.9.0, ~20k lines, unminified, [from cdnjs.com](https://cdnjs.com/libraries/d3)). The entire pipeline — lexing, parsing, and AST generation — completes in well under 120ms on my 🔥 rastafarian Ryzen 5 with 6 cores/12 threads:
+SweetSyntax is built for speed. Below is a **hyperfine** benchmark parsing and validating a full copy of **d3.js** (v7.9.0, ~20k lines, unminified, [from cdnjs.com](https://cdnjs.com/libraries/d3)). The entire pipeline (**lexing**, **parsing**, and **AST generation**) completes in under 120ms on my 🔥 rastafarian Ryzen 5 with 6 cores/12 threads:
 ```
 hyperfine --runs 4 './sweetsyntax_benc_d3'
 Benchmark 1: ./sweetsyntax_benc_d3
