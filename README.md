@@ -1,5 +1,5 @@
 <p align="center">
-  SweetSyntax 🍭 A generic parser and AST explorer for analyzing programming languages 
+  SweetSyntax 🍭 A generic parser and AST explorer<br>for analyzing programming languages 
 </p>
 
 <p align="center">
