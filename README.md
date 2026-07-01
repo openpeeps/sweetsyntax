@@ -1,5 +1,4 @@
 <p align="center">
-  <img src="https://raw.githubusercontent.com/openpeeps/sweetsyntax/main/.github/sweetsyntax.png" alt="SweetSyntax - Generic parser, AST explorer and analyzer" width="120px" height="120px"><br>
   SweetSyntax 🍭 A generic parser and AST explorer for analyzing programming languages 
 </p>
 
