@@ -21,6 +21,12 @@ template expectIdentOrLit(body: untyped) {.dirty.} =
   else:
     error(p, "Expected identifier or string literal")
 
+template expectString(body: untyped) {.dirty.} =
+  if p.curr.kind == tkString:
+    body
+  else:
+    error(p, "Expected string literal")
+
 proc parseImportPath(p: var GenericParser): Node =
   ## Parse a Nim import path like `module/sub/[a, b]` or `../relative/path`
   result = Node(kind: nkIdentDefs)
@@ -69,6 +75,7 @@ proc parseImportPath(p: var GenericParser): Node =
 proc nimHandlers*(p: var GenericParser) =
   # Register Nim-specific statement handlers.
   p.stmtKeywords["type"] = "type_handler"
+  p.stmtKeywords["echo"] = "echo_handler"
   p.keywordPrefixOps.incl("ref")
   p.keywordPrefixOps.incl("ptr")
 
@@ -84,6 +91,7 @@ proc nimHandlers*(p: var GenericParser) =
     ## Also handles: let/const/var name: Type [= expr], let (a, b) = expr
     result = Node(kind: nkStatement)
     let kw = p.curr.value
+    let kwCol = p.curr.col
     result.children.add(Node(kind: nkIdent, name: kw))
     walk p
     while true:
@@ -92,7 +100,10 @@ proc nimHandlers*(p: var GenericParser) =
         let pattern = parseExpression(p)
         result.children.add(pattern)
         if p.curr.kind == tkPunct and p.curr.value == "=":
+          let eqLine = p.curr.line
           walk p
+          if p.curr.line != eqLine and p.curr.col <= kwCol:
+            error(p, "Expected expression after '='")
           result.children.add(parseExpression(p))
         else:
           result.children.add(ast.newEmptyNode())
@@ -116,7 +127,10 @@ proc nimHandlers*(p: var GenericParser) =
           varDef.children.add(ast.newEmptyNode())
         # optional default value: `= expr`
         if p.curr.kind == tkPunct and p.curr.value == "=":
+          let eqLine = p.curr.line
           walk p
+          if p.curr.line != eqLine and p.curr.col <= kwCol:
+            error(p, "Expected expression after '='")
           varDef.children.add(parseExpression(p))
         else:
           varDef.children.add(ast.newEmptyNode())
@@ -131,7 +145,10 @@ proc nimHandlers*(p: var GenericParser) =
     ## const NAME: Type = expr;  or  const NAME = expr;
     result = Node(kind: nkStatement)
     result.children.add(Node(kind: nkIdent, name: "const"))
+    let kwCol = p.curr.col
     walk p # consume 'const'
+    expectIdent:
+      discard
     var name = Node(kind: nkIdent, name: p.curr.value)
     walk p
     # Nim export marker `*` after name
@@ -146,7 +163,10 @@ proc nimHandlers*(p: var GenericParser) =
       typeNode = parseExpression(p)
     else:
       typeNode = Node(kind: nkEmpty)
+    let eqLine = p.curr.line
     p.expectWalk("=")
+    if p.curr.line != eqLine and p.curr.col <= kwCol:
+      error(p, "Expected expression after '='")
     let val = parseExpression(p)
     result.children.add(Node(kind: nkIdentDefs, children: @[name, typeNode, val]))
     p.walkOpt(";")
@@ -241,11 +261,13 @@ proc nimHandlers*(p: var GenericParser) =
     if hasParens: walk p
     # left-hand side of `in`: variable(s)
     var vars = Node(kind: nkIdentDefs)
-    vars.children.add(Node(kind: nkIdent, name: p.curr.value))
+    expectIdent:
+      vars.children.add(Node(kind: nkIdent, name: p.curr.value))
     walk p
     while p.curr.kind == tkPunct and p.curr.value == ",":
       walk p
-      vars.children.add(Node(kind: nkIdent, name: p.curr.value))
+      expectIdent:
+        vars.children.add(Node(kind: nkIdent, name: p.curr.value))
       walk p
     # `in` keyword
     if p.curr.kind == tkIdentifier and p.curr.value == "in":
@@ -391,7 +413,8 @@ proc nimHandlers*(p: var GenericParser) =
         # handle `as variableName` after exception type
         if p.curr.kind == tkIdentifier and p.curr.value == "as":
           walk p
-          exceptBlock.children.add(Node(kind: nkIdent, name: p.curr.value))
+          expectIdent:
+            exceptBlock.children.add(Node(kind: nkIdent, name: p.curr.value))
           walk p
       exceptBlock.children.add(parseTryBody(p, tryCol))
       result.children.add(exceptBlock)
@@ -408,6 +431,8 @@ proc nimHandlers*(p: var GenericParser) =
     let labelNode =
       if p.curr.kind == tkPunct and p.curr.value == "(":
         walk p
+        expectIdent:
+          discard
         let lbl = Node(kind: nkIdent, name: p.curr.value)
         walk p
         p.expectWalk(")")
@@ -719,6 +744,8 @@ proc nimHandlers*(p: var GenericParser) =
         let key = p.curr.value
         if key == "case":
           walk p
+          expectIdent:
+            discard
           let caseNode = Node(kind: nkStatement)
           caseNode.children.add(Node(kind: nkIdent, name: "case"))
           var disc = Node(kind: nkIdent, name: p.curr.value)
@@ -1039,8 +1066,28 @@ proc nimHandlers*(p: var GenericParser) =
       result.children.add(parseBlock(p))
     else:
       # inline asm string
-      result.children.add(Node(kind: nkLitString, valStr: p.curr.value))
+      expectString:
+        result.children.add(Node(kind: nkLitString, valStr: p.curr.value))
       walk p
+    p.walkOpt(";")
+
+  stmtHandler p, "echo_handler":
+    ## echo expr or echo expr1, expr2, ...
+    walk p # consume 'echo'
+    result = Node(kind: nkCall)
+    result.children.add(Node(kind: nkIdent, name: "echo"))
+    while p.curr.kind in {tkComment, tkDocComment}:
+      result.children.add(parseCommentGeneric(p))
+    if p.curr.kind in {tkEOF} or
+       p.curr.line != p.prev.line or
+       (p.curr.kind == tkPunct and p.curr.value in [";", "}", ":", p.blockClose]):
+      if p.curr.kind == tkPunct and p.curr.value == ";":
+        walk p
+      error(p, "Expected expression after 'echo'")
+    result.children.add(parseExpression(p))
+    while p.curr.kind == tkPunct and p.curr.value == ",":
+      walk p
+      result.children.add(parseExpression(p))
     p.walkOpt(";")
 
   stmtHandler p, "static":
