@@ -14,6 +14,7 @@
 
 import ./sweetsyntax/[config, sweetlexer]
 import ./sweetsyntax/engine/[ast, parser]
+export config, sweetlexer, ast, parser
 
 when isMainModule:
   import std/[tables, os, strutils]

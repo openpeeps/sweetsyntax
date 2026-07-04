@@ -683,10 +683,9 @@ proc parseStatement*(p: var GenericParser, parentCol: int = -1): Node =
     return
 
   # Nim command call: identifier arg1, arg2: body
-  # Exclude `ident: ...` (type annotation, not command call)
   if featCommandSyntax in p.features and p.curr.kind == tkIdentifier and
      not (p.next.kind == tkPunct and
-          p.next.value in [".", "*", "=", "+=", "-=", "*=", "/=", "%=", "&=", "|=", "^=", "<<=", ">>=", ":"]) and
+          p.next.value in [".", "*", "=", "+=", "-=", "*=", "/=", "%=", "&=", "|=", "^=", "<<=", ">>="]) and
      not p.infixTable.hasKey(p.curr.value):
     # Only trigger command syntax when not followed by a field access, colon, or assignment
     # (those are regular expressions/assignments/labeled-stmts, not command calls)
