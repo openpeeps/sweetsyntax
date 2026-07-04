@@ -9,6 +9,18 @@ import std/[tables, strutils]
 import ../[config, sweetlexer]
 import ../engine/[ast, parser]
 
+template expectIdent(body: untyped) {.dirty.} =
+  if p.curr.kind == tkIdentifier:
+    body
+  else:
+    error(p, "Expected identifier")
+
+template expectString(body: untyped) {.dirty.} =
+  if p.curr.kind == tkString:
+    body
+  else:
+    error(p, "Expected string literal")
+
 proc jsHandlers*(p: var GenericParser) =
   # Register Nim-specific statement handlers.
 
@@ -71,7 +83,9 @@ proc jsHandlers*(p: var GenericParser) =
     result = Node(kind: nkStatement)
     result.children.add(Node(kind: nkIdent, name: "const"))
     walk p # consume 'const'
-    let name = Node(kind: nkIdent, name: p.curr.value)
+    var name: Node
+    expectIdent:
+      name = Node(kind: nkIdent, name: p.curr.value)
     walk p
     # optional type annotation
     var typeNode: Node
@@ -262,7 +276,9 @@ proc jsHandlers*(p: var GenericParser) =
   stmtHandler p, "class":
     ## class Name { ... } or class Name extends Base { ... }
     walk p # consume 'class'
-    let name = Node(kind: nkIdent, name: p.curr.value)
+    var name: Node
+    expectIdent:
+      name = Node(kind: nkIdent, name: p.curr.value)
     walk p
     var parent: Node
     if p.curr.kind == tkIdentifier and p.curr.value == "extends":
@@ -400,7 +416,9 @@ proc jsHandlers*(p: var GenericParser) =
     let labelNode =
       if p.curr.kind == tkPunct and p.curr.value == "(":
         walk p
-        let lbl = Node(kind: nkIdent, name: p.curr.value)
+        var lbl: Node
+        expectIdent:
+          lbl = Node(kind: nkIdent, name: p.curr.value)
         walk p
         p.expectWalk(")")
         lbl
@@ -417,18 +435,22 @@ proc jsHandlers*(p: var GenericParser) =
     ## import module  or  import module / sub  or  import module1, module2
     walk p # consume 'import'
     result = Node(kind: nkImport)
-    result.children.add(Node(kind: nkIdent, name: p.curr.value))
+    expectIdent:
+      result.children.add(Node(kind: nkIdent, name: p.curr.value))
     walk p
     while p.curr.kind == tkPunct and p.curr.value == ",":
       walk p
-      result.children.add(Node(kind: nkIdent, name: p.curr.value))
+      expectIdent:
+        result.children.add(Node(kind: nkIdent, name: p.curr.value))
       walk p
     p.walkOpt(";")
 
   stmtHandler p, "from":
     ## from module import name1, name2
     walk p # consume 'from'
-    let moduleName = Node(kind: nkIdent, name: p.curr.value)
+    var moduleName: Node
+    expectIdent:
+      moduleName = Node(kind: nkIdent, name: p.curr.value)
     walk p
     result = Node(kind: nkStatement)
     result.children.add(Node(kind: nkIdent, name: "from"))
@@ -436,11 +458,13 @@ proc jsHandlers*(p: var GenericParser) =
     if p.curr.kind == tkIdentifier and p.curr.value == "import":
       walk p
       let imports = Node(kind: nkIdentDefs)
-      imports.children.add(Node(kind: nkIdent, name: p.curr.value))
+      expectIdent:
+        imports.children.add(Node(kind: nkIdent, name: p.curr.value))
       walk p
       while p.curr.kind == tkPunct and p.curr.value == ",":
         walk p
-        imports.children.add(Node(kind: nkIdent, name: p.curr.value))
+        expectIdent:
+          imports.children.add(Node(kind: nkIdent, name: p.curr.value))
         walk p
       result.children.add(imports)
     p.walkOpt(";")
@@ -449,7 +473,8 @@ proc jsHandlers*(p: var GenericParser) =
     ## include file  or  include "file.nim"
     walk p # consume 'include'
     result = Node(kind: nkInclude)
-    result.children.add(Node(kind: nkLitString, valStr: p.curr.value))
+    expectString:
+      result.children.add(Node(kind: nkLitString, valStr: p.curr.value))
     walk p
     p.walkOpt(";")
 
@@ -458,7 +483,8 @@ proc jsHandlers*(p: var GenericParser) =
     walk p # consume 'export'
     result = Node(kind: nkStatement)
     result.children.add(Node(kind: nkIdent, name: "export"))
-    result.children.add(Node(kind: nkIdent, name: p.curr.value))
+    expectIdent:
+      result.children.add(Node(kind: nkIdent, name: p.curr.value))
     walk p
     p.walkOpt(";")
 
@@ -518,6 +544,32 @@ proc jsHandlers*(p: var GenericParser) =
     p.expectWalk("(")
     while not (p.curr.kind == tkPunct and p.curr.value == ")"):
       if p.curr.kind == tkEOF: error(p, "Unexpected EOF in params")
+
+      # Skip inline comments inside param list
+      if p.curr.kind in {tkComment, tkDocComment}:
+        discard parseCommentGeneric(p)
+        continue
+
+      # Rest parameter: ...name (must be last param)
+      if p.curr.kind == tkPunct and p.curr.value == "...":
+        walk p
+        if p.curr.kind != tkIdentifier:
+          error(p, "Expected rest parameter name")
+        let paramName = Node(kind: nkIdent, name: p.curr.value)
+        walk p
+        params.children.add(Node(kind: nkPrefix,
+          children: @[Node(kind: nkIdent, name: "..."), paramName]))
+        break
+
+      # Destructured parameter: {a, b} or [a, b]
+      if p.curr.kind == tkPunct and p.curr.value in ["{", "["]:
+        let pattern = parseExpression(p)
+        params.children.add(pattern)
+        p.walkOpt(",")
+        continue
+
+      if p.curr.kind != tkIdentifier:
+        error(p, "Expected parameter name")
       let paramName = Node(kind: nkIdent, name: p.curr.value)
       walk p
       if p.curr.kind == tkPunct and p.curr.value == ":":
@@ -577,7 +629,9 @@ proc jsHandlers*(p: var GenericParser) =
     result.children.add(Node(kind: nkIdent, name: "type"))
     
     # parse type name
-    let typeIdent = p.curr.newIdent(p.curr.value)
+    var typeIdent: Node
+    expectIdent:
+      typeIdent = p.curr.newIdent(p.curr.value)
     if p.next.kind == tkPunct and p.next.value == "*":
       walk p
       result.children.add(newPostfix(p.curr.newIdent("*"), typeIdent))
@@ -701,7 +755,8 @@ proc jsHandlers*(p: var GenericParser) =
       result.children.add(parseBlock(p))
     else:
       # inline asm string
-      result.children.add(Node(kind: nkLitString, valStr: p.curr.value))
+      expectString:
+        result.children.add(Node(kind: nkLitString, valStr: p.curr.value))
       walk p
     p.walkOpt(";")
 
