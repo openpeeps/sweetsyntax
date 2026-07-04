@@ -5,9 +5,21 @@
 #          Made by Humans from OpenPeeps
 #          https://github.com/openpeeps/sweetsyntax
 
-import std/[tables, strutils, options]
+import std/[tables, strutils, options, sets]
 import ../[config, sweetlexer]
 import ../engine/[ast, parser]
+
+template expectIdent(body: untyped) {.dirty.} =
+  if p.curr.kind == tkIdentifier:
+    body
+  else:
+    error(p, "Expected identifier")
+
+template expectIdentOrLit(body: untyped) {.dirty.} =
+  if p.curr.kind in {tkIdentifier, tkString}:
+    body
+  else:
+    error(p, "Expected identifier or string literal")
 
 proc parseImportPath(p: var GenericParser): Node =
   ## Parse a Nim import path like `module/sub/[a, b]` or `../relative/path`
@@ -30,6 +42,8 @@ proc parseImportPath(p: var GenericParser): Node =
     elif p.curr.kind == tkPunct and p.curr.value in [".", ".."]:
       result.children.add(Node(kind: nkIdent, name: p.curr.value))
       walk p
+    elif p.curr.kind == tkPunct and p.curr.value == ",":
+      walk p # TODO check for indentation
     elif p.curr.kind == tkPunct and p.curr.value == "[":
       # Submodule bracket group: [mod1/sub, mod2]
       walk p
@@ -55,6 +69,8 @@ proc parseImportPath(p: var GenericParser): Node =
 proc nimHandlers*(p: var GenericParser) =
   # Register Nim-specific statement handlers.
   p.stmtKeywords["type"] = "type_handler"
+  p.keywordPrefixOps.incl("ref")
+  p.keywordPrefixOps.incl("ptr")
 
   prefixHandler p, "$":
     ## `$` string conversion operator: `$expr` converts to string
@@ -82,6 +98,8 @@ proc nimHandlers*(p: var GenericParser) =
           result.children.add(ast.newEmptyNode())
       else:
         let varDef = Node(kind: nkIdentDefs)
+        expectIdent:
+          discard
         var fieldName = Node(kind: nkIdent, name: p.curr.value)
         walk p
         # Nim export marker `*` after name (e.g., `invalidFilenameChars*`)
@@ -433,12 +451,10 @@ proc nimHandlers*(p: var GenericParser) =
     if p.curr.kind == tkIdentifier and p.curr.value == "import":
       walk p
       let imports = Node(kind: nkIdentDefs)
-      imports.children.add(Node(kind: nkIdent, name: p.curr.value))
-      walk p
+      imports.children.add(parseImportPath(p))
       while p.curr.kind == tkPunct and p.curr.value == ",":
         walk p
-        imports.children.add(Node(kind: nkIdent, name: p.curr.value))
-        walk p
+        imports.children.add(parseImportPath(p))
       result.children.add(imports)
     p.walkOpt(";")
 
@@ -832,98 +848,106 @@ proc nimHandlers*(p: var GenericParser) =
     # parse type definitions (one or more)
     let body = Node(kind: nkBlock)
     let indent = if parentCol >= 0: parentCol else: max(0, p.curr.col - 1)
-    if p.curr.kind == tkPunct and p.curr.value == "{":
-      result.children.add(parseBlock(p))
-    else:
-      if p.curr.kind == tkPunct and p.curr.value == ":":
+    if p.curr.kind == tkPunct and p.curr.value == ":":
+      walk p
+    
+    if p.curr.kind == tkEOF:
+      error(p, "Expected type name after 'type'")
+    while p.curr.kind != tkEOF and p.curr.col > indent:
+      if p.curr.kind in {tkComment, tkDocComment}:
+        body.children.add(parseCommentGeneric(p))
+        continue
+      if p.curr.kind == tkIdentifier:
+        # Dispatch statement keywords (proc, func, etc.) to their handlers
+        if p.stmtKeywords.hasKey(p.curr.value):
+          body.children.add(parseStatement(p, indent))
+          break
+        var fieldName = Node(kind: nkIdent, name: p.curr.value)
         walk p
-      while p.curr.kind != tkEOF and p.curr.col > indent:
-        if p.curr.kind in {tkComment, tkDocComment}:
-          body.children.add(parseCommentGeneric(p))
-          continue
-        if p.curr.kind == tkIdentifier:
-          # Dispatch statement keywords (proc, func, etc.) to their handlers
-          if p.stmtKeywords.hasKey(p.curr.value):
-            body.children.add(parseStatement(p, indent))
-            continue
-          var fieldName = Node(kind: nkIdent, name: p.curr.value)
+        if p.curr.kind == tkPunct and p.curr.value == "*":
+          fieldName = Node(kind: nkPostfix,
+            children: @[fieldName, Node(kind: nkIdent, name: "*")])
           walk p
-          if p.curr.kind == tkPunct and p.curr.value == "*":
-            fieldName = Node(kind: nkPostfix,
-              children: @[fieldName, Node(kind: nkIdent, name: "*")])
+        # Handle Nim pragma {.xxx.} after field/type name
+        while p.curr.kind == tkPunct and p.curr.value == "{" and
+              p.next.kind == tkPunct and p.next.value == ".":
+          walk p # consume '{'
+          body.children.add(parsePragma(p))
+        # Handle comma-separated fields: prev*, curr*: Type
+        if p.curr.kind == tkPunct and p.curr.value == ",":
+          body.children.add(fieldName)
+          walk p
+        elif p.curr.kind == tkPunct and p.curr.value == "=":
+          walk p
+          let rhsStart = p.curr.value
+          if rhsStart == "object":
+            body.children.add(Node(kind: nkInfix,
+              children: @[Node(kind: nkIdent, name: "="),
+                          fieldName,
+                          Node(kind: nkIdent, name: "object")]))
+            let objIndent = p.curr.col
             walk p
-          # Handle Nim pragma {.xxx.} after field/type name
-          while p.curr.kind == tkPunct and p.curr.value == "{" and
-                p.next.kind == tkPunct and p.next.value == ".":
-            walk p # consume '{'
-            body.children.add(parsePragma(p))
-          # Handle comma-separated fields: prev*, curr*: Type
-          if p.curr.kind == tkPunct and p.curr.value == ",":
-            body.children.add(fieldName)
-            walk p
-          elif p.curr.kind == tkPunct and p.curr.value == "=":
-            walk p
-            let rhsStart = p.curr.value
-            if rhsStart == "object":
-              body.children.add(Node(kind: nkInfix,
-                children: @[Node(kind: nkIdent, name: "="),
-                           fieldName,
-                           Node(kind: nkIdent, name: "object")]))
-              let objIndent = p.curr.col
+            if p.curr.kind == tkIdentifier and p.curr.value == "of":
               walk p
-              if p.curr.kind == tkIdentifier and p.curr.value == "of":
-                walk p
-                body.children.add(Node(kind: nkIdent, name: p.curr.value))
-                walk p
-              body.children.add(parseObjectBody(p, objIndent))
-            elif rhsStart == "ref" and p.next.kind == tkIdentifier and
-                 p.next.value == "object":
+              body.children.add(Node(kind: nkIdent, name: p.curr.value))
               walk p
-              body.children.add(Node(kind: nkInfix,
-                children: @[Node(kind: nkIdent, name: "="),
-                           fieldName,
-                           Node(kind: nkIdent, name: "ref object")]))
-              walk p # consume 'object'
-              let objIndent = p.curr.col
-              if p.curr.kind == tkIdentifier and p.curr.value == "of":
-                walk p
-                body.children.add(Node(kind: nkIdent, name: p.curr.value))
-                walk p
-              body.children.add(parseObjectBody(p, objIndent))
-            elif rhsStart == "ptr" and p.next.kind == tkIdentifier and
-                 p.next.value == "object":
-              walk p
-              body.children.add(Node(kind: nkInfix,
-                children: @[Node(kind: nkIdent, name: "="),
-                           fieldName,
-                           Node(kind: nkIdent, name: "ptr object")]))
-              walk p # consume 'object'
-              let objIndent = p.curr.col
-              body.children.add(parseObjectBody(p, objIndent))
-            elif rhsStart == "enum":
-              body.children.add(Node(kind: nkInfix,
-                children: @[Node(kind: nkIdent, name: "="),
-                           fieldName,
-                           Node(kind: nkIdent, name: "enum")]))
-              walk p
-              let enumIndent = p.curr.col
-              body.children.add(parseEnumBody(p, enumIndent))
-            else:
-              body.children.add(Node(kind: nkInfix,
-                children: @[Node(kind: nkIdent, name: "="),
-                           fieldName,
-                           parseExpression(p)]))
-          elif p.curr.kind == tkPunct and p.curr.value == ":":
+            body.children.add(parseObjectBody(p, objIndent))
+          elif rhsStart == "ref" and p.next.kind == tkIdentifier and
+                p.next.value == "object":
             walk p
             body.children.add(Node(kind: nkInfix,
-              children: @[Node(kind: nkIdent, name: ":"),
-                         fieldName,
-                         parseExpression(p)]))
+              children: @[Node(kind: nkIdent, name: "="),
+                          fieldName,
+                          Node(kind: nkIdent, name: "ref object")]))
+            walk p # consume 'object'
+            let objIndent = p.curr.col
+            if p.curr.kind == tkIdentifier and p.curr.value == "of":
+              walk p
+              body.children.add(Node(kind: nkIdent, name: p.curr.value))
+              walk p
+            body.children.add(parseObjectBody(p, objIndent))
+          elif rhsStart == "ptr" and p.next.kind == tkIdentifier and
+                p.next.value == "object":
+            walk p
+            body.children.add(Node(kind: nkInfix,
+              children: @[Node(kind: nkIdent, name: "="),
+                          fieldName,
+                          Node(kind: nkIdent, name: "ptr object")]))
+            walk p # consume 'object'
+            let objIndent = p.curr.col
+            body.children.add(parseObjectBody(p, objIndent))
+          elif rhsStart == "enum":
+            body.children.add(Node(kind: nkInfix,
+              children: @[Node(kind: nkIdent, name: "="),
+                          fieldName,
+                          Node(kind: nkIdent, name: "enum")]))
+            walk p
+            let enumIndent = p.curr.col
+            body.children.add(parseEnumBody(p, enumIndent))
+          elif rhsStart == "tuple":
+            body.children.add(Node(kind: nkInfix,
+              children: @[Node(kind: nkIdent, name: "="),
+                          fieldName,
+                          Node(kind: nkIdent, name: "tuple")]))
+            walk p
+            let tupIndent = p.curr.col
+            body.children.add(parseObjectBody(p, tupIndent))
           else:
-            body.children.add(fieldName)
+            body.children.add(Node(kind: nkInfix,
+              children: @[Node(kind: nkIdent, name: "="),
+                          fieldName,
+                          parseExpression(p)]))
+        elif p.curr.kind == tkPunct and p.curr.value == ":":
+          walk p
+          body.children.add(Node(kind: nkInfix,
+            children: @[Node(kind: nkIdent, name: ":"),
+                        fieldName,
+                        parseExpression(p)]))
         else:
-          body.children.add(parseStatement(p, indent))
-      result.children.add(body)
+          body.children.add(fieldName)
+      else:
+        body.children.add(parseStatement(p, indent))
+    result.children.add(body)
 
   stmtHandler p, "defer":
     ## defer: body
@@ -1053,17 +1077,20 @@ proc nimHandlers*(p: var GenericParser) =
   stmtHandler p, "from":
     ## from module/path import name1, name2
     walk p # consume 'from'
-    let modulePath = parseImportPath(p)
+    expectIdent:
+      discard
+    let modulePath = Node(kind: nkIdent, name: p.curr.value)
+    walk p
     result = Node(kind: nkStatement)
     result.children.add(Node(kind: nkIdent, name: "from"))
     result.children.add(modulePath)
     if p.curr.kind == tkIdentifier and p.curr.value == "import":
       walk p
       let imports = Node(kind: nkIdentDefs)
-      while p.curr.kind == tkIdentifier:
-        imports.children.add(Node(kind: nkIdent, name: p.curr.value))
+      imports.children.add(parseImportPath(p))
+      while p.curr.kind == tkPunct and p.curr.value == ",":
         walk p
-        p.walkOpt(",")
+        imports.children.add(parseImportPath(p))
       result.children.add(imports)
     p.walkOpt(";")
 
@@ -1079,11 +1106,14 @@ proc nimHandlers*(p: var GenericParser) =
     p.walkOpt(";")
 
   stmtHandler p, "export":
-    ## export name  or  export module/path
+    ## export name, name2  or  export module/path
     walk p # consume 'export'
     result = Node(kind: nkStatement)
     result.children.add(Node(kind: nkIdent, name: "export"))
     result.children.add(parseImportPath(p))
+    while p.curr.kind == tkPunct and p.curr.value == ",":
+      walk p
+      result.children.add(parseImportPath(p))
     p.walkOpt(";")
 
 proc parseNim*(path: string): OpenAstProgram =
