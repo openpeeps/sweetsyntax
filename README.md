@@ -46,37 +46,7 @@ SweetSyntax is written in Nim, and thanks to Nim's versatile compilation model, 
 The Nim library compiles to a small, self-contained shared object that any FFI-capable language can load, making SweetSyntax a portable parsing engine for your polyglot projects.
 
 ## Examples
-
-### Parsing JavaScript
-
-```nim
-import sweetsyntax
-
-# Parse a file — the library detects the language from the extension
-let program = parseJavaScript("app.js")
-echo toJson(program)
-```
-
-### Parsing with custom features
-
-```nim
-let program = parseScript("module.ts", jsHandlers,
-  features = {featAsync, featArrowFn, featGenerators,
-              featLabeledStmt, featTemplateLit})
-```
-
-### Parsing with custom language handlers
-
-```nim
-proc myHandlers(p: var GenericParser) =
-  stmtHandler p, "myKeyword":
-    walk p
-    result = Node(kind: nkStatement,
-      children: @[Node(kind: nkIdent, name: "myKeyword"), parseExpression(p)])
-
-let program = parseScript("file.ext", myHandlers,
-  features = {featAsync, featArrowFn})
-```
+_todo_
 
 ### Error Reporting
 SweetSyntax has built-in support for context-aware reporting. For example:
