@@ -432,42 +432,155 @@ proc jsHandlers*(p: var GenericParser) =
       children: @[Node(kind: nkIdent, name: "block"), labelNode, parseBlock(p)])
 
   stmtHandler p, "import":
-    ## import module  or  import module / sub  or  import module1, module2
+    ## ES module import: import x from 'y', import {x} from 'y',
+    ## import * as x from 'y', import 'y', import x, y (Nim compat)
     walk p # consume 'import'
     result = Node(kind: nkImport)
-    expectIdent:
-      result.children.add(Node(kind: nkIdent, name: p.curr.value))
-    walk p
-    while p.curr.kind == tkPunct and p.curr.value == ",":
-      walk p
-      expectIdent:
-        result.children.add(Node(kind: nkIdent, name: p.curr.value))
-      walk p
-    p.walkOpt(";")
 
-  stmtHandler p, "from":
-    ## from module import name1, name2
-    walk p # consume 'from'
-    var moduleName: Node
-    expectIdent:
-      moduleName = Node(kind: nkIdent, name: p.curr.value)
-    walk p
-    result = Node(kind: nkStatement)
-    result.children.add(Node(kind: nkIdent, name: "from"))
-    result.children.add(moduleName)
-    if p.curr.kind == tkIdentifier and p.curr.value == "import":
+    # Side-effect import: import 'module'
+    if p.curr.kind == tkString:
+      result.children.add(newEmptyNode())
+      result.children.add(Node(kind: nkLitString, valStr: p.curr.value))
       walk p
-      let imports = Node(kind: nkIdentDefs)
-      expectIdent:
-        imports.children.add(Node(kind: nkIdent, name: p.curr.value))
+      p.walkOpt(";")
+      return
+
+    # import { named1, named2 } from 'module'
+    if p.curr.kind == tkPunct and p.curr.value == "{":
+      result.children.add(newEmptyNode())
       walk p
-      while p.curr.kind == tkPunct and p.curr.value == ",":
+      let named = Node(kind: nkIdentDefs)
+      while not (p.curr.kind == tkPunct and p.curr.value == "}"):
+        if p.curr.kind == tkEOF: error(p, "Unexpected EOF in import")
+        if p.curr.kind in {tkComment, tkDocComment}:
+          discard parseCommentGeneric(p); continue
+        if p.curr.kind == tkIdentifier:
+          let name = Node(kind: nkIdent, name: p.curr.value)
+          walk p
+          if p.curr.kind == tkIdentifier and p.curr.value == "as":
+            walk p
+            expectIdent:
+              named.children.add(Node(kind: nkInfix,
+                children: @[Node(kind: nkIdent, name: "as"), name,
+                            Node(kind: nkIdent, name: p.curr.value)]))
+            walk p
+          else:
+            named.children.add(name)
+        p.walkOpt(",")
+      p.expectWalk("}")
+      result.children.add(named)
+      if p.curr.kind == tkIdentifier and p.curr.value == "from":
+        walk p
+        expectString:
+          result.children.add(Node(kind: nkLitString, valStr: p.curr.value))
+        walk p
+      p.walkOpt(";")
+      return
+
+    # import * as name from 'module'
+    if p.curr.kind == tkPunct and p.curr.value == "*":
+      result.children.add(newEmptyNode())
+      walk p
+      if p.curr.kind == tkIdentifier and p.curr.value == "as":
         walk p
         expectIdent:
-          imports.children.add(Node(kind: nkIdent, name: p.curr.value))
+          result.children.add(Node(kind: nkInfix,
+            children: @[Node(kind: nkIdent, name: "as"),
+                        Node(kind: nkIdent, name: "*"),
+                        Node(kind: nkIdent, name: p.curr.value)]))
         walk p
-      result.children.add(imports)
-    p.walkOpt(";")
+      if p.curr.kind == tkIdentifier and p.curr.value == "from":
+        walk p
+        expectString:
+          result.children.add(Node(kind: nkLitString, valStr: p.curr.value))
+        walk p
+      p.walkOpt(";")
+      return
+
+    # import identifier ...
+    if p.curr.kind == tkIdentifier:
+      let defaultName = Node(kind: nkIdent, name: p.curr.value)
+      walk p
+
+      # import defaultExport from 'module'
+      if p.curr.kind == tkIdentifier and p.curr.value == "from":
+        result.children.add(defaultName)
+        walk p
+        expectString:
+          result.children.add(Node(kind: nkLitString, valStr: p.curr.value))
+        walk p
+        p.walkOpt(";")
+        return
+
+      # import defaultExport, { named } from 'module'
+      # or Nim-style import a, b
+      if p.curr.kind == tkPunct and p.curr.value == ",":
+        result.children.add(defaultName)
+        walk p
+        # import defaultExport, { named } from 'module'
+        if p.curr.kind == tkPunct and p.curr.value == "{":
+          let named = Node(kind: nkIdentDefs)
+          walk p
+          while not (p.curr.kind == tkPunct and p.curr.value == "}"):
+            if p.curr.kind == tkEOF: error(p, "Unexpected EOF in import")
+            if p.curr.kind in {tkComment, tkDocComment}:
+              discard parseCommentGeneric(p); continue
+            if p.curr.kind == tkIdentifier:
+              let name = Node(kind: nkIdent, name: p.curr.value)
+              walk p
+              if p.curr.kind == tkIdentifier and p.curr.value == "as":
+                walk p
+                expectIdent:
+                  named.children.add(Node(kind: nkInfix,
+                    children: @[Node(kind: nkIdent, name: "as"), name,
+                                Node(kind: nkIdent, name: p.curr.value)]))
+                walk p
+              else:
+                named.children.add(name)
+            p.walkOpt(",")
+          p.expectWalk("}")
+          result.children.add(named)
+          if p.curr.kind == tkIdentifier and p.curr.value == "from":
+            walk p
+            expectString:
+              result.children.add(Node(kind: nkLitString, valStr: p.curr.value))
+            walk p
+          p.walkOpt(";")
+          return
+
+        # import defaultExport, * as name from 'module'
+        if p.curr.kind == tkPunct and p.curr.value == "*":
+          walk p
+          if p.curr.kind == tkIdentifier and p.curr.value == "as":
+            walk p
+            expectIdent:
+              result.children.add(Node(kind: nkInfix,
+                children: @[Node(kind: nkIdent, name: "as"),
+                            Node(kind: nkIdent, name: "*"),
+                            Node(kind: nkIdent, name: p.curr.value)]))
+            walk p
+          if p.curr.kind == tkIdentifier and p.curr.value == "from":
+            walk p
+            expectString:
+              result.children.add(Node(kind: nkLitString, valStr: p.curr.value))
+            walk p
+          p.walkOpt(";")
+          return
+
+        # Nim-style: import a, b, c
+        result.children.add(Node(kind: nkIdent, name: p.curr.value))
+        walk p
+        while p.curr.kind == tkPunct and p.curr.value == ",":
+          walk p
+          expectIdent:
+            result.children.add(Node(kind: nkIdent, name: p.curr.value))
+          walk p
+        p.walkOpt(";")
+        return
+
+      # Nim-style: import name
+      result.children.add(defaultName)
+      p.walkOpt(";")
 
   stmtHandler p, "include":
     ## include file  or  include "file.nim"
@@ -479,10 +592,89 @@ proc jsHandlers*(p: var GenericParser) =
     p.walkOpt(";")
 
   stmtHandler p, "export":
-    ## export name  or  export module/name
+    ## ES module export: export default, export {x}, export {x} from,
+    ## export function/class/var/let/const, export * from,
+    ## Nim-style: export name
     walk p # consume 'export'
     result = Node(kind: nkStatement)
     result.children.add(Node(kind: nkIdent, name: "export"))
+
+    # export default expression
+    if p.curr.kind == tkIdentifier and p.curr.value == "default":
+      walk p
+      result.children.add(Node(kind: nkIdent, name: "default"))
+      result.children.add(parseExpression(p))
+      p.walkOpt(";")
+      return
+
+    # export { name1, name2 } or export { name1 } from 'module'
+    if p.curr.kind == tkPunct and p.curr.value == "{":
+      walk p
+      let named = Node(kind: nkIdentDefs)
+      while not (p.curr.kind == tkPunct and p.curr.value == "}"):
+        if p.curr.kind == tkEOF: error(p, "Unexpected EOF in export")
+        if p.curr.kind in {tkComment, tkDocComment}:
+          discard parseCommentGeneric(p); continue
+        if p.curr.kind == tkIdentifier:
+          let name = Node(kind: nkIdent, name: p.curr.value)
+          walk p
+          if p.curr.kind == tkIdentifier and p.curr.value == "as":
+            walk p
+            expectIdent:
+              named.children.add(Node(kind: nkInfix,
+                children: @[Node(kind: nkIdent, name: "as"), name,
+                            Node(kind: nkIdent, name: p.curr.value)]))
+            walk p
+          else:
+            named.children.add(name)
+        p.walkOpt(",")
+      p.expectWalk("}")
+      result.children.add(named)
+      if p.curr.kind == tkIdentifier and p.curr.value == "from":
+        walk p
+        expectString:
+          result.children.add(Node(kind: nkLitString, valStr: p.curr.value))
+        walk p
+      p.walkOpt(";")
+      return
+
+    # export * from 'module' or export * as name from 'module'
+    if p.curr.kind == tkPunct and p.curr.value == "*":
+      walk p
+      if p.curr.kind == tkIdentifier and p.curr.value == "as":
+        walk p
+        expectIdent:
+          result.children.add(Node(kind: nkInfix,
+            children: @[Node(kind: nkIdent, name: "as"),
+                        Node(kind: nkIdent, name: "*"),
+                        Node(kind: nkIdent, name: p.curr.value)]))
+        walk p
+      else:
+        result.children.add(Node(kind: nkIdent, name: "*"))
+      if p.curr.kind == tkIdentifier and p.curr.value == "from":
+        walk p
+        expectString:
+          result.children.add(Node(kind: nkLitString, valStr: p.curr.value))
+        walk p
+      p.walkOpt(";")
+      return
+
+    # export function name() {}
+    if p.curr.kind == tkIdentifier and p.curr.value == "function":
+      result.children.add(p.stmtHandlers["function"](p))
+      return
+
+    # export class Name {}
+    if p.curr.kind == tkIdentifier and p.curr.value == "class":
+      result.children.add(p.stmtHandlers["class"](p))
+      return
+
+    # export var/let/const ...
+    if p.curr.kind == tkIdentifier and p.curr.value in ["var", "let", "const"]:
+      result.children.add(p.stmtHandlers["declarator"](p))
+      return
+
+    # Nim-style: export name
     expectIdent:
       result.children.add(Node(kind: nkIdent, name: p.curr.value))
     walk p
