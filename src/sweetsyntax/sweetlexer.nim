@@ -45,9 +45,15 @@ type
     line*, col*, pos*: int # meta information for error reporting and token metadata
     current*: char
     usingMemFile: bool
-    spec*: SweetSpec
-      ## The syntax specification that defines how to tokenize the input, including
-      ## the symbols, identifiers, and filters to apply.
+    symbols*: Table[string, string]
+    identifiers*: Table[string, string]
+    inlineComment*: Option[string]
+    blockComment*: array[2, string]
+    openTag*: Option[string]
+    closeTag*: Option[string]
+    features*: set[LanguageFeature]
+    allOps*: seq[string]
+    filters*: seq[SweetFilter]
     enableFilters: bool
     filtersReady: bool
     filterHits: seq[FilterHit]
@@ -267,17 +273,14 @@ proc prepareFilters(l: SweetLexer) =
   l.filterHits.setLen(0)
   l.filterScanIdx = 0
 
-  when compiles(l.spec.filters):
-    if l.spec.filters.len == 0:
-      return
-  else:
+  if l.filters.len == 0:
     return
 
   let src = l.getFullInput()
   if src.len == 0:
     return
 
-  for f in l.spec.filters:
+  for f in l.filters:
     if f.attr.len == 0:
       continue
 
@@ -333,8 +336,8 @@ proc makeRange(l: SweetLexer, k: SweetTokenKind, startPos, startLine, startCol: 
   # For comments, store the comment content without the syntax markers
   if k == tkComment:
     # Strip inline comment syntax (e.g., "//")
-    if l.spec.inlineComment.isSome():
-      let commentSyntax = l.spec.inlineComment.get()
+    if l.inlineComment.isSome():
+      let commentSyntax = l.inlineComment.get()
       if lexeme.startsWith(commentSyntax):
         # Store only the comment text, not the "//"
         result.start = startPos + commentSyntax.len
@@ -343,18 +346,18 @@ proc makeRange(l: SweetLexer, k: SweetTokenKind, startPos, startLine, startCol: 
           inc result.start
   elif k == tkDocComment:
     # Strip block comment syntax (e.g., "/**" and "*/")
-    let startSyntax = l.spec.blockComment[0]
-    let endSyntax = l.spec.blockComment[1]
+    let startSyntax = l.blockComment[0]
+    let endSyntax = l.blockComment[1]
     if lexeme.startsWith(startSyntax):
       result.start = startPos + startSyntax.len
     if lexeme.endsWith(endSyntax):
       result.stop = result.stop - endSyntax.len
   elif k == tkIdentifier:
-    let identAttr = lookupAttrByLexeme(l.spec.identifiers, lexeme)
+    let identAttr = lookupAttrByLexeme(l.identifiers, lexeme)
     if identAttr.len > 0:
       result.attr.addAttrOnce(identAttr)
   elif k == tkPunct:
-    let symAttr = lookupAttrByLexeme(l.spec.symbols, lexeme)
+    let symAttr = lookupAttrByLexeme(l.symbols, lexeme)
     if symAttr.len > 0:
       result.attr.addAttrOnce(symAttr)
   # elif k == tkRegex:
@@ -373,8 +376,8 @@ proc getToken*(l: var SweetLexer): Token =
 
 
   # Skip open tags (e.g. `<?php`) — transparently consumed
-  if l.spec.open_tag.isSome and l.current == l.spec.open_tag.get[0]:
-    let tag = l.spec.open_tag.get
+  if l.openTag.isSome and l.current == l.openTag.get[0]:
+    let tag = l.openTag.get
     var matches = true
     for i in 0 ..< tag.len:
       if l.charAt(l.pos + i) != tag[i]: matches = false; break
@@ -384,8 +387,8 @@ proc getToken*(l: var SweetLexer): Token =
       return l.getToken() # recurse — parser only sees the real tokens
 
   # Close tags (e.g. `?>`) — treat as EOF
-  if l.spec.close_tag.isSome and l.current == l.spec.close_tag.get[0]:
-    let tag = l.spec.close_tag.get
+  if l.closeTag.isSome and l.current == l.closeTag.get[0]:
+    let tag = l.closeTag.get
     var matches = true
     for i in 0 ..< tag.len:
       if l.charAt(l.pos + i) != tag[i]: matches = false; break
@@ -516,10 +519,10 @@ proc getToken*(l: var SweetLexer): Token =
     return l.makeRange(tkString, startPos, startLine, startCol) # unterminated, but safe
 
   # Check for block comments FIRST (before inline comments and operators)
-  if l.spec.blockComment[0].len > 0 and l.current == l.spec.blockComment[0][0]:
+  if l.blockComment[0].len > 0 and l.current == l.blockComment[0][0]:
     let commentStart = l.pos
-    let startSyntax = l.spec.blockComment[0]
-    let endSyntax = l.spec.blockComment[1]
+    let startSyntax = l.blockComment[0]
+    let endSyntax = l.blockComment[1]
     var matchesStart = true
     for i in 0 ..< startSyntax.len:
       if l.charAt(l.pos + i) != startSyntax[i]:
@@ -560,8 +563,8 @@ proc getToken*(l: var SweetLexer): Token =
       )
 
   # Check for inline comments
-  if l.spec.inlineComment.isSome():
-    let commentSyntax = l.spec.inlineComment.get()
+  if l.inlineComment.isSome():
+    let commentSyntax = l.inlineComment.get()
     if commentSyntax.len > 0 and l.current == commentSyntax[0]:
       var matchesSyntax = true
       for i in 0 ..< commentSyntax.len:
@@ -584,7 +587,7 @@ proc getToken*(l: var SweetLexer): Token =
   # Backtick-quoted identifiers (Nim) or template literals (JS)
   if l.current == '`':
     # Check if this is a template literal language
-    let isTemplateLit = l.spec.features != nil and l.spec.features.templateLiterals
+    let isTemplateLit = featTemplateLit in l.features
     if isTemplateLit:
       discard l.advance() # consume opening '`'
       while l.current != '\0':
@@ -657,30 +660,10 @@ proc getToken*(l: var SweetLexer): Token =
       if opAccum.len > 0:
         let candidate = opAccum & nextCh
         var found = false
-        for sym in l.spec.symbols.keys:
-          if sym.startsWith(candidate):
+        for tok in l.allOps:
+          if tok.startsWith(candidate):
             found = true
             break
-        if not found and l.spec.operators != nil:
-          for g in l.spec.operators.prefix:
-            for tok in g.tokens:
-              if tok.startsWith(candidate):
-                found = true; break
-            if found: break
-          if not found:
-            for g in l.spec.operators.infix:
-              for tok in g.tokens:
-                if tok.startsWith(candidate):
-                  found = true; break
-              if found: break
-          if not found and l.spec.operators.assignment != nil:
-            for tok in l.spec.operators.assignment.tokens:
-              if tok.startsWith(candidate):
-                found = true; break
-          if not found and l.spec.operators.ternary != nil:
-            if l.spec.operators.ternary.token.startsWith(candidate):
-              found = true
-        # Also allow `=>` (arrow function) which is handled at the parser level
         if not found and candidate != "=>":
           break
       opAccum.add(nextCh)
@@ -688,6 +671,55 @@ proc getToken*(l: var SweetLexer): Token =
     return l.makeRange(tkPunct, startPos, startLine, startCol)
 
 proc initLexerFromFile*(spec: SweetSpec, path: string, enableFilters: bool = false): SweetLexer =
+  ## Initialize lexer from a file using memfiles for efficient access.
+  ## This overload accepts a SweetSpec and extracts lexer data from it.
+  result = SweetLexer(
+    input: path,
+    mf: memfiles.open(path, fmRead),
+    data: nil,
+    len: 0,
+    line: 1,
+    col: 1,
+    pos: 0,
+    symbols: spec.symbols,
+    identifiers: spec.identifiers,
+    inlineComment: spec.inline_comment,
+    blockComment: spec.block_comment,
+    openTag: spec.open_tag,
+    closeTag: spec.close_tag,
+    filters: spec.filters,
+    enableFilters: enableFilters,
+    usingMemFile: true,
+    filtersReady: false,
+    filterHits: @[],
+    filterScanIdx: 0
+  )
+  if spec.features != nil:
+    if spec.features.regexLiterals: result.features.incl(featRegex)
+    if spec.features.asyncAwait: result.features.incl(featAsync)
+    if spec.features.generators: result.features.incl(featGenerators)
+    if spec.features.arrowFunctions: result.features.incl(featArrowFn)
+    if spec.features.templateLiterals: result.features.incl(featTemplateLit)
+    if spec.features.labeledStatements: result.features.incl(featLabeledStmt)
+    if spec.features.commandSyntax: result.features.incl(featCommandSyntax)
+  # Build allOps from spec operators
+  if spec.operators != nil:
+    result.allOps = @[]
+    for k in spec.symbols.keys: result.allOps.add(k)
+    for g in spec.operators.prefix:
+      for tok in g.tokens: result.allOps.add(tok)
+    for g in spec.operators.infix:
+      for tok in g.tokens: result.allOps.add(tok)
+      for kw in g.keywords: result.allOps.add(kw)
+    if spec.operators.assignment != nil:
+      for tok in spec.operators.assignment.tokens: result.allOps.add(tok)
+    if spec.operators.ternary != nil:
+      result.allOps.add(spec.operators.ternary.token)
+  result.data = cast[ptr UncheckedArray[char]](result.mf.mem)
+  result.len = result.mf.size
+  result.current = result.charAt(0)
+
+proc initLexerFromFile*(pre: SweetLexerInit, path: string, enableFilters: bool = false): SweetLexer =
   ## Initialize lexer from a file using memfiles for efficient access.
   result = SweetLexer(
     input: path,
@@ -697,7 +729,14 @@ proc initLexerFromFile*(spec: SweetSpec, path: string, enableFilters: bool = fal
     line: 1,
     col: 1,
     pos: 0,
-    spec: spec,
+    symbols: pre.symbols,
+    identifiers: pre.identifiers,
+    inlineComment: pre.inlineComment,
+    blockComment: pre.blockComment,
+    openTag: pre.openTag,
+    closeTag: pre.closeTag,
+    features: pre.features,
+    allOps: pre.allOps,
     enableFilters: enableFilters,
     usingMemFile: true,
     filtersReady: false,
@@ -709,6 +748,51 @@ proc initLexerFromFile*(spec: SweetSpec, path: string, enableFilters: bool = fal
   result.current = result.charAt(0)
 
 proc initLexer*(spec: SweetSpec, input: sink string, enableFilters: bool = false): SweetLexer =
+  ## Initialize lexer from raw source text (SweetSpec-based, backward compat).
+  result = SweetLexer(
+    input: input,
+    data: nil,
+    len: input.len,
+    line: 1,
+    col: 1,
+    pos: 0,
+    current: '\0',
+    symbols: spec.symbols,
+    identifiers: spec.identifiers,
+    inlineComment: spec.inline_comment,
+    blockComment: spec.block_comment,
+    openTag: spec.open_tag,
+    closeTag: spec.close_tag,
+    filters: spec.filters,
+    enableFilters: enableFilters,
+    filtersReady: false,
+    filterHits: @[],
+    filterScanIdx: 0
+  )
+  if spec.features != nil:
+    if spec.features.regexLiterals: result.features.incl(featRegex)
+    if spec.features.asyncAwait: result.features.incl(featAsync)
+    if spec.features.generators: result.features.incl(featGenerators)
+    if spec.features.arrowFunctions: result.features.incl(featArrowFn)
+    if spec.features.templateLiterals: result.features.incl(featTemplateLit)
+    if spec.features.labeledStatements: result.features.incl(featLabeledStmt)
+    if spec.features.commandSyntax: result.features.incl(featCommandSyntax)
+  if spec.operators != nil:
+    result.allOps = @[]
+    for k in spec.symbols.keys: result.allOps.add(k)
+    for g in spec.operators.prefix:
+      for tok in g.tokens: result.allOps.add(tok)
+    for g in spec.operators.infix:
+      for tok in g.tokens: result.allOps.add(tok)
+      for kw in g.keywords: result.allOps.add(kw)
+    if spec.operators.assignment != nil:
+      for tok in spec.operators.assignment.tokens: result.allOps.add(tok)
+    if spec.operators.ternary != nil:
+      result.allOps.add(spec.operators.ternary.token)
+  if result.len > 0:
+    result.current = result.charAt(0)
+
+proc initLexer*(pre: SweetLexerInit, input: sink string, enableFilters: bool = false): SweetLexer =
   ## Initialize lexer from raw source text, this is efficient for small inputs
   result = SweetLexer(
     input: input,
@@ -718,7 +802,14 @@ proc initLexer*(spec: SweetSpec, input: sink string, enableFilters: bool = false
     col: 1,
     pos: 0,
     current: '\0',
-    spec: spec,
+    symbols: pre.symbols,
+    identifiers: pre.identifiers,
+    inlineComment: pre.inlineComment,
+    blockComment: pre.blockComment,
+    openTag: pre.openTag,
+    closeTag: pre.closeTag,
+    features: pre.features,
+    allOps: pre.allOps,
     enableFilters: enableFilters,
     filtersReady: false,
     filterHits: @[],

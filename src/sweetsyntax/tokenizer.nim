@@ -19,18 +19,20 @@ type
     col: int
     pos: int
 
-proc getToken*[T](p: var T): TokenTuple =
+proc getToken*[T](p: var T): TokenTuple {.inline.} =
   ## Retrieve the next token from the input stream, advancing
   ## the lexer's position accordingly.
   let token = p.lexer.getToken()
   let val = p.lexer.getTokenValue(token)
-  # Check if it's a known symbol
-  if token.kind == tkPunct and p.lexer.spec.symbols.hasKey(val):
-    return (token.kind, p.lexer.spec.symbols[val], val, token.line, token.col, token.pos)
-  
-  # Check if it's an identifier
-  if p.lexer.spec.identifiers.hasKey(val):
-    return (token.kind, p.lexer.spec.identifiers[val], val, token.line, token.col, token.pos)
 
-  # Otherwise, return the raw token information without a known identifier
+  # Single lookup: symbols for punctuation, identifiers for keywords
+  if token.kind == tkPunct:
+    let ident = p.lexer.symbols.getOrDefault(val)
+    if ident.len > 0:
+      return (token.kind, ident, val, token.line, token.col, token.pos)
+  else:
+    let ident = p.lexer.identifiers.getOrDefault(val)
+    if ident.len > 0:
+      return (token.kind, ident, val, token.line, token.col, token.pos)
+
   return (token.kind, "", val, token.line, token.col, token.pos)

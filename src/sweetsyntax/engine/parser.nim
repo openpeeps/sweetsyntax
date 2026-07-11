@@ -24,15 +24,6 @@ import ../[config, sweetlexer]
 import ../tokenizer, ./ast
 
 type
-  Assoc* = enum
-    leftAssoc = "left"
-    rightAssoc = "right"
-
-  InfixEntry* = object
-    precedence*: int
-    assoc*: Assoc
-    special*: string   # "dot", "bracket", "call", "ternary", ""
-
   PrefixHandler* = proc(p: var GenericParser, minPrec: int = 0): Node {.closure.}
   StmtHandler* = proc(p: var GenericParser, parentCol: int = -1): Node {.closure.}
   ExpressionHandler* = proc(p: var GenericParser, lhs: Node, minPrec: int): Node {.nimcall.}
@@ -40,6 +31,12 @@ type
   GenericParser* = object
     lexer*: SweetLexer
     prev*, curr*, next*: TokenTuple
+
+    # Language spec data (moved from SweetSpec for compile-time prebuilding)
+    symbols*: Table[string, string]
+    identifiers*: Table[string, string]
+    inlineCommentOpt*: Option[string]
+    blockCommentSpec*: array[2, string]
 
     # Precompiled lookup tables from YAML
     infixTable*: Table[string, InfixEntry]
@@ -63,13 +60,14 @@ type
     blockOpen*, blockClose*: string
     features*: set[LanguageFeature]
       ## Set of enabled language features (e.g. featAsync, featGenerators) that can be used
+
   
   OpenAstParsingError* = object of CatchableError
 
 #
 # Walk helpers
 #
-proc walk*(p: var GenericParser, offset = 1) =
+proc walk*(p: var GenericParser, offset = 1) {.inline.} =
   p.prev = p.curr
   p.curr = p.next
   # Set expectRegex before reading the next token so the lexer can
@@ -80,7 +78,7 @@ proc walk*(p: var GenericParser, offset = 1) =
     (p.curr.kind == tkIdentifier and p.curr.value in p.expectRegexKeywords)
   p.next = p.getToken()
 
-proc walkOpt*(p: var GenericParser, val: string) =
+proc walkOpt*(p: var GenericParser, val: string) {.inline.} =
   if p.curr.kind == tkPunct and p.curr.value == val:
     walk p
 
@@ -735,6 +733,10 @@ proc compile*(spec: SweetSpec): GenericParser =
   ## for infix operators, statement keywords, block delimiters, and feature flags. The resulting
   ## `GenericParser` is then ready to be used for parsing source code according to the defined syntax
   result = GenericParser()
+  result.symbols = spec.symbols
+  result.identifiers = spec.identifiers
+  result.inlineCommentOpt = spec.inline_comment
+  result.blockCommentSpec = spec.block_comment
   result.blockOpen = if spec.blocks != nil: spec.blocks.open else: "{"
   result.blockClose = if spec.blocks != nil: spec.blocks.close else: "}"
 
@@ -835,6 +837,25 @@ template exprHandler*(parser: untyped, name: string, body: untyped) {.dirty.} =
   ## Helper macro to define expression handlers with cleaner syntax.
   `parser`.expressionHandlers[name] =
     proc(p: var GenericParser, lhs: Node, minPrec: int): Node {.nimcall.} = body
+
+proc applyPrecompiled*(p: var GenericParser, init: SweetLexerInit) =
+  ## Apply compile-time prebuilt tables to a GenericParser.
+  ## Eliminates the need for compile() + YAML spec at runtime.
+  p.symbols = init.symbols
+  p.identifiers = init.identifiers
+  p.inlineCommentOpt = init.inlineComment
+  p.blockCommentSpec = init.blockComment
+  p.features = init.features
+  p.infixTable = init.infixTable
+  p.assignOps = init.assignOps
+  p.prefixOps = init.prefixOps
+  p.postfixOps = init.postfixOps
+  p.keywordPrefixOps = init.keywordPrefixOps
+  p.stmtKeywords = init.stmtKeywords
+  p.expectRegexTokens = init.expectRegexTokens
+  p.expectRegexKeywords = init.expectRegexKeywords
+  p.blockOpen = init.blockOpen
+  p.blockClose = init.blockClose
 
 proc parseScript*(path: string, parsingCallback: ParsingCallback = nil,
             features: set[LanguageFeature] = {}): OpenAstProgram {.discardable.} =

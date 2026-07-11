@@ -8,7 +8,8 @@
 ## This module defines the core data structures and parsing logic for the SweetSyntax library,
 ## which provides a flexible syntax specification system for parsing and analyzing programming languages based on YAML configuration files.
 
-import std/[tables, options, strutils, strformat, os, sets]
+import std/[tables, options, sets, strutils, strformat, os]
+export tables, options, sets
 import pkg/openparser/[json, yaml]
 
 type
@@ -122,6 +123,15 @@ type
     commandSyntax*: bool
       ## whether the language supports command call syntax (e.g. Nim's `command arg1, arg2:`)
 
+  Assoc* = enum
+    leftAssoc = "left"
+    rightAssoc = "right"
+
+  InfixEntry* = object
+    precedence*: int
+    assoc*: Assoc
+    special*: string   # "dot", "bracket", "call", "ternary", ""
+
   LanguageFeature* = enum
     featRegex = "regex_literals"
     featAsync = "async_await"
@@ -130,6 +140,28 @@ type
     featTemplateLit = "template_literals"
     featLabeledStmt = "labeled_statements"
     featCommandSyntax = "command_syntax"
+
+  SweetLexerInit* = object
+    ## Compile-time prebuilt data for initializing the lexer without a SweetSpec.
+    ## Populated by buildParser macro.
+    symbols*: Table[string, string]
+    identifiers*: Table[string, string]
+    inlineComment*: Option[string]
+    blockComment*: array[2, string]
+    openTag*: Option[string]
+    closeTag*: Option[string]
+    features*: set[LanguageFeature]
+    allOps*: seq[string]
+    infixTable*: Table[string, InfixEntry]
+    assignOps*: Table[string, bool]
+    prefixOps*: HashSet[string]
+    postfixOps*: HashSet[string]
+    keywordPrefixOps*: HashSet[string]
+    stmtKeywords*: Table[string, string]
+    expectRegexTokens*: seq[string]
+    expectRegexKeywords*: seq[string]
+    blockOpen*: string
+    blockClose*: string
 
   SweetSpec* = ref object
     name*: string
