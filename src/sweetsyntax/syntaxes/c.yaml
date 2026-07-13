@@ -235,11 +235,16 @@ statements:
     keyword: "enum"
     handler: enum
   var_decl:
-    keywords: ["auto", "register", "static", "extern", "const", "volatile", "inline", "restrict"]
+    keywords: ["auto", "register", "static", "extern", "const", "volatile", "inline", "restrict",
+               "void", "char", "short", "int", "long", "float", "double", "signed", "unsigned",
+               "_Bool", "_Complex", "_Imaginary", "typeof"]
     handler: declarator
   static_assert_stmt:
     keyword: "_Static_assert"
     handler: static_assert
+  default_stmt:
+    keyword: "default"
+    handler: case
   sizeof_expr:
     keyword: "sizeof"
     handler: sizeof

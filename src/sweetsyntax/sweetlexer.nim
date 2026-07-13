@@ -335,8 +335,13 @@ proc makeRange(l: SweetLexer, k: SweetTokenKind, startPos, startLine, startCol: 
       l.getLexeme(startPos, stopPos)
   # For comments, store the comment content without the syntax markers
   if k == tkComment:
+    # Strip block comment markers (e.g., "/*" and "*/")
+    if l.blockComment[0].len > 0 and lexeme.startsWith(l.blockComment[0]):
+      result.start = startPos + l.blockComment[0].len
+      if lexeme.endsWith(l.blockComment[1]):
+        result.stop = result.stop - l.blockComment[1].len
     # Strip inline comment syntax (e.g., "//")
-    if l.inlineComment.isSome():
+    elif l.inlineComment.isSome():
       let commentSyntax = l.inlineComment.get()
       if lexeme.startsWith(commentSyntax):
         # Store only the comment text, not the "//"
@@ -350,6 +355,9 @@ proc makeRange(l: SweetLexer, k: SweetTokenKind, startPos, startLine, startCol: 
     let endSyntax = l.blockComment[1]
     if lexeme.startsWith(startSyntax):
       result.start = startPos + startSyntax.len
+      # Also skip the doc marker character (* or !) after /*
+      if l.charAt(result.start) in {'*', '!'}:
+        inc result.start
     if lexeme.endsWith(endSyntax):
       result.stop = result.stop - endSyntax.len
   elif k == tkIdentifier:

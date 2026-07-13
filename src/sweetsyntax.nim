@@ -21,7 +21,7 @@ when isMainModule:
   import pkg/openparser/json
   import pkg/kapsis
   import pkg/kapsis/[runtime, interactive/prompts]
-  import ./sweetsyntax/languages/[js, nim]
+  import ./sweetsyntax/languages/[js, nim, c]
 
   proc getLanguageHandlers(ext: string): (ParsingCallback, set[LanguageFeature]) =
     ## Resolve language handlers and features by file extension.
@@ -31,6 +31,8 @@ when isMainModule:
                         featLabeledStmt, featTemplateLit})
     of "nim", "nims":
       (nim.nimHandlers, {})
+    of "c", "h":
+      (c.cHandlers, {featLabeledStmt})
     else:
       (nil, {})
 
