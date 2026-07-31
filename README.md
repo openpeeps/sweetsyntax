@@ -124,6 +124,19 @@ echo toJson(ast)
 
 PHP support includes namespaces, `class`/`interface`/`trait`/`enum` bodies with visibility modifiers and typed properties, nullable/union signatures, arrow functions (`fn`), `match`, `goto`/labels, `declare`, function-like keywords (`new`, `isset`, `empty`, `unset`, `list`, `clone`, `exit`/`die`, `print`), `throw` as an expression, PHP 8 attributes (`#[...]`), alternative control-flow syntax (`if: ... endif;`), and multi-block `<?php ... ?>` files.
 
+Parse a Ruby script (`def`/`class`/`module`, blocks, modifiers, hashes, and more):
+
+```nim
+import sweetsyntax
+import sweetsyntax/languages/ruby
+import pkg/openparser/json
+
+let ast = parseRuby("hello.rb")
+echo toJson(ast)
+```
+
+Ruby support includes `def`/`class`/`module` (singleton methods, splat/keyword/block params, `rescue`/`ensure` clauses), `if`/`unless`/`while`/`until`/`for`/`case`/`begin`, `do...end` and `{|...|}` blocks, paren-less method calls (`puts x`, `require 'json'`, `attr_accessor :name`), modifier forms (`return nil unless ok`), hash literals (`{a: 1}` and `{a => 1}`), instance/class/global variables (`@x`/`@@x`/`$x`), symbols (`:sym`), ranges, ternary, safe navigation (`&.`), lambdas (`->`), and `#` comments.
+
 Highlight source as ANSI or HTML, or stream tokens/folds as NDJSON:
 
 ```nim
