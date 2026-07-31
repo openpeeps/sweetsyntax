@@ -148,6 +148,8 @@ type
     identifiers*: Table[string, string]
     inlineComment*: Option[string]
     blockComment*: array[2, string]
+    hashComments*: bool
+      # whether '#' starts an inline comment (e.g. PHP), unless followed by '['
     openTag*: Option[string]
     closeTag*: Option[string]
     features*: set[LanguageFeature]
@@ -172,6 +174,9 @@ type
       ## the syntax for inline comments, e.g. "//"
     block_comment*: array[2, string]
       ## the syntax for block comments, e.g. ["/*", "*/"]
+    hash_comments*: bool
+      ## whether '#' starts an inline comment (e.g. PHP), unless followed by '['
+      ## (PHP 8 attributes)
     symbols*: SymbolsTable
       ## mapping of symbol names to their literal representations, e.g. "plus" -> "+"
     identifiers*: IdentsTable

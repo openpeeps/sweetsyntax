@@ -60,6 +60,12 @@ type
     blockOpen*, blockClose*: string
     features*: set[LanguageFeature]
       ## Set of enabled language features (e.g. featAsync, featGenerators) that can be used
+    strictStatements*: bool
+      ## Enforce strict statement termination (PHP-like): a bare `;` raises a
+      ## parse error and expression statements must end with `;`.
+    statementTerminated*: bool
+      ## Set by handlers that consume their own statement terminator (or end
+      ## with `}`), so the strict `;` check can be skipped for them.
 
   
   OpenAstParsingError* = object of CatchableError
@@ -96,6 +102,9 @@ proc expect*(p: var GenericParser, expectedKind: SweetTokenKind, msg: string = "
 proc expectWalk*(p: var GenericParser, val: string, msg: string = "") =
   if p.curr.kind == tkPunct and p.curr.value == val:
     walk p
+  elif val == ";" and p.lexer.tagTerminated:
+    # a close tag (e.g. PHP's `?>`) implicitly terminates the statement
+    p.lexer.tagTerminated = false
   else:
     let emsg = if msg.len > 0: msg
                else: "Expected '" & val & "', got '" & p.curr.value & "'"
@@ -242,7 +251,14 @@ proc parseArrayLiteral(p: var GenericParser, minPrec: int = 0): Node =
     if p.curr.kind == tkPunct and p.curr.value in [",", "]"]:
       result.children.add(Node(kind: nkEmpty))
     else:
-      result.children.add(parseExpression(p))
+      let key = parseExpression(p)
+      # key => value pairs (PHP arrays, match-style mappings)
+      if p.curr.kind == tkPunct and p.curr.value == "=>":
+        walk p
+        result.children.add(Node(kind: nkColonExpr,
+          children: @[key, parseExpression(p)]))
+      else:
+        result.children.add(key)
     p.walkOpt(",")
   p.expectWalk("]")
 
@@ -644,6 +660,8 @@ proc parseStatement*(p: var GenericParser, parentCol: int = -1): Node =
     return parseBlock(p)
 
   if p.curr.kind == tkPunct and p.curr.value == ";":
+    if p.strictStatements:
+      error(p, "unexpected token `;`")
     walk p
     return
 
@@ -720,8 +738,13 @@ proc parseStatement*(p: var GenericParser, parentCol: int = -1): Node =
     return
 
   # Default: expression statement
+  p.statementTerminated = false
   result = parseCommaExpr(p)
-  p.walkOpt(";")
+  if p.strictStatements and not p.statementTerminated and not p.lexer.tagTerminated:
+    p.expectWalk(";")
+  else:
+    p.walkOpt(";")
+    p.lexer.tagTerminated = false
 
 #
 # Compiler: build tables from SweetSpec

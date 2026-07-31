@@ -49,6 +49,9 @@ type
     identifiers*: Table[string, string]
     inlineComment*: Option[string]
     blockComment*: array[2, string]
+    hashComments*: bool
+      # whether '#' starts an inline comment (e.g. PHP), unless followed by '['
+      # (PHP 8 attributes)
     openTag*: Option[string]
     closeTag*: Option[string]
     features*: set[LanguageFeature]
@@ -59,6 +62,9 @@ type
     filterHits: seq[FilterHit]
     filterScanIdx: int
     expectRegex*: bool
+    tagTerminated*: bool
+      # set to true when the last fetched token was preceded by a close tag
+      # (e.g. PHP's `?>`), which terminates the current statement
 
   Token* = ref object
     ## Represents a token with its kind, position, and
@@ -341,6 +347,11 @@ proc makeRange(l: SweetLexer, k: SweetTokenKind, startPos, startLine, startCol: 
       if lexeme.endsWith(l.blockComment[1]):
         result.stop = result.stop - l.blockComment[1].len
     # Strip inline comment syntax (e.g., "//")
+    elif l.hashComments and lexeme.startsWith("#"):
+      # Strip the '#' and leading whitespace
+      result.start = startPos + 1
+      while result.start < stopPos and l.charAt(result.start) == ' ':
+        inc result.start
     elif l.inlineComment.isSome():
       let commentSyntax = l.inlineComment.get()
       if lexeme.startsWith(commentSyntax):
@@ -394,13 +405,31 @@ proc getToken*(l: var SweetLexer): Token =
       l.skipWhitespace()
       return l.getToken() # recurse — parser only sees the real tokens
 
-  # Close tags (e.g. `?>`) — treat as EOF
+  # Close tags (e.g. `?>`) — skip any raw content until the next open tag
+  # (or EOF) and resume lexing, enabling multi-block files such as
+  # `<?php ... ?> <html> <?php ... ?>`.
   if l.closeTag.isSome and l.current == l.closeTag.get[0]:
     let tag = l.closeTag.get
     var matches = true
     for i in 0 ..< tag.len:
       if l.charAt(l.pos + i) != tag[i]: matches = false; break
     if matches:
+      for i in 0 ..< tag.len: discard l.advance()
+      if l.openTag.isSome:
+        let open = l.openTag.get
+        while l.current != '\0':
+          if l.current == open[0]:
+            var openMatches = true
+            for i in 0 ..< open.len:
+              if l.charAt(l.pos + i) != open[i]: openMatches = false; break
+            if openMatches:
+              for i in 0 ..< open.len: discard l.advance()
+              l.skipWhitespace()
+              result = l.getToken() # resume lexing after the open tag
+              l.tagTerminated = true
+              return
+          discard l.advance()
+      l.tagTerminated = true
       return Token(kind: tkEOF, line: startLine, col: startCol,
                    pos: startPos, start: startPos, stop: startPos)
 
@@ -592,6 +621,14 @@ proc getToken*(l: var SweetLexer): Token =
         
         return l.makeRange(tkComment, commentStart, startLine, startCol)
 
+  # Hash comments (e.g. PHP): '#' to end of line, unless followed by '[' which
+  # starts a PHP 8 attribute.
+  if l.hashComments and l.current == '#' and l.peek() != '[':
+    let commentStart = l.pos
+    while l.current != '\0' and l.current != '\n':
+      discard l.advance()
+    return l.makeRange(tkComment, commentStart, startLine, startCol)
+
   # Backtick-quoted identifiers (Nim) or template literals (JS)
   if l.current == '`':
     # Check if this is a template literal language
@@ -627,6 +664,20 @@ proc getToken*(l: var SweetLexer): Token =
 
   # Check for punctuation
   if isDelimiterPunct(l.current):
+    # Some languages define multi-char delimiters in their symbols table
+    # (e.g. PHP's "::" scope resolution). Greedily match the longest known op.
+    var bestOp = ""
+    for op in l.allOps:
+      if op.len > 1 and op[0] == l.current and op.len > bestOp.len:
+        var matches = true
+        for i in 0 ..< op.len:
+          if l.charAt(l.pos + i) != op[i]: matches = false; break
+        if matches:
+          bestOp = op
+    if bestOp.len > 0:
+      for i in 0 ..< bestOp.len:
+        discard l.advance()
+      return l.makeRange(tkPunct, startPos, startLine, startCol)
     discard l.advance()
     return l.makeRange(tkPunct, startPos, startLine, startCol)
 
@@ -693,6 +744,7 @@ proc initLexerFromFile*(spec: SweetSpec, path: string, enableFilters: bool = fal
     identifiers: spec.identifiers,
     inlineComment: spec.inline_comment,
     blockComment: spec.block_comment,
+    hashComments: spec.hash_comments,
     openTag: spec.open_tag,
     closeTag: spec.close_tag,
     filters: spec.filters,
@@ -741,6 +793,7 @@ proc initLexerFromFile*(pre: SweetLexerInit, path: string, enableFilters: bool =
     identifiers: pre.identifiers,
     inlineComment: pre.inlineComment,
     blockComment: pre.blockComment,
+    hashComments: pre.hashComments,
     openTag: pre.openTag,
     closeTag: pre.closeTag,
     features: pre.features,
@@ -769,6 +822,7 @@ proc initLexer*(spec: SweetSpec, input: sink string, enableFilters: bool = false
     identifiers: spec.identifiers,
     inlineComment: spec.inline_comment,
     blockComment: spec.block_comment,
+    hashComments: spec.hash_comments,
     openTag: spec.open_tag,
     closeTag: spec.close_tag,
     filters: spec.filters,
@@ -814,6 +868,7 @@ proc initLexer*(pre: SweetLexerInit, input: sink string, enableFilters: bool = f
     identifiers: pre.identifiers,
     inlineComment: pre.inlineComment,
     blockComment: pre.blockComment,
+    hashComments: pre.hashComments,
     openTag: pre.openTag,
     closeTag: pre.closeTag,
     features: pre.features,

@@ -42,6 +42,10 @@ macro buildPrepared*(yamlPath: static string): untyped =
   # block comment
   body.add parseStmt("t.blockComment = [" & q(spec.blockComment[0]) & ", " & q(spec.blockComment[1]) & "]")
 
+  # hash comments
+  if spec.hash_comments:
+    body.add parseStmt("t.hashComments = true")
+
   # open/close tags
   if spec.open_tag.isSome:
     body.add parseStmt("t.openTag = some(" & q(spec.open_tag.get) & ")")

@@ -11,6 +11,7 @@ inline_comment: '//'
 block_comment:
   - '/*'
   - '*/'
+hash_comments: true
 
 open_tag: "<?php"
 close_tag: "?>"
@@ -76,6 +77,7 @@ symbols:
   comma: ','
   at: '@'
   dollar: '$'
+  hash: '#'
   backslash: '\\'
 
 identifiers:
@@ -159,7 +161,7 @@ blocks:
   close: "}"
 
 features:
-  arrow_functions: true
+  arrow_functions: false
   generators: true
 
 operators:
@@ -294,6 +296,18 @@ statements:
   use_stmt:
     keyword: "use"
     handler: use
+  namespace_stmt:
+    keyword: "namespace"
+    handler: namespace
+  goto_stmt:
+    keyword: "goto"
+    handler: goto
+  declare_stmt:
+    keyword: "declare"
+    handler: declare
+  global_stmt:
+    keyword: "global"
+    handler: global
 
   expect_regex_after:
     tokens: ["=", "+=", "-=", "*=", "/=", "%=",

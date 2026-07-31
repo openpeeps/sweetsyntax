@@ -111,6 +111,19 @@ let ast = parseScript("hello.c", cHandlers, {featLabeledStmt})
 echo toJson(ast)
 ```
 
+Parse a PHP file (namespaces, classes, typed signatures, arrow functions, match, and more):
+
+```nim
+import sweetsyntax
+import sweetsyntax/languages/php
+import pkg/openparser/json
+
+let ast = parsePHP("hello.php")
+echo toJson(ast)
+```
+
+PHP support includes namespaces, `class`/`interface`/`trait`/`enum` bodies with visibility modifiers and typed properties, nullable/union signatures, arrow functions (`fn`), `match`, `goto`/labels, `declare`, function-like keywords (`new`, `isset`, `empty`, `unset`, `list`, `clone`, `exit`/`die`, `print`), `throw` as an expression, PHP 8 attributes (`#[...]`), alternative control-flow syntax (`if: ... endif;`), and multi-block `<?php ... ?>` files.
+
 Highlight source as ANSI or HTML, or stream tokens/folds as NDJSON:
 
 ```nim
