@@ -31,6 +31,59 @@ Key capabilities:
 - **Parser**: Pratt (precedence-climbing) parser with configurable operator precedence and associativity
 - **AST**: Typed node tree with support for statements, expressions, infix/prefix/postfix operations, function declarations, and more
 - **YAML-driven**: Language syntaxes are pure YAML, allowing for custom statement handlers
+- **Renderers**: Terminal (ANSI), HTML, line-delimited JSON for editors/higher-level apps, and tree-sitter style code folding
+
+### Renderers
+SweetSyntax ships a family of token-level renderers that turn a lexer into a usable output stream. All renderers consume a `SweetLexer` directly, so they work with any YAML syntax spec.
+
+| Renderer | Module | Output |
+|----------|--------|--------|
+| **Terminal** | `renderers/asciirenderer` | Source text with ANSI color codes |
+| **Web** | `renderers/htmlrenderer` | Source text wrapped in `<span class="...">` for CSS styling |
+| **JSON** | `renderers/jsonrenderer` | Line-delimited JSON (NDJSON) — one self-contained token object per line |
+| **Folds** | `renderers/foldrenderer` | Tree-sitter style fold regions as NDJSON |
+
+#### JSON renderer
+The JSON renderer emits each token as its own NDJSON line, designed to be streamed to higher-level applications over websocket/udp so editors and IDEs can build syntax highlighting:
+
+```json
+{"kind":"ident","scope":"storage.type","attr":["int"],"line":1,"col":1,"start":0,"stop":3,"value":"int"}
+{"kind":"ident","scope":"variable","line":1,"col":5,"start":4,"stop":5,"value":"x"}
+{"kind":"int","scope":"constant.numeric.integer","line":1,"col":9,"start":8,"stop":10,"value":"42"}
+```
+
+Every token exposes its **kind**, a derived TextMate-style **scope** (e.g. `keyword.control`, `string.quoted.double`, `constant.numeric.integer`, `storage.type`), user-defined **attributes**, 1-based line/column, byte offsets (`start`/`stop`), and the token **value**.
+
+```nim
+import sweetsyntax
+import sweetsyntax/renderers/jsonrenderer
+
+let syntax = getKnownSyntax(KnownSyntax.c)
+var lx = initLexer(syntax.spec, "int x = 42;")
+echo highlightJsonLd(lx)   # one JSON token per line
+```
+
+#### Code folding
+Code folding is fully **optional** and opt-in. `computeFolds` derives tree-sitter style fold regions from the token stream and emits them as their own NDJSON stream, so editors can subscribe to folds independently of token highlighting:
+
+```json
+{"kind":"block","start":{"line":1,"col":12,"offset":11},"end":{"line":5,"col":1,"offset":38}}
+```
+
+Fold sources (controlled via `FoldMode` and flags):
+- **Braces** (`fmBraces`, or `fmAuto` when the file contains `{`): `{...}` blocks spanning multiple lines
+- **Indentation** (`fmIndent`): Python/Nim-style blocks, including nested blocks and `else`/`elif` branches
+- **Comments**: multi-line `/* ... */` and `/** ... */` doc comments
+- **Preprocessor** (`preprocessorFolds = true`): `#if/#ifdef/#ifndef ... #endif` and `#region ... #endregion`
+
+```nim
+import sweetsyntax
+import sweetsyntax/renderers/foldrenderer
+
+let syntax = getKnownSyntax(KnownSyntax.c)
+var lx = initLexer(syntax.spec, "int main() {\n  return 0;\n}")
+echo foldsToJsonLd(computeFolds(lx))   # fold regions as NDJSON
+```
 
 ### Embeddable SweetSyntax
 SweetSyntax is written in Nim, and thanks to Nim's versatile compilation model, can be embedded natively into a wide range of host languages. This is WIP via https://github.com/openpeeps/clue toolkit
@@ -46,7 +99,33 @@ SweetSyntax is written in Nim, and thanks to Nim's versatile compilation model, 
 The Nim library compiles to a small, self-contained shared object that any FFI-capable language can load, making SweetSyntax a portable parsing engine for your polyglot projects.
 
 ## Examples
-_todo_
+
+Parse a C file into an AST:
+
+```nim
+import sweetsyntax
+import sweetsyntax/languages/c
+import pkg/openparser/json
+
+let ast = parseScript("hello.c", cHandlers, {featLabeledStmt})
+echo toJson(ast)
+```
+
+Highlight source as ANSI or HTML, or stream tokens/folds as NDJSON:
+
+```nim
+import sweetsyntax
+import sweetsyntax/renderers/[asciirenderer, htmlrenderer, jsonrenderer, foldrenderer]
+
+let syntax = getKnownSyntax(KnownSyntax.js)
+var lx = initLexer(syntax.spec, "const x = 42;")
+
+echo highlightAscii(lx)             # terminal output with colors
+echo highlightJsonLd(lx)            # one JSON token per line
+echo foldsToJsonLd(computeFolds(lx)) # fold regions as NDJSON
+```
+
+Interactive renderer examples live in `example_renderers/`.
 
 ### Error Reporting
 SweetSyntax has built-in support for context-aware reporting. For example:
