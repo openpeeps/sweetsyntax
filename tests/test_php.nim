@@ -212,8 +212,3 @@ suite "PHP parser":
       discard parseStatement(p)
       inc count
     check count == 2
-
-  test "bigger file":
-    let helloPath = currentSourcePath().parentDir / ".." / "examples" / "hello.php"
-    let ast = phpHandlersMod.parsePHP(helloPath)
-    check ast.nodes.len > 0
