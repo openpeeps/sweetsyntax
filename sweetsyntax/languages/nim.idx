@@ -1,0 +1,3 @@
+nimTitle	nim	sweetsyntax/languages/nim.html	module sweetsyntax/languages/nim		0
+nim	nimHandlers	sweetsyntax/languages/nim.html#nimHandlers,GenericParser	proc nimHandlers(p: var GenericParser)		75
+nim	parseNim	sweetsyntax/languages/nim.html#parseNim,string	proc parseNim(path: string): OpenAstProgram		1166

@@ -1,0 +1,3 @@
+nimTitle	tokenizer	sweetsyntax/tokenizer.html	module sweetsyntax/tokenizer		0
+nim	TokenTuple	sweetsyntax/tokenizer.html#TokenTuple	tuple TokenTuple		12
+nim	getToken	sweetsyntax/tokenizer.html#getToken,T	proc getToken[T](p: var T): TokenTuple		22

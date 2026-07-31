@@ -1,0 +1,3 @@
+nimTitle	js	sweetsyntax/languages/js.html	module sweetsyntax/languages/js		0
+nim	jsHandlers	sweetsyntax/languages/js.html#jsHandlers,GenericParser	proc jsHandlers(p: var GenericParser)		24
+nim	parseJavaScript	sweetsyntax/languages/js.html#parseJavaScript,string	proc parseJavaScript(path: string): OpenAstProgram		988

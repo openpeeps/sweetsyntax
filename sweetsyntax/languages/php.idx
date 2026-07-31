@@ -1,0 +1,3 @@
+nimTitle	php	sweetsyntax/languages/php.html	module sweetsyntax/languages/php		0
+nim	phpHandlers	sweetsyntax/languages/php.html#phpHandlers,GenericParser	proc phpHandlers(p: var GenericParser)		409
+nim	parsePHP	sweetsyntax/languages/php.html#parsePHP,string	proc parsePHP(path: string): OpenAstProgram		893

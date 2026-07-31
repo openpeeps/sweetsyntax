@@ -1,0 +1,3 @@
+nimTitle	ruby	sweetsyntax/languages/ruby.html	module sweetsyntax/languages/ruby		0
+nim	rubyHandlers	sweetsyntax/languages/ruby.html#rubyHandlers,GenericParser	proc rubyHandlers(p: var GenericParser)		271
+nim	parseRuby	sweetsyntax/languages/ruby.html#parseRuby,string	proc parseRuby(path: string): OpenAstProgram		566

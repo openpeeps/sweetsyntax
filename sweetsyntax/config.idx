@@ -1,0 +1,56 @@
+nimTitle	config	sweetsyntax/config.html	module sweetsyntax/config		0
+nim	SymbolsTable	sweetsyntax/config.html#SymbolsTable	type SymbolsTable		16
+nim	IdentsTable	sweetsyntax/config.html#IdentsTable	type IdentsTable		18
+nim	AstNode	sweetsyntax/config.html#AstNode	object AstNode		21
+nim	Pattern	sweetsyntax/config.html#Pattern	object Pattern		25
+nim	Definition	sweetsyntax/config.html#Definition	type Definition		29
+nim	Definitions	sweetsyntax/config.html#Definitions	type Definitions		39
+nim	SweetFilter	sweetsyntax/config.html#SweetFilter	type SweetFilter		41
+nim	assocLeft	sweetsyntax/config.html#assocLeft	AssocKind.assocLeft		50
+nim	assocRight	sweetsyntax/config.html#assocRight	AssocKind.assocRight		50
+nim	AssocKind	sweetsyntax/config.html#AssocKind	enum AssocKind		50
+nim	InfixGroup	sweetsyntax/config.html#InfixGroup	type InfixGroup		54
+nim	PrefixGroup	sweetsyntax/config.html#PrefixGroup	type PrefixGroup		61
+nim	PostfixGroup	sweetsyntax/config.html#PostfixGroup	type PostfixGroup		66
+nim	AssignmentDef	sweetsyntax/config.html#AssignmentDef	type AssignmentDef		69
+nim	TernaryDef	sweetsyntax/config.html#TernaryDef	type TernaryDef		72
+nim	OperatorsSpec	sweetsyntax/config.html#OperatorsSpec	type OperatorsSpec		77
+nim	StatementSpec	sweetsyntax/config.html#StatementSpec	type StatementSpec		90
+nim	StatementsSpec	sweetsyntax/config.html#StatementsSpec	type StatementsSpec		98
+nim	BlocksSpec	sweetsyntax/config.html#BlocksSpec	type BlocksSpec		101
+nim	FeaturesSpec	sweetsyntax/config.html#FeaturesSpec	type FeaturesSpec		108
+nim	leftAssoc	sweetsyntax/config.html#leftAssoc	Assoc.leftAssoc		126
+nim	rightAssoc	sweetsyntax/config.html#rightAssoc	Assoc.rightAssoc		126
+nim	Assoc	sweetsyntax/config.html#Assoc	enum Assoc		126
+nim	InfixEntry	sweetsyntax/config.html#InfixEntry	object InfixEntry		130
+nim	featRegex	sweetsyntax/config.html#featRegex	LanguageFeature.featRegex		135
+nim	featAsync	sweetsyntax/config.html#featAsync	LanguageFeature.featAsync		135
+nim	featGenerators	sweetsyntax/config.html#featGenerators	LanguageFeature.featGenerators		135
+nim	featArrowFn	sweetsyntax/config.html#featArrowFn	LanguageFeature.featArrowFn		135
+nim	featTemplateLit	sweetsyntax/config.html#featTemplateLit	LanguageFeature.featTemplateLit		135
+nim	featLabeledStmt	sweetsyntax/config.html#featLabeledStmt	LanguageFeature.featLabeledStmt		135
+nim	featCommandSyntax	sweetsyntax/config.html#featCommandSyntax	LanguageFeature.featCommandSyntax		135
+nim	LanguageFeature	sweetsyntax/config.html#LanguageFeature	enum LanguageFeature		135
+nim	SweetLexerInit	sweetsyntax/config.html#SweetLexerInit	object SweetLexerInit		144
+nim	SweetSpec	sweetsyntax/config.html#SweetSpec	type SweetSpec		170
+nim	js	sweetsyntax/config.html#js	KnownSyntax.js		203
+nim	py	sweetsyntax/config.html#py	KnownSyntax.py		203
+nim	nim	sweetsyntax/config.html#nim	KnownSyntax.nim		203
+nim	c	sweetsyntax/config.html#c	KnownSyntax.c		203
+nim	rust	sweetsyntax/config.html#rust	KnownSyntax.rust		203
+nim	ruby	sweetsyntax/config.html#ruby	KnownSyntax.ruby		203
+nim	php	sweetsyntax/config.html#php	KnownSyntax.php		203
+nim	go	sweetsyntax/config.html#go	KnownSyntax.go		203
+nim	d	sweetsyntax/config.html#d	KnownSyntax.d		203
+nim	KnownSyntax	sweetsyntax/config.html#KnownSyntax	enum KnownSyntax		203
+nim	SweetSyntax	sweetsyntax/config.html#SweetSyntax	type SweetSyntax		214
+nim	knownSyntaxTable	sweetsyntax/config.html#knownSyntaxTable	const knownSyntaxTable		219
+nim	parseHook	sweetsyntax/config.html#parseHook,YamlParser,SymbolsTable	proc parseHook(p: var YamlParser; v: var SymbolsTable)		231
+nim	parseHook	sweetsyntax/config.html#parseHook,YamlParser,Definitions	proc parseHook(p: var YamlParser; v: var Definitions)		242
+nim	parseHook	sweetsyntax/config.html#parseHook,YamlParser,SweetFilter	proc parseHook(p: var YamlParser; v: var SweetFilter)		269
+nim	parseHook	sweetsyntax/config.html#parseHook,YamlParser,PrefixGroup	proc parseHook(p: var YamlParser; v: var PrefixGroup)		286
+nim	parseHook	sweetsyntax/config.html#parseHook,YamlParser,FeaturesSpec	proc parseHook(p: var YamlParser; v: var FeaturesSpec)		297
+nim	parseHook	sweetsyntax/config.html#parseHook,YamlParser,StatementSpec	proc parseHook(p: var YamlParser; v: var StatementSpec)		311
+nim	newSyntax	sweetsyntax/config.html#newSyntax,string	proc newSyntax(specPath: string): SweetSyntax		323
+nim	getKnownSyntax	sweetsyntax/config.html#getKnownSyntax,KnownSyntax	proc getKnownSyntax(knownSyntax: KnownSyntax): SweetSyntax		327
+nimgrp	parsehook	sweetsyntax/config.html#parseHook-procs-all	proc		231

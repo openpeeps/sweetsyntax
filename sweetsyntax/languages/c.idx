@@ -1,0 +1,4 @@
+nimTitle	c	sweetsyntax/languages/c.html	module sweetsyntax/languages/c		0
+nim	cSpecifiers	sweetsyntax/languages/c.html#cSpecifiers	const cSpecifiers		13
+nim	cHandlers	sweetsyntax/languages/c.html#cHandlers,GenericParser	proc cHandlers(p: var GenericParser)		176
+nim	parseC	sweetsyntax/languages/c.html#parseC,string	proc parseC(path: string): OpenAstProgram		480
