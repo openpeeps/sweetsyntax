@@ -6,6 +6,7 @@ import ../src/sweetsyntax/languages/js as jsHandlersMod
 import ../src/sweetsyntax/languages/nim as nimHandlersMod
 import ../src/sweetsyntax/languages/c as cHandlersMod
 import ../src/sweetsyntax/renderers/jsonrenderer
+import ../src/sweetsyntax/renderers/foldrenderer
 
 proc parseJS(code: string): Node =
   let syntax = getKnownSyntax(KnownSyntax.js)
@@ -162,3 +163,86 @@ char c = 'a';
       let stop = tokens[i]["stop"].getInt
       check start < stop
       check code[start ..< stop] == tokens[i]["value"].getStr
+
+suite "Fold renderer":
+  proc folds(code: string, mode: FoldMode = fmAuto,
+             pre = false): seq[FoldRegion] =
+    let syntax = getKnownSyntax(KnownSyntax.c)
+    var lx = initLexer(syntax.spec, code)
+    computeFolds(lx, mode, pre)
+
+  test "brace folding of a function body":
+    let regions = folds("int main() {\n  return 0;\n}")
+    check regions.len == 1
+    check regions[0].kind == fkBlock
+    check regions[0].startLine == 1
+    check regions[0].endLine == 3
+
+  test "nested braces produce nested regions":
+    let regions = folds("void f() {\n  if (x) {\n    y();\n  }\n}")
+    check regions.len == 2
+    check regions[0].kind == fkBlock
+    check regions[0].startLine == 1
+    check regions[0].endLine == 5
+    check regions[1].kind == fkBlock
+    check regions[1].startLine == 2
+    check regions[1].endLine == 4
+
+  test "same-line braces and braces in strings do not fold":
+    check folds("int x; { foo(); }").len == 0
+    check folds("char *s = \"{\";\n}").len == 0
+
+  test "multi-line block and doc comments fold, single-line do not":
+    let blockRegs = folds("/* line1\n   line2 */\nint x;")
+    check blockRegs.len == 1
+    check blockRegs[0].kind == fkComment
+    check blockRegs[0].startLine == 1
+    check blockRegs[0].endLine == 2
+    let doc = folds("/** doc\n    more */\nint x;")
+    check doc.len == 1
+    check doc[0].kind == fkDocComment
+    check folds("// single line\nint x;").len == 0
+
+  test "preprocessor folding is opt-in":
+    let code = "#if 0\nint x;\n#endif"
+    check folds(code).len == 0
+    let regions = folds(code, pre = true)
+    check regions.len == 1
+    check regions[0].kind == fkPreprocessor
+    check regions[0].startLine == 1
+    check regions[0].endLine == 3
+
+  test "indent folding of python-style blocks":
+    let regions = folds("def f():\n    x = 1\n    y = 2", fmIndent)
+    check regions.len == 1
+    check regions[0].kind == fkIndent
+    check regions[0].startLine == 1
+    check regions[0].endLine == 3
+
+  test "indent folding handles nested blocks and else branches":
+    let nested = folds("def f():\n    if x:\n        pass\n    y = 1", fmIndent)
+    check nested.len == 2
+    check nested[0].startLine == 1 and nested[0].endLine == 4
+    check nested[1].startLine == 2 and nested[1].endLine == 3
+    let branches = folds("if x:\n    a()\nelse:\n    b()", fmIndent)
+    check branches.len == 2
+    check branches[0].startLine == 1 and branches[0].endLine == 2
+    check branches[1].startLine == 3 and branches[1].endLine == 4
+
+  test "indent folding ignores comment-only lines":
+    let regions = folds("def f():\n    # note\n    x = 1", fmIndent)
+    check regions.len == 1
+    check regions[0].startLine == 1
+    check regions[0].endLine == 3
+
+  test "foldsToJsonLd emits parseable NDJSON":
+    let syntax = getKnownSyntax(KnownSyntax.c)
+    var lx = initLexer(syntax.spec, "int main() {\n  return 0;\n}")
+    var lines = foldsToJsonLd(computeFolds(lx)).splitLines()
+    for line in lines:
+      if line.len == 0:
+        continue
+      let node = parseJson(line)
+      check node["kind"].getStr == "block"
+      check node["start"]["line"].getInt == 1
+      check node["end"]["line"].getInt == 3
