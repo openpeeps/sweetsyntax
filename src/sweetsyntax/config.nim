@@ -150,6 +150,8 @@ type
     blockComment*: array[2, string]
     hashComments*: bool
       # whether '#' starts an inline comment (e.g. PHP), unless followed by '['
+    trailingBangQuestion*: bool
+      # whether identifiers may end with '?' or '!' (e.g. Ruby method names)
     openTag*: Option[string]
     closeTag*: Option[string]
     features*: set[LanguageFeature]
@@ -177,6 +179,8 @@ type
     hash_comments*: bool
       ## whether '#' starts an inline comment (e.g. PHP), unless followed by '['
       ## (PHP 8 attributes)
+    trailing_bang_question*: bool
+      ## whether identifiers may end with '?' or '!' (e.g. Ruby method names)
     symbols*: SymbolsTable
       ## mapping of symbol names to their literal representations, e.g. "plus" -> "+"
     identifiers*: IdentsTable
@@ -214,11 +218,11 @@ type
 const
   knownSyntaxTable* = {
     "js": staticRead(currentSourcePath().parentDir / "syntaxes" / "js.yaml"),
-    "python": staticRead(currentSourcePath().parentDir / "syntaxes" / "python.yaml"),
+    "py": staticRead(currentSourcePath().parentDir / "syntaxes" / "python.yaml"),
     "nim": staticRead(currentSourcePath().parentDir / "syntaxes" / "nim.yaml"),
     "c": staticRead(currentSourcePath().parentDir / "syntaxes" / "c.yaml"),
-    "rust": staticRead(currentSourcePath().parentDir / "syntaxes" / "rust.yaml"),
-    "ruby": staticRead(currentSourcePath().parentDir / "syntaxes" / "ruby.yaml"),
+    "rs": staticRead(currentSourcePath().parentDir / "syntaxes" / "rust.yaml"),
+    "rb": staticRead(currentSourcePath().parentDir / "syntaxes" / "ruby.yaml"),
     "php": staticRead(currentSourcePath().parentDir / "syntaxes" / "php.yaml"),
     "go": staticRead(currentSourcePath().parentDir / "syntaxes" / "go.yaml"),
     "d": staticRead(currentSourcePath().parentDir / "syntaxes" / "d.yaml")

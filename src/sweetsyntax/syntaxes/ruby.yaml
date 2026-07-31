@@ -5,16 +5,22 @@ extension:
   - rake
   - gemspec
 
+inline_comment: '#'
+trailing_bang_question: true
+
 symbols:
   plus: '+'
   minus: '-'
   multiply: '*'
   divide: '/'
   modulo: '%'
+  power: '**'
   assign: '='
   eq: '=='
   eqStrict: '==='
   ne: '!='
+  notMatch: '!~'
+  matchOp: '=~'
   not: '!'
   gt: '>'
   gte: '>='
@@ -34,14 +40,17 @@ symbols:
   multiplyAssign: '*='
   divideAssign: '/='
   moduloAssign: '%='
+  powerAssign: '**='
   andAssign: '&='
   orAssign: '|='
   xorAssign: '^='
+  andAndAssign: '&&='
+  orOrAssign: '||='
   shiftLeftAssign: '<<='
   shiftRightAssign: '>>='
-  increment: '++' # Not valid in Ruby, but included for symmetry
-  decrement: '--' # Not valid in Ruby, but included for symmetry
   arrow: '=>'
+  safeNav: '&.'
+  lambdaArrow: '->'
   parl: '('
   parr: ')'
   sqbl: '['
@@ -102,3 +111,118 @@ identifiers:
   __FILE__: "__FILE__"
   __LINE__: "__LINE__"
   __ENCODING__: "__ENCODING__"
+
+blocks:
+  open: ""
+  close: ""
+
+features:
+  command_syntax: false
+
+operators:
+  prefix:
+    - tokens: ["-", "+", "!", "~", "*", "**", "&"]
+    - tokens: ["not"]
+      is_keyword: true
+
+  infix:
+    - precedence: 1
+      keywords: ["or"]
+    - precedence: 2
+      keywords: ["and"]
+    - precedence: 3
+      tokens: ["..", "..."]
+    - precedence: 4
+      tokens: ["|", "^"]
+    - precedence: 5
+      tokens: ["&"]
+    - precedence: 6
+      tokens: ["==", "!=", "===", "=~", "!~", "<=>"]
+    - precedence: 7
+      tokens: ["<", "<=", ">", ">="]
+    - precedence: 8
+      tokens: ["<<", ">>"]
+    - precedence: 9
+      tokens: ["+", "-"]
+    - precedence: 10
+      tokens: ["*", "/", "%"]
+    - precedence: 11
+      tokens: ["**"]
+      assoc: right
+    - precedence: 12
+      tokens: [".", "&.", "::"]
+      handler: dot
+    - precedence: 13
+      tokens: ["["]
+      handler: bracket
+    - precedence: 14
+      tokens: ["("]
+      handler: call
+
+  assignment:
+    tokens: ["=", "+=", "-=", "*=", "/=", "%=", "**=",
+             "&&=", "||=", "<<=", ">>=", "&=", "|=", "^="]
+
+  ternary:
+    token: "?"
+    separator: ":"
+    precedence: 3
+
+statements:
+  def_stmt:
+    keyword: "def"
+    handler: def
+  class_stmt:
+    keyword: "class"
+    handler: class
+  module_stmt:
+    keyword: "module"
+    handler: module
+  if_stmt:
+    keyword: "if"
+    handler: conditional
+  unless_stmt:
+    keyword: "unless"
+    handler: conditional
+  while_stmt:
+    keyword: "while"
+    handler: loop
+  until_stmt:
+    keyword: "until"
+    handler: loop
+  for_stmt:
+    keyword: "for"
+    handler: for_loop
+  case_stmt:
+    keyword: "case"
+    handler: case
+  begin_stmt:
+    keyword: "begin"
+    handler: begin
+  return_stmt:
+    keyword: "return"
+    handler: return
+  break_stmt:
+    keyword: "break"
+    handler: break
+  next_stmt:
+    keyword: "next"
+    handler: next
+  redo_stmt:
+    keyword: "redo"
+    handler: redo
+  retry_stmt:
+    keyword: "retry"
+    handler: retry
+  yield_stmt:
+    keyword: "yield"
+    handler: yield
+  alias_stmt:
+    keyword: "alias"
+    handler: alias
+  undef_stmt:
+    keyword: "undef"
+    handler: undef
+  end_stmt:
+    keyword: "end"
+    handler: end

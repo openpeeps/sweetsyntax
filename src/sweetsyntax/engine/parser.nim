@@ -66,6 +66,10 @@ type
     statementTerminated*: bool
       ## Set by handlers that consume their own statement terminator (or end
       ## with `}`), so the strict `;` check can be skipped for them.
+    noSymbolArgCall*: bool
+      ## When set, language-specific bare-call handlers must not treat a
+      ## leading `:` symbol as a call argument (used for Ruby `if x: ...`,
+      ## hash keys and keyword arguments, which conflict with `attr_accessor :x`).
 
   
   OpenAstParsingError* = object of CatchableError
@@ -240,7 +244,7 @@ proc parseGroupExpr*(p: var GenericParser, minPrec: int = 0): Node =
            else: Node(kind: nkStatement,
              children: @[Node(kind: nkIdent, name: "comma")] & items)
 
-proc parseArrayLiteral(p: var GenericParser, minPrec: int = 0): Node =
+proc parseArrayLiteral*(p: var GenericParser, minPrec: int = 0): Node =
   result = Node(kind: nkBracketExpr)
   walk p # consume '['
   while not (p.curr.kind == tkPunct and p.curr.value == "]"):
@@ -319,7 +323,11 @@ proc parseObjectLiteral*(p: var GenericParser, minPrec: int = 0): Node =
       result.children.add(Node(kind: nkColonExpr,
         children: @[key, val]))
     else:
-      p.expectWalk(":")
+      # Ruby-style hash rockets: { key => value } (also `:` pairs)
+      if p.curr.kind == tkPunct and p.curr.value == "=>":
+        walk p
+      else:
+        p.expectWalk(":")
       let val = parseExpression(p)
       result.children.add(Node(kind: nkColonExpr, children: @[key, val]))
     p.walkOpt(",")
@@ -361,7 +369,7 @@ proc parseExpression*(p: var GenericParser, minPrec: int = 0): Node =
     if handled != nil:
       return handled
 
-  # Pratt infix/postfix loop (unchanged from here down)
+  # Pratt infix/postfix loop
   while true:
     # Skip interleaved comments
     while p.curr.kind in {tkComment, tkDocComment}:
@@ -418,9 +426,13 @@ proc parseExpression*(p: var GenericParser, minPrec: int = 0): Node =
         let prec = p.infixTable[op].precedence
         if prec < minPrec: break
         walk p # consume '?'
+        # `: value` here is the ternary separator, not a bare-call symbol arg
+        let savedNoSymbol = p.noSymbolArgCall
+        p.noSymbolArgCall = true
         let thenExpr = parseExpression(p, 0)
         p.expectWalk(":")
         let elseExpr = parseExpression(p, prec) # right-assoc
+        p.noSymbolArgCall = savedNoSymbol
         lhs = Node(kind: nkCall, children: @[
           Node(kind: nkIdent, name: "ternary"), lhs, thenExpr, elseExpr])
         continue
@@ -485,12 +497,16 @@ proc parseExpression*(p: var GenericParser, minPrec: int = 0): Node =
         if entry.precedence < minPrec: break
         walk p
         let call = Node(kind: nkCall, children: @[lhs])
+        # Within call arguments, `: value` is a keyword/named argument, not a
+        # bare-call symbol argument (e.g. Ruby `foo(a: 1)`).
+        let savedNoSymbol = p.noSymbolArgCall
+        p.noSymbolArgCall = true
         while not (p.curr.kind == tkPunct and p.curr.value == ")"):
           if p.curr.kind == tkEOF: error(p, "Unexpected EOF in call")
           if p.curr.kind in {tkComment, tkDocComment}:
             call.children.add(parseCommentGeneric(p)); continue
           let arg = parseExpression(p, 0)
-          # Nim named args: `name: value`
+          # Named/keyword args: `name: value`
           if p.curr.kind == tkPunct and p.curr.value == ":":
             walk p
             call.children.add(Node(kind: nkColonExpr,
@@ -499,6 +515,7 @@ proc parseExpression*(p: var GenericParser, minPrec: int = 0): Node =
             call.children.add(arg)
           p.walkOpt(",")
         p.expectWalk(")")
+        p.noSymbolArgCall = savedNoSymbol
         lhs = call
         continue
 
@@ -532,16 +549,16 @@ proc parseExpression*(p: var GenericParser, minPrec: int = 0): Node =
       break
 
     else: discard
-
-    # Infix expression handler hook (language-specific)
-    if p.expressionHandlers.hasKey("infix"):
-      let handled = p.expressionHandlers["infix"](p, lhs, minPrec)
-      if handled != nil:
-        lhs = handled
-        continue
     break
 
   result = lhs
+  # Language-specific continuation hook (e.g. Ruby bare calls, blocks, modifiers).
+  # Called after the infix/postfix loop breaks; the handler consumes its own
+  # continuation, so no re-entry into the loop is required.
+  if p.expressionHandlers.hasKey("infix"):
+    let handled = p.expressionHandlers["infix"](p, result, minPrec)
+    if handled != nil:
+      result = handled
   # Prepend any leading comments
   if leadingComments.len > 0:
     leadingComments.add(lhs)

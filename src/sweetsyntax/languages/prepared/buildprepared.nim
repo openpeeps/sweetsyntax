@@ -46,6 +46,10 @@ macro buildPrepared*(yamlPath: static string): untyped =
   if spec.hash_comments:
     body.add parseStmt("t.hashComments = true")
 
+  # trailing ?/! on identifiers
+  if spec.trailing_bang_question:
+    body.add parseStmt("t.trailingBangQuestion = true")
+
   # open/close tags
   if spec.open_tag.isSome:
     body.add parseStmt("t.openTag = some(" & q(spec.open_tag.get) & ")")

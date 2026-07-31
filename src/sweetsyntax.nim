@@ -21,7 +21,7 @@ when isMainModule:
   import pkg/openparser/json
   import pkg/kapsis
   import pkg/kapsis/[runtime, interactive/prompts]
-  import ./sweetsyntax/languages/[js, nim, c, php]
+  import ./sweetsyntax/languages/[js, nim, c, php, ruby]
 
   proc getLanguageHandlers(ext: string): (ParsingCallback, set[LanguageFeature]) =
     ## Resolve language handlers and features by file extension.
@@ -35,6 +35,8 @@ when isMainModule:
       (c.cHandlers, {featLabeledStmt})
     of "php", "phtml", "php3", "php4", "php5", "phps":
       (php.phpHandlers, {featLabeledStmt, featGenerators})
+    of "rb", "ruby", "rake", "gemspec":
+      (ruby.rubyHandlers, {})
     else:
       (nil, {})
 

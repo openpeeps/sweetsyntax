@@ -52,6 +52,8 @@ type
     hashComments*: bool
       # whether '#' starts an inline comment (e.g. PHP), unless followed by '['
       # (PHP 8 attributes)
+    trailingBangQuestion*: bool
+      # whether identifiers may end with '?' or '!' (e.g. Ruby method names)
     openTag*: Option[string]
     closeTag*: Option[string]
     features*: set[LanguageFeature]
@@ -444,6 +446,8 @@ proc getToken*(l: var SweetLexer): Token =
     while true:
       if isIdentPart(l.current):
         discard l.advance()
+      elif l.trailingBangQuestion and l.current in {'?', '!'}:
+        discard l.advance()
       elif ord(l.current) >= 0x80:
         discard l.advanceUtf8Char()
       else:
@@ -745,6 +749,7 @@ proc initLexerFromFile*(spec: SweetSpec, path: string, enableFilters: bool = fal
     inlineComment: spec.inline_comment,
     blockComment: spec.block_comment,
     hashComments: spec.hash_comments,
+    trailingBangQuestion: spec.trailing_bang_question,
     openTag: spec.open_tag,
     closeTag: spec.close_tag,
     filters: spec.filters,
@@ -794,6 +799,7 @@ proc initLexerFromFile*(pre: SweetLexerInit, path: string, enableFilters: bool =
     inlineComment: pre.inlineComment,
     blockComment: pre.blockComment,
     hashComments: pre.hashComments,
+    trailingBangQuestion: pre.trailingBangQuestion,
     openTag: pre.openTag,
     closeTag: pre.closeTag,
     features: pre.features,
@@ -823,6 +829,7 @@ proc initLexer*(spec: SweetSpec, input: sink string, enableFilters: bool = false
     inlineComment: spec.inline_comment,
     blockComment: spec.block_comment,
     hashComments: spec.hash_comments,
+    trailingBangQuestion: spec.trailing_bang_question,
     openTag: spec.open_tag,
     closeTag: spec.close_tag,
     filters: spec.filters,
@@ -869,6 +876,7 @@ proc initLexer*(pre: SweetLexerInit, input: sink string, enableFilters: bool = f
     inlineComment: pre.inlineComment,
     blockComment: pre.blockComment,
     hashComments: pre.hashComments,
+    trailingBangQuestion: pre.trailingBangQuestion,
     openTag: pre.openTag,
     closeTag: pre.closeTag,
     features: pre.features,
