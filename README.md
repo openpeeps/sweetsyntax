@@ -161,6 +161,9 @@ SweetSyntax has built-in support for context-aware reporting. For example:
 Error (2:33) Unexpected prefix token: '#'
 ```
 
+### Projects using SweetSyntax
+- [Squeezy](https://github.com/openpeeps/squeezy) - A dead simple JavaScript and CSS validator, bundler and minifier
+
 ### Benchmarks
 SweetSyntax is built for speed. Below is a **hyperfine** benchmark parsing and validating a full copy of **d3.js** (v7.9.0, ~20k lines, unminified, [from cdnjs.com](https://cdnjs.com/libraries/d3)). The entire pipeline (**lexing**, **parsing**, and **AST generation**) completes in under 120ms on my 🔥 rastafarian Ryzen 5 with 6 cores/12 threads:
 ```
