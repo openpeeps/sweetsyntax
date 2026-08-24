@@ -192,6 +192,169 @@ proc sortFolds(folds: var seq[FoldRegion]) =
     if result == 0:
       result = cmp(a.start, b.start)
 
+proc streamCountNewlines(lexer: SweetLexer, start, stop: int): tuple[n, lastPos: int] =
+  ## Count '\n' in [start, stop) straight from the lexer's buffer (mmap or
+  ## string). No lexeme copy — the streaming fold pass must not allocate a
+  ## string per token.
+  result = (0, -1)
+  var i = start
+  while i < stop:
+    if lexer.charAt(i) == '\n':
+      inc result.n
+      result.lastPos = i - start
+    inc i
+
+proc computeIndentFoldsStream(lexer: var SweetLexer): seq[FoldRegion] =
+  ## Streaming port of `computeIndentFolds`: builds the per-line info table
+  ## directly from the token stream (per-line retention, not per-token).
+  if lexer.isNil or lexer.len == 0:
+    return
+
+  type LineInfo = tuple
+    line, indent, col, start, stop, lastCol: int
+    content: bool
+
+  var lines: seq[LineInfo]
+  var tok = lexer.getToken()
+  while tok.kind != tkEOF:
+    if lines.len == 0 or lines[^1].line != tok.line:
+      var info: LineInfo = (line: tok.line, indent: -1, col: tok.col,
+                            start: tok.start, stop: tok.stop, lastCol: tok.col,
+                            content: true)
+      if tok.kind in [tkComment, tkDocComment]:
+        info.content = false
+      else:
+        info.indent = tok.col - 1
+      lines.add(info)
+    else:
+      lines[^1].stop = tok.stop
+      lines[^1].lastCol = tok.col
+      if not lines[^1].content and tok.kind notin [tkComment, tkDocComment]:
+        lines[^1].content = true
+        lines[^1].indent = tok.col - 1
+        lines[^1].col = tok.col
+        lines[^1].start = tok.start
+    tok = lexer.getToken()
+
+  var stack: seq[tuple[indent, line, col, start: int]]
+  var baseline = -1
+  var prev: tuple[line, col, start, stop: int]
+
+  for info in lines:
+    if not info.content:
+      continue
+    if baseline < 0:
+      baseline = info.indent
+      prev = (info.line, info.col, info.start, info.stop)
+      continue
+    # Close regions that dedent below this line
+    while stack.len > 0 and info.indent < stack[^1].indent:
+      let r = stack.pop()
+      result.add(FoldRegion(
+        kind: fkIndent,
+        startLine: r.line, startCol: r.col,
+        endLine: prev.line, endCol: prev.col,
+        start: r.start, stop: prev.stop))
+    if stack.len == 0:
+      if info.indent > baseline:
+        stack.add((info.indent, prev.line, prev.col, prev.start))
+    elif info.indent > stack[^1].indent:
+      stack.add((info.indent, prev.line, prev.col, prev.start))
+    prev = (info.line, info.col, info.start, info.stop)
+
+  # Close any remaining regions at EOF
+  while stack.len > 0:
+    let r = stack.pop()
+    result.add(FoldRegion(
+      kind: fkIndent,
+      startLine: r.line, startCol: r.col,
+      endLine: prev.line, endCol: prev.col,
+      start: r.start, stop: prev.stop))
+
+proc computeFoldsStream*(lexer: var SweetLexer,
+                         mode: FoldMode = fmAuto,
+                         preprocessorFolds = false): seq[FoldRegion] =
+  ## Memory-light variant of `computeFolds`: consumes the token stream once
+  ## and retains only the (shallow) open-brace / preprocessor stacks. Tokens
+  ## are never materialized into a `seq[Token]` and no per-token lexeme
+  ## strings are allocated, so peak memory stays flat for huge inputs.
+  ##
+  ## With `fmAuto`, brace vs indent mode can only be decided after seeing a
+  ## brace (or EOF), so indent-mode files pay a second streaming pass over a
+  ## reset lexer; brace-mode files (the common case) finish in one pass.
+  var sawBrace = false
+  var braceStack: seq[Token]
+  var ppStack: seq[Token]  # preprocessor opener tokens (the '#')
+  var prev: Token          # one-token lookahead for preprocessor pairs
+
+  template emitCommentFold(t: Token) =
+    let counts = streamCountNewlines(lexer, t.start, t.stop)
+    if counts.n > 0:
+      result.add(FoldRegion(
+        kind: if t.kind == tkDocComment: fkDocComment else: fkComment,
+        startLine: t.line, startCol: t.col,
+        endLine: t.line + counts.n,
+        endCol: (t.stop - t.start) - counts.lastPos,
+        start: t.start, stop: t.stop))
+
+  var tok = lexer.getToken()
+  while tok.kind != tkEOF:
+    case tok.kind
+    of tkPunct:
+      if tok.stop - tok.start == 1:
+        case lexer.charAt(tok.start)
+        of '{':
+          sawBrace = true
+          braceStack.add(tok)
+        of '}':
+          if braceStack.len > 0:
+            sawBrace = true
+            let openTok = braceStack.pop()
+            if tok.line > openTok.line:
+              result.add(FoldRegion(
+                kind: fkBlock,
+                startLine: openTok.line, startCol: openTok.col,
+                endLine: tok.line, endCol: tok.col,
+                start: openTok.start, stop: tok.stop))
+        else:
+          discard
+    of tkComment, tkDocComment:
+      emitCommentFold(tok)
+    of tkIdentifier:
+      if preprocessorFolds and prev != nil and prev.kind == tkPunct and
+          prev.stop - prev.start == 1 and lexer.charAt(prev.start) == '#':
+        let kw = lexer.getTokenValue(tok)
+        case kw
+        of "if", "ifdef", "ifndef", "region":
+          ppStack.add(prev)
+        of "endif", "endregion":
+          if ppStack.len > 0:
+            let openTok = ppStack.pop()
+            if tok.line > openTok.line:
+              result.add(FoldRegion(
+                kind: fkPreprocessor,
+                startLine: openTok.line, startCol: openTok.col,
+                endLine: tok.line, endCol: tok.col,
+                start: openTok.start, stop: tok.stop))
+        else:
+          discard
+    else:
+      discard
+    prev = tok
+    tok = lexer.getToken()
+
+  let effectiveMode =
+    if mode == fmAuto:
+      (if sawBrace: fmBraces else: fmIndent)
+    else:
+      mode
+
+  if effectiveMode == fmIndent:
+    resetLexer(lexer)
+    result.add computeIndentFoldsStream(lexer)
+
+  result.sortFolds()
+
 proc computeFolds*(lexer: var SweetLexer,
                    mode: FoldMode = fmAuto,
                    preprocessorFolds = false): seq[FoldRegion] =

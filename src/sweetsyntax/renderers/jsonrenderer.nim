@@ -61,20 +61,21 @@ proc scopeForToken*(lexer: SweetLexer, tok: Token): string =
       result = "punctuation"
   of tkIdentifier:
     let value = lexer.getTokenValue(tok)
-    case value
-    of "true", "false": result = "constant.language.boolean"
-    of "null", "undefined": result = "constant.language.null"
-    else:
-      # Keywords are the identifiers declared in the syntax YAML spec
-      if value in lexer.identifiers:
-        if value in storageTypeKeywords:
-          result = "storage.type"
-        elif value in controlKeywords:
-          result = "keyword.control"
-        else:
-          result = "keyword"
+    if "field.name" in tok.attr:
+      result = "variable.other.property"
+    elif value in ["true", "false"]:
+      result = "constant.language.boolean"
+    elif value in ["null", "undefined"]:
+      result = "constant.language.null"
+    elif value in lexer.identifiers:
+      if value in storageTypeKeywords:
+        result = "storage.type"
+      elif value in controlKeywords:
+        result = "keyword.control"
       else:
-        result = "variable"
+        result = "keyword"
+    else:
+      result = "variable"
   of tkEOF: result = "source"
 
 proc tokenToJson*(lexer: SweetLexer, tok: Token, includeValue = true): JsonNode =

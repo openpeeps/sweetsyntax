@@ -148,6 +148,22 @@ suite "PHP parser":
     check attrs[1].kind == nkStatement
     check attrs[1][0].name == "attr"
 
+  test "bare hash comment with no text":
+    proc parseAll(code: string): seq[Node] =
+      let syntax = getKnownSyntax(KnownSyntax.php)
+      var p = compile(syntax.spec)
+      p.lexer = initLexer(syntax.spec, code)
+      phpHandlersMod.phpHandlers(p)
+      p.features.incl(featLabeledStmt)
+      p.features.incl(featGenerators)
+      p.curr = p.getToken()
+      p.next = p.getToken()
+      while p.curr.kind != tkEOF:
+        result.add(parseStatement(p))
+    let nodes = parseAll("#\n$x = 1;")
+    check nodes.len == 2
+    check nodes[0].kind == nkInlineComment
+
   test "scope resolution and qualified names":
     let n = parsePHP("Foo::bar($x);")
     check n.kind == nkCall

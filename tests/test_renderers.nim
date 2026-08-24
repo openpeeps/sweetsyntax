@@ -53,6 +53,17 @@ char c = 'a';
       check start < stop
       check code[start ..< stop] == tokens[i]["value"].getStr
 
+  test "comments with no trailing text keep a non-zero span":
+    let code = "//\n/* */\n/**/\nint x;"
+    let tokens = highlight(code)
+    check tokens[0]["kind"].getStr == "comment"
+    check tokens[1]["kind"].getStr == "comment"
+    check tokens[2]["kind"].getStr == "doc_comment"
+    for i in 0 ..< 3:
+      let start = tokens[i]["start"].getInt
+      let stop = tokens[i]["stop"].getInt
+      check start < stop
+
 suite "Fold renderer":
   proc folds(code: string, mode: FoldMode = fmAuto,
              pre = false): seq[FoldRegion] =

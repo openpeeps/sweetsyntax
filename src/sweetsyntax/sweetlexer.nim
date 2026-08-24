@@ -41,7 +41,7 @@ type
     input: string
     mf: MemFile
     data: ptr UncheckedArray[char]
-    len: int
+    len*: int
     line*, col*, pos*: int # meta information for error reporting and token metadata
     current*: char
     usingMemFile: bool
@@ -81,7 +81,7 @@ type
     ## Represents an error that can occur during lexing,
     ## such as invalid UTF-8 sequences or unterminated strings
 
-proc charAt(l: SweetLexer, idx: int): char {.inline.} =
+proc charAt*(l: SweetLexer, idx: int): char {.inline.} =
   # Returns the character at the given index, or '\0' if out of bounds
   if idx < 0 or idx >= l.len: return '\0'
   if l.data != nil: l.data[idx] else: l.input[idx]
@@ -223,7 +223,7 @@ proc getTokenValue*(l: SweetLexer, tok: Token): string {.inline.} =
   ## Returns the source text for the given token.
   l.getLexeme(tok.start, tok.stop)
 
-proc getFullInput(l: SweetLexer): string =
+proc getFullInput*(l: SweetLexer): string =
   ## Returns full source text as string (needed for regex filters).
   if l.data != nil:
     if l.len <= 0: return ""
@@ -362,6 +362,12 @@ proc makeRange(l: SweetLexer, k: SweetTokenKind, startPos, startLine, startCol: 
         # also, ensure the comment line does not start with whitespace
         while result.start < stopPos and l.charAt(result.start) == ' ':
           inc result.start
+    # A comment with no trailing content (e.g. bare "//", "/* */" or "#")
+    # must not collapse into a zero-width token. Fall back to the full
+    # comment span so it is still recognized as a comment.
+    if result.start >= result.stop:
+      result.start = startPos
+      result.stop = stopPos
   elif k == tkDocComment:
     # Strip block comment syntax (e.g., "/**" and "*/")
     let startSyntax = l.blockComment[0]
@@ -373,6 +379,11 @@ proc makeRange(l: SweetLexer, k: SweetTokenKind, startPos, startLine, startCol: 
         inc result.start
     if lexeme.endsWith(endSyntax):
       result.stop = result.stop - endSyntax.len
+    # Empty doc comment (e.g. "/**/") must not collapse into a negative or
+    # zero-width span.
+    if result.start >= result.stop:
+      result.start = startPos
+      result.stop = stopPos
   elif k == tkIdentifier:
     let identAttr = lookupAttrByLexeme(l.identifiers, lexeme)
     if identAttr.len > 0:
@@ -888,6 +899,19 @@ proc initLexer*(pre: SweetLexerInit, input: sink string, enableFilters: bool = f
   )
   if result.len > 0:
     result.current = result.charAt(0)
+
+proc resetLexer*(l: SweetLexer) =
+  ## Rewind the lexer to offset 0 so its token stream can be consumed again.
+  ## Used by streaming consumers that need a second pass over the input
+  ## (e.g. fold computation that detects its mode only at EOF).
+  if l.isNil: return
+  l.pos = 0
+  l.line = 1
+  l.col = 1
+  l.filterScanIdx = 0
+  l.expectRegex = false
+  l.tagTerminated = false
+  l.current = if l.len > 0: l.charAt(0) else: '\0'
 
 proc closeLexer*(l: var SweetLexer) =
   if l != nil and l.usingMemFile:
