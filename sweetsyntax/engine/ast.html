@@ -86,7 +86,10 @@
   nkVarTy, nkNil, nkIdentDefs, nkPrefix, nkPostfix, nkInfix, nkDotExpr,
   nkBracketExpr, nkColonExpr, nkCall, nkRegex, nkReturn, nkImport, nkInclude,
   nkInlineComment, nkDocComment, nkFunction, nkClass, nkInterface, nkVar,
-  nkStatement, nkBlock">NodeKind</a></li>
+  nkStatement, nkBlock, nkArrayLit, ## Array literal `[a, b, c]` — distinct from `nkBracketExpr`,
+                                     ## which is reserved for subscript access `a[i]`.
+  nkCommentGroup             ## An expression with interleaved comments attached:
+                             ## `[expr, comment]`. Chains nest.">NodeKind</a></li>
 <li><a class="reference" href="#OpenAstProgram" title="OpenAstProgram = ref object
   nodes*: seq[Node] ## The root of the AST, containing a sequence of top-level
                     ## nodes (e.g., statements or declarations)">OpenAstProgram</a></li>
@@ -242,7 +245,10 @@
   <span class="Identifier">nkVarTy</span><span class="Other">,</span> <span class="Identifier">nkNil</span><span class="Other">,</span> <span class="Identifier">nkIdentDefs</span><span class="Other">,</span> <span class="Identifier">nkPrefix</span><span class="Other">,</span> <span class="Identifier">nkPostfix</span><span class="Other">,</span> <span class="Identifier">nkInfix</span><span class="Other">,</span> <span class="Identifier">nkDotExpr</span><span class="Other">,</span>
   <span class="Identifier">nkBracketExpr</span><span class="Other">,</span> <span class="Identifier">nkColonExpr</span><span class="Other">,</span> <span class="Identifier">nkCall</span><span class="Other">,</span> <span class="Identifier">nkRegex</span><span class="Other">,</span> <span class="Identifier">nkReturn</span><span class="Other">,</span> <span class="Identifier">nkImport</span><span class="Other">,</span> <span class="Identifier">nkInclude</span><span class="Other">,</span>
   <span class="Identifier">nkInlineComment</span><span class="Other">,</span> <span class="Identifier">nkDocComment</span><span class="Other">,</span> <span class="Identifier">nkFunction</span><span class="Other">,</span> <span class="Identifier">nkClass</span><span class="Other">,</span> <span class="Identifier">nkInterface</span><span class="Other">,</span> <span class="Identifier">nkVar</span><span class="Other">,</span>
-  <span class="Identifier">nkStatement</span><span class="Other">,</span> <span class="Identifier">nkBlock</span></pre></dt>
+  <span class="Identifier">nkStatement</span><span class="Other">,</span> <span class="Identifier">nkBlock</span><span class="Other">,</span> <span class="Identifier">nkArrayLit</span><span class="Other">,</span> <span class="Comment">## Array literal `[a, b, c]` — distinct from `nkBracketExpr`,</span>
+                                     <span class="Comment">## which is reserved for subscript access `a[i]`.</span>
+  <span class="Identifier">nkCommentGroup</span>             <span class="Comment">## An expression with interleaved comments attached:</span>
+                             <span class="Comment">## `[expr, comment]`. Chains nest.</span></pre></dt>
   <dd>
     
     The different kinds of AST nodes we can have. This is a very basic set of node kinds, and can be extended as needed for specific languages or constructs
@@ -505,7 +511,7 @@
       <div class="twelve-columns footer">
         <span class="nim-sprite"></span>
         <br>
-        <small style="color: var(--hint);">Made with Nim. Generated: 2026-08-24 08:33:16 UTC</small>
+        <small style="color: var(--hint);">Made with Nim. Generated: 2026-08-26 16:30:31 UTC</small>
       </div>
     </div>
   </div>

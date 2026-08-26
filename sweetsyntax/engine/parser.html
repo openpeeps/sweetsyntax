@@ -82,6 +82,8 @@
   braceHandler*: proc (p: var GenericParser; minPrec: int = 0): Node {.nimcall.}
   expectRegexTokens*: seq[string]
   expectRegexKeywords*: seq[string]
+  expectRegexTokenSet*: HashSet[string] ## hash-set mirror of `expectRegexTokens` for O(1) checks in `walk`
+  expectRegexKeywordSet*: HashSet[string] ## hash-set mirror of `expectRegexKeywords` for O(1) checks in `walk`
   blockOpen*, blockClose*: string
   features*: set[LanguageFeature] ## Set of enabled language features (e.g. featAsync, featGenerators) that can be used
   strictStatements*: bool ## Enforce strict statement termination (PHP-like): a bare `;` raises a
@@ -252,6 +254,8 @@
   <span class="Identifier">braceHandler</span><span class="Operator">*</span><span class="Other">:</span> <span class="Keyword">proc</span> <span class="Other">(</span><span class="Identifier">p</span><span class="Other">:</span> <span class="Keyword">var</span> <a href="#GenericParser"><span class="Identifier">GenericParser</span></a><span class="Other">;</span> <span class="Identifier">minPrec</span><span class="Other">:</span> <span class="Identifier">int</span> <span class="Other">=</span> <span class="DecNumber">0</span><span class="Other">)</span><span class="Other">:</span> <a href="ast.html#Node"><span class="Identifier">Node</span></a> {.<span class="Identifier">nimcall</span>.}
   <span class="Identifier">expectRegexTokens</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">seq</span><span class="Other">[</span><span class="Identifier">string</span><span class="Other">]</span>
   <span class="Identifier">expectRegexKeywords</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">seq</span><span class="Other">[</span><span class="Identifier">string</span><span class="Other">]</span>
+  <span class="Identifier">expectRegexTokenSet</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">HashSet</span><span class="Other">[</span><span class="Identifier">string</span><span class="Other">]</span> <span class="Comment">## hash-set mirror of `expectRegexTokens` for O(1) checks in `walk`</span>
+  <span class="Identifier">expectRegexKeywordSet</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">HashSet</span><span class="Other">[</span><span class="Identifier">string</span><span class="Other">]</span> <span class="Comment">## hash-set mirror of `expectRegexKeywords` for O(1) checks in `walk`</span>
   <span class="Identifier">blockOpen</span><span class="Operator">*</span><span class="Other">,</span> <span class="Identifier">blockClose</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">string</span>
   <span class="Identifier">features</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">set</span><span class="Other">[</span><a href="../config.html#LanguageFeature"><span class="Identifier">LanguageFeature</span></a><span class="Other">]</span> <span class="Comment">## Set of enabled language features (e.g. featAsync, featGenerators) that can be used</span>
   <span class="Identifier">strictStatements</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">bool</span> <span class="Comment">## Enforce strict statement termination (PHP-like): a bare `;` raises a</span>
@@ -569,7 +573,7 @@
       <div class="twelve-columns footer">
         <span class="nim-sprite"></span>
         <br>
-        <small style="color: var(--hint);">Made with Nim. Generated: 2026-08-24 08:33:16 UTC</small>
+        <small style="color: var(--hint);">Made with Nim. Generated: 2026-08-26 16:30:31 UTC</small>
       </div>
     </div>
   </div>

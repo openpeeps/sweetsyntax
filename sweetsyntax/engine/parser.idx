@@ -3,25 +3,25 @@ nim	PrefixHandler	sweetsyntax/engine/parser.html#PrefixHandler	type PrefixHandle
 nim	StmtHandler	sweetsyntax/engine/parser.html#StmtHandler	type StmtHandler		28
 nim	ExpressionHandler	sweetsyntax/engine/parser.html#ExpressionHandler	type ExpressionHandler		29
 nim	GenericParser	sweetsyntax/engine/parser.html#GenericParser	object GenericParser		31
-nim	OpenAstParsingError	sweetsyntax/engine/parser.html#OpenAstParsingError	object OpenAstParsingError		75
-nim	walk	sweetsyntax/engine/parser.html#walk,GenericParser,int	proc walk(p: var GenericParser; offset = 1)		80
-nim	walkOpt	sweetsyntax/engine/parser.html#walkOpt,GenericParser,string	proc walkOpt(p: var GenericParser; val: string)		91
-nim	error	sweetsyntax/engine/parser.html#error,GenericParser,string	proc error(p: var GenericParser; msg: string)		95
-nim	expect	sweetsyntax/engine/parser.html#expect,GenericParser,SweetTokenKind,string	proc expect(p: var GenericParser; expectedKind: SweetTokenKind; msg: string = "")		100
-nim	expectWalk	sweetsyntax/engine/parser.html#expectWalk,GenericParser,string,string	proc expectWalk(p: var GenericParser; val: string; msg: string = "")		106
-nim	parseExpression	sweetsyntax/engine/parser.html#parseExpression,GenericParser,int	proc parseExpression(p: var GenericParser; minPrec: int = 0): Node		122
-nim	parseStatement	sweetsyntax/engine/parser.html#parseStatement,GenericParser,int	proc parseStatement(p: var GenericParser; parentCol: int = -1): Node		123
-nim	parseBlock	sweetsyntax/engine/parser.html#parseBlock,GenericParser,int	proc parseBlock(p: var GenericParser; indentPos: int = -1): Node		124
-nim	parseCommentGeneric	sweetsyntax/engine/parser.html#parseCommentGeneric,GenericParser,int	proc parseCommentGeneric(p: var GenericParser; minPrec: int = 0): Node		166
-nim	parseGroupExpr	sweetsyntax/engine/parser.html#parseGroupExpr,GenericParser,int	proc parseGroupExpr(p: var GenericParser; minPrec: int = 0): Node		207
-nim	parseArrayLiteral	sweetsyntax/engine/parser.html#parseArrayLiteral,GenericParser,int	proc parseArrayLiteral(p: var GenericParser; minPrec: int = 0): Node		247
-nim	parseObjectLiteral	sweetsyntax/engine/parser.html#parseObjectLiteral,GenericParser,int	proc parseObjectLiteral(p: var GenericParser; minPrec: int = 0): Node		269
-nim	parseCommaExpr	sweetsyntax/engine/parser.html#parseCommaExpr,GenericParser	proc parseCommaExpr(p: var GenericParser): Node		340
-nim	parseIndentBlock	sweetsyntax/engine/parser.html#parseIndentBlock,GenericParser	proc parseIndentBlock(p: var GenericParser): Node		647
-nim	compile	sweetsyntax/engine/parser.html#compile,SweetSpec	proc compile(spec: SweetSpec): GenericParser		769
-nim	ParsingCallback	sweetsyntax/engine/parser.html#ParsingCallback	type ParsingCallback		859
-nim	stmtHandler	sweetsyntax/engine/parser.html#stmtHandler.t,untyped,string,untyped	template stmtHandler(parser: untyped; name: string; body: untyped)		864
-nim	prefixHandler	sweetsyntax/engine/parser.html#prefixHandler.t,untyped,string,untyped	template prefixHandler(parser: untyped; name: string; body: untyped)		870
-nim	exprHandler	sweetsyntax/engine/parser.html#exprHandler.t,untyped,string,untyped	template exprHandler(parser: untyped; name: string; body: untyped)		876
-nim	applyPrecompiled	sweetsyntax/engine/parser.html#applyPrecompiled,GenericParser,SweetLexerInit	proc applyPrecompiled(p: var GenericParser; init: SweetLexerInit)		881
-nim	parseScript	sweetsyntax/engine/parser.html#parseScript,string,ParsingCallback,set[LanguageFeature]	proc parseScript(path: string; parsingCallback: ParsingCallback = nil;\n            features: set[LanguageFeature] = {}): OpenAstProgram		900
+nim	OpenAstParsingError	sweetsyntax/engine/parser.html#OpenAstParsingError	object OpenAstParsingError		79
+nim	walk	sweetsyntax/engine/parser.html#walk,GenericParser,int	proc walk(p: var GenericParser; offset = 1)		84
+nim	walkOpt	sweetsyntax/engine/parser.html#walkOpt,GenericParser,string	proc walkOpt(p: var GenericParser; val: string)		95
+nim	error	sweetsyntax/engine/parser.html#error,GenericParser,string	proc error(p: var GenericParser; msg: string)		99
+nim	expect	sweetsyntax/engine/parser.html#expect,GenericParser,SweetTokenKind,string	proc expect(p: var GenericParser; expectedKind: SweetTokenKind; msg: string = "")		104
+nim	expectWalk	sweetsyntax/engine/parser.html#expectWalk,GenericParser,string,string	proc expectWalk(p: var GenericParser; val: string; msg: string = "")		110
+nim	parseExpression	sweetsyntax/engine/parser.html#parseExpression,GenericParser,int	proc parseExpression(p: var GenericParser; minPrec: int = 0): Node		126
+nim	parseStatement	sweetsyntax/engine/parser.html#parseStatement,GenericParser,int	proc parseStatement(p: var GenericParser; parentCol: int = -1): Node		127
+nim	parseBlock	sweetsyntax/engine/parser.html#parseBlock,GenericParser,int	proc parseBlock(p: var GenericParser; indentPos: int = -1): Node		128
+nim	parseCommentGeneric	sweetsyntax/engine/parser.html#parseCommentGeneric,GenericParser,int	proc parseCommentGeneric(p: var GenericParser; minPrec: int = 0): Node		170
+nim	parseGroupExpr	sweetsyntax/engine/parser.html#parseGroupExpr,GenericParser,int	proc parseGroupExpr(p: var GenericParser; minPrec: int = 0): Node		211
+nim	parseArrayLiteral	sweetsyntax/engine/parser.html#parseArrayLiteral,GenericParser,int	proc parseArrayLiteral(p: var GenericParser; minPrec: int = 0): Node		251
+nim	parseObjectLiteral	sweetsyntax/engine/parser.html#parseObjectLiteral,GenericParser,int	proc parseObjectLiteral(p: var GenericParser; minPrec: int = 0): Node		273
+nim	parseCommaExpr	sweetsyntax/engine/parser.html#parseCommaExpr,GenericParser	proc parseCommaExpr(p: var GenericParser): Node		346
+nim	parseIndentBlock	sweetsyntax/engine/parser.html#parseIndentBlock,GenericParser	proc parseIndentBlock(p: var GenericParser): Node		661
+nim	compile	sweetsyntax/engine/parser.html#compile,SweetSpec	proc compile(spec: SweetSpec): GenericParser		783
+nim	ParsingCallback	sweetsyntax/engine/parser.html#ParsingCallback	type ParsingCallback		875
+nim	stmtHandler	sweetsyntax/engine/parser.html#stmtHandler.t,untyped,string,untyped	template stmtHandler(parser: untyped; name: string; body: untyped)		880
+nim	prefixHandler	sweetsyntax/engine/parser.html#prefixHandler.t,untyped,string,untyped	template prefixHandler(parser: untyped; name: string; body: untyped)		886
+nim	exprHandler	sweetsyntax/engine/parser.html#exprHandler.t,untyped,string,untyped	template exprHandler(parser: untyped; name: string; body: untyped)		892
+nim	applyPrecompiled	sweetsyntax/engine/parser.html#applyPrecompiled,GenericParser,SweetLexerInit	proc applyPrecompiled(p: var GenericParser; init: SweetLexerInit)		897
+nim	parseScript	sweetsyntax/engine/parser.html#parseScript,string,ParsingCallback,set[LanguageFeature]	proc parseScript(path: string; parsingCallback: ParsingCallback = nil;\n            features: set[LanguageFeature] = {}): OpenAstProgram		918

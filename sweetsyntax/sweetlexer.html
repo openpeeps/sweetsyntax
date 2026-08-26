@@ -77,7 +77,10 @@
   allOps*: seq[string]
   filters*: seq[SweetFilter]
   expectRegex*: bool
-  tagTerminated*: bool">SweetLexer</a></li>
+  tagTerminated*: bool
+  symbolsRev*, identifiersRev*: Table[string, string] ## lazily-built reverse tables (attr -&gt; lexeme) for reversed YAML styles
+  reverseAttrLookup*: bool ## when true, attr lookup also probes a reverse (attr -&gt; lexeme) table.
+                           ## Off by default: no bundled language spec uses reversed-style mappings.">SweetLexer</a></li>
 <li><a class="reference" href="#SweetLexerError" title="SweetLexerError = object of CatchableError">SweetLexerError</a></li>
 <li><a class="reference" href="#SweetTokenKind" title="SweetTokenKind = enum
   tkEOF, tkIdentifier = &quot;ident&quot;, tkInt = &quot;int&quot;, tkFloat = &quot;float&quot;, tkHex, ## hex literal: 0xFF
@@ -180,7 +183,10 @@
   <span class="Identifier">allOps</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">seq</span><span class="Other">[</span><span class="Identifier">string</span><span class="Other">]</span>
   <span class="Identifier">filters</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">seq</span><span class="Other">[</span><a href="config.html#SweetFilter"><span class="Identifier">SweetFilter</span></a><span class="Other">]</span>
   <span class="Identifier">expectRegex</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">bool</span>
-  <span class="Identifier">tagTerminated</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">bool</span></pre></dt>
+  <span class="Identifier">tagTerminated</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">bool</span>
+  <span class="Identifier">symbolsRev</span><span class="Operator">*</span><span class="Other">,</span> <span class="Identifier">identifiersRev</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">Table</span><span class="Other">[</span><span class="Identifier">string</span><span class="Other">,</span> <span class="Identifier">string</span><span class="Other">]</span> <span class="Comment">## lazily-built reverse tables (attr -&gt; lexeme) for reversed YAML styles</span>
+  <span class="Identifier">reverseAttrLookup</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">bool</span> <span class="Comment">## when true, attr lookup also probes a reverse (attr -&gt; lexeme) table.</span>
+                           <span class="Comment">## Off by default: no bundled language spec uses reversed-style mappings.</span></pre></dt>
   <dd>
     
     Represents the state of the lexer
@@ -375,7 +381,7 @@
       <div class="twelve-columns footer">
         <span class="nim-sprite"></span>
         <br>
-        <small style="color: var(--hint);">Made with Nim. Generated: 2026-08-24 08:33:16 UTC</small>
+        <small style="color: var(--hint);">Made with Nim. Generated: 2026-08-26 16:30:31 UTC</small>
       </div>
     </div>
   </div>
