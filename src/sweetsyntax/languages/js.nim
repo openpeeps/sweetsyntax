@@ -41,7 +41,9 @@ proc jsHandlers*(p: var GenericParser) =
         discard parseCommentGeneric(p)
       if p.curr.kind == tkPunct and p.curr.value in ["{", "["]:
         # Destructuring: let { a, b } = obj or let [ a, b ] = arr
-        let pattern = parseExpression(p)
+        # minPrec=1 stops the Pratt loop from consuming the following
+        # `=` as an assignment operator.
+        let pattern = parseExpression(p, 1)
         result.children.add(pattern)
         if p.curr.kind == tkPunct and p.curr.value == "=":
           walk p
@@ -173,7 +175,12 @@ proc jsHandlers*(p: var GenericParser) =
     ## for (init; cond; update) { body }
     ## for (var x in obj) { body }
     ## for (var x of iter) { body }
+    ## for await (var x of iter) { body }
     walk p # consume 'for'
+    var isAwait = false
+    if p.curr.kind == tkIdentifier and p.curr.value == "await":
+      isAwait = true
+      walk p
     p.expectWalk("(")
 
     var initNode: Node
@@ -268,13 +275,68 @@ proc jsHandlers*(p: var GenericParser) =
       p.expectWalk(")")
       let body = if p.curr.kind == tkPunct and p.curr.value == "{": parseBlock(p)
                  else: parseStatement(p)
-      result = Node(kind: nkStatement,
-        children: @[Node(kind: nkIdent, name: "for"), initNode, iterable, body])
+      result = Node(kind: nkStatement)
+      result.children.add(Node(kind: nkIdent, name: "for"))
+      # Marker child so consumers can distinguish of/in loops from c-style
+      result.children.add(Node(kind: nkIdent,
+        name: (if isAwait: "await-" & loopType else: loopType)))
+      result.children.add(initNode)
+      result.children.add(iterable)
+      result.children.add(body)
     else:
       error(p, "Expected ';', 'in', or 'of' in for loop")
 
+  stmtHandler p, "try_js":
+    ## try { } catch (e) { } finally { }
+    ## Nested shape: Statement(try, body, clause, ...)
+    ## where clause = Statement("except", param|Empty, block)
+    ##             or Statement("finally", block)
+    walk p # consume 'try'
+    if not (p.curr.kind == tkPunct and p.curr.value == "{"):
+      error(p, "Expected '{' after 'try'")
+    result = Node(kind: nkStatement)
+    result.children.add(Node(kind: nkIdent, name: "try"))
+    result.children.add(parseBlock(p))
+    while true:
+      if p.curr.kind == tkIdentifier and p.curr.value == "catch":
+        walk p
+        var param = newEmptyNode()
+        if p.curr.kind == tkPunct and p.curr.value == "(":
+          walk p
+          if p.curr.kind == tkIdentifier:
+            param = Node(kind: nkIdent, name: p.curr.value)
+            walk p
+          elif p.curr.kind == tkPunct and p.curr.value == "{":
+            # destructured catch param — keep the raw braces
+            var depth = 0
+            let startPos = p.lexer.pos
+            while true:
+              if p.curr.kind == tkEOF: error(p, "Unexpected EOF in catch parameter")
+              if p.curr.kind == tkPunct and p.curr.value == "{": inc depth
+              elif p.curr.kind == tkPunct and p.curr.value == "}":
+                dec depth
+                if depth == 0: break
+              walk p
+            param = Node(kind: nkLitString,
+              valStr: "{" & p.lexer.getLexeme(startPos + 1, p.lexer.pos - 1) & "}")
+          p.expectWalk(")")
+        if not (p.curr.kind == tkPunct and p.curr.value == "{"):
+          error(p, "Expected '{' after 'catch'")
+        result.children.add(Node(kind: nkStatement,
+          children: @[Node(kind: nkIdent, name: "except"), param, parseBlock(p)]))
+      elif p.curr.kind == tkIdentifier and p.curr.value == "finally":
+        walk p
+        if not (p.curr.kind == tkPunct and p.curr.value == "{"):
+          error(p, "Expected '{' after 'finally'")
+        result.children.add(Node(kind: nkStatement,
+          children: @[Node(kind: nkIdent, name: "finally"), parseBlock(p)]))
+      else:
+        break
+
   stmtHandler p, "class":
-    ## class Name { ... } or class Name extends Base { ... }
+    ## class Name extends Base { members }
+    ## Members: methods (with static/get/set/async/* modifiers),
+    ## fields (`x`, `x = init`) and class static blocks.
     walk p # consume 'class'
     var name: Node
     expectIdent:
@@ -287,7 +349,93 @@ proc jsHandlers*(p: var GenericParser) =
     else:
       parent = newEmptyNode()
     result = Node(kind: nkStatement,
-      children: @[Node(kind: nkIdent, name: "class"), name, parent, parseBlock(p)])
+      children: @[Node(kind: nkIdent, name: "class"), name, parent])
+
+    p.expectWalk("{")
+    let body = Node(kind: nkBlock)
+    while not (p.curr.kind == tkPunct and p.curr.value == "}"):
+      if p.curr.kind == tkEOF: error(p, "Unexpected EOF in class body")
+      if p.curr.kind in {tkComment, tkDocComment}:
+        body.children.add(parseCommentGeneric(p))
+        continue
+      if p.curr.kind == tkPunct and p.curr.value == ";":
+        walk p
+        continue
+      # Static block: static { ... }
+      if p.curr.kind == tkIdentifier and p.curr.value == "static" and
+         p.next.kind == tkPunct and p.next.value == "{":
+        body.children.add(Node(kind: nkStatement,
+          children: @[Node(kind: nkIdent, name: "static-block"), parseBlock(p)]))
+        continue
+      # Modifiers: static/get/set/async/* — unless the token is the name itself
+      # (e.g. `get() {...}`, `static = 5`)
+      var flags: seq[Node]
+      while true:
+        if p.curr.kind == tkPunct and p.curr.value == "*":
+          flags.add(Node(kind: nkIdent, name: "*"))
+          walk p
+          continue
+        if p.curr.kind == tkIdentifier and p.curr.value in ["static", "get", "set", "async"]:
+          let nxt = p.next
+          let isName = nxt.kind == tkEOF or
+            (nxt.kind == tkPunct and nxt.value in ["(", "=", ";", "}"])
+          if isName: break
+          flags.add(Node(kind: nkIdent, name: p.curr.value))
+          walk p
+          continue
+        break
+      # Member name: identifier, string or computed `[expr]`
+      var key: Node
+      if p.curr.kind == tkPunct and p.curr.value == "[":
+        walk p
+        key = Node(kind: nkStatement,
+          children: @[Node(kind: nkIdent, name: "computed"), parseExpression(p)])
+        p.expectWalk("]")
+      elif p.curr.kind == tkString:
+        key = Node(kind: nkLitString, valStr: p.curr.value)
+        walk p
+      else:
+        key = Node(kind: nkIdent, name: p.curr.value)
+        walk p
+      if p.curr.kind == tkPunct and p.curr.value == "(":
+        # Method
+        walk p
+        let params = Node(kind: nkIdentDefs)
+        while not (p.curr.kind == tkPunct and p.curr.value == ")"):
+          if p.curr.kind == tkEOF: error(p, "Unexpected EOF in method parameters")
+          params.children.add(parseExpression(p))
+          if p.curr.kind == tkPunct and p.curr.value == ",":
+            walk p
+          elif not (p.curr.kind == tkPunct and p.curr.value == ")"):
+            error(p, "Expected ',' or ')' in method parameters")
+        p.expectWalk(")")
+        if not (p.curr.kind == tkPunct and p.curr.value == "{"):
+          error(p, "Expected method body")
+        let fnBody = parseBlock(p)
+        let fnNode = Node(kind: nkFunction, children: flags & @[params, fnBody])
+        body.children.add(Node(kind: nkColonExpr, children: @[key, fnNode]))
+      elif p.curr.kind == tkPunct and p.curr.value == "=":
+        walk p
+        let init = parseExpression(p)
+        p.walkOpt(";")
+        # Field member: ["field", flagIdents..., key, initializer]
+        var fieldStmt = Node(kind: nkStatement)
+        fieldStmt.children.add(Node(kind: nkIdent, name: "field"))
+        fieldStmt.children.add(flags)
+        fieldStmt.children.add(key)
+        fieldStmt.children.add(init)
+        body.children.add(fieldStmt)
+      else:
+        # Bare field declaration
+        var fieldStmt = Node(kind: nkStatement)
+        fieldStmt.children.add(Node(kind: nkIdent, name: "field"))
+        fieldStmt.children.add(flags)
+        fieldStmt.children.add(key)
+        fieldStmt.children.add(Node(kind: nkEmpty))
+        body.children.add(fieldStmt)
+        p.walkOpt(";")
+    p.expectWalk("}")
+    result.children.add(body)
 
   stmtHandler p, "switch":
     ## switch (expr) { case x: body; ... }
@@ -921,14 +1069,52 @@ proc jsHandlers*(p: var GenericParser) =
     p.walkOpt(";")
 
   stmtHandler p, "yield":
-    ## yield expr
+    ## yield [ * ] expr
     walk p # consume 'yield'
     result = Node(kind: nkStatement)
     result.children.add(Node(kind: nkIdent, name: "yield"))
+    if p.curr.kind == tkPunct and p.curr.value == "*":
+      # yield* delegate — `yield * 2` parses the same way, matching JS grammar
+      result.children.add(Node(kind: nkIdent, name: "*"))
+      walk p
     if p.curr.kind notin {tkEOF} and
        not (p.curr.kind == tkPunct and p.curr.value in [";", "}"]):
       result.children.add(parseExpression(p))
     p.walkOpt(";")
+
+  stmtHandler p, "async_function":
+    ## async function f() {...}   (declaration)
+    ## async x => ... / async (a, b) => ...   (arrow expression)
+    walk p # consume 'async'
+    if p.curr.kind == tkIdentifier and p.curr.value == "function":
+      let fn = p.stmtHandlers["function"](p)
+      result = Node(kind: nkStatement)
+      result.children.add(Node(kind: nkIdent, name: "async"))
+      result.children.add(fn)
+    elif (p.curr.kind == tkPunct and p.curr.value == "(") or
+         p.curr.kind == tkIdentifier:
+      # async arrow: collect params then expect '=>'
+      var params = Node(kind: nkIdentDefs)
+      if p.curr.kind == tkPunct and p.curr.value == "(":
+        walk p
+        while not (p.curr.kind == tkPunct and p.curr.value == ")"):
+          if p.curr.kind == tkEOF: error(p, "Unexpected EOF in async arrow params")
+          params.children.add(parseExpression(p))
+          if p.curr.kind == tkPunct and p.curr.value == ",":
+            walk p
+          elif not (p.curr.kind == tkPunct and p.curr.value == ")"):
+            error(p, "Expected ',' or ')' in async arrow parameters")
+        p.expectWalk(")")
+      else:
+        params.children.add(Node(kind: nkIdent, name: p.curr.value))
+        walk p
+      p.expectWalk("=>")
+      let body = if p.curr.kind == tkPunct and p.curr.value == "{": parseBlock(p)
+                 else: parseExpression(p, 0)
+      result = Node(kind: nkFunction,
+        children: @[Node(kind: nkIdent, name: "async"), params, body])
+    else:
+      error(p, "Expected 'function' or arrow parameters after 'async'")
 
   stmtHandler p, "do_block":
     ## do: body  — used in callback style: foo do (x, y): echo x + y

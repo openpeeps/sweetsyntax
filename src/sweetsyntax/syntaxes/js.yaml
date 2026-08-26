@@ -57,6 +57,7 @@ symbols:
   arrow: '=>'
 
 identifiers:
+  async: "async"
   await: "await" 
   bool: "true"
   break: "break"
@@ -117,7 +118,7 @@ features:
 operators:
   prefix:
     - tokens: ["+", "-", "!", "!!", "~", "++", "--"]
-    - tokens: ["typeof", "void", "delete", "new"]
+    - tokens: ["typeof", "void", "delete", "new", "await"]
       is_keyword: true
     - tokens: ["..."]
       handler: spread       # hint for the parser
@@ -205,7 +206,7 @@ statements:
     handler: continue
   try_stmt:
     keyword: "try"
-    handler: try_catch
+    handler: try_js
   switch_stmt:
     keyword: "switch"
     handler: switch
@@ -218,6 +219,12 @@ statements:
   export_stmt:
     keyword: "export"
     handler: export
+  yield_stmt:
+    keyword: "yield"
+    handler: yield
+  async_decl:
+    keyword: "async"
+    handler: async_function
 
   expect_regex_after:
     tokens: ["=", "+=", "-=", "*=", "/=", "%=",

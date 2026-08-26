@@ -67,6 +67,11 @@ type
     tagTerminated*: bool
       # set to true when the last fetched token was preceded by a close tag
       # (e.g. PHP's `?>`), which terminates the current statement
+    symbolsRev*, identifiersRev*: Table[string, string]
+      ## lazily-built reverse tables (attr -> lexeme) for reversed YAML styles
+    reverseAttrLookup*: bool
+      ## when true, attr lookup also probes a reverse (attr -> lexeme) table.
+      ## Off by default: no bundled language spec uses reversed-style mappings.
 
   Token* = ref object
     ## Represents a token with its kind, position, and
@@ -241,16 +246,29 @@ proc overlap(aStart, aStop, bStart, bStop: int): bool {.inline.} =
   # Checks if the ranges [aStart, aStop) and [bStart, bStop) overlap
   aStart < bStop and bStart < aStop
 
-proc lookupAttrByLexeme(tbl: Table[string, string], lexeme: string): string =
-  # Supports both YAML styles:
-  # - lexeme -> attr
-  # - attr   -> lexeme
-  if tbl.hasKey(lexeme):
-    return tbl[lexeme]
+proc buildRevTable(tbl: Table[string, string]): Table[string, string] =
+  ## Builds the reverse (attr -> lexeme) mapping of `tbl`.
   for k, v in tbl.pairs:
-    if v == lexeme:
-      return k
-  ""
+    result[v] = k
+
+proc lookupAttrByLexeme(l: SweetLexer, lexeme: string, isIdentTable: bool): string =
+  # Supports both YAML styles:
+  # - lexeme -> attr (fast path, forward table)
+  # - attr   -> lexeme (only when `reverseAttrLookup` is enabled)
+  if isIdentTable:
+    if l.identifiers.hasKey(lexeme):
+      return l.identifiers[lexeme]
+    if l.reverseAttrLookup:
+      if l.identifiers.len > 0 and l.identifiersRev.len == 0:
+        l.identifiersRev = buildRevTable(l.identifiers)
+      result = l.identifiersRev.getOrDefault(lexeme)
+  else:
+    if l.symbols.hasKey(lexeme):
+      return l.symbols[lexeme]
+    if l.reverseAttrLookup:
+      if l.symbols.len > 0 and l.symbolsRev.len == 0:
+        l.symbolsRev = buildRevTable(l.symbols)
+      result = l.symbolsRev.getOrDefault(lexeme)
 
 proc resolveGroupRange(m: MatchResult, groupIdx: int): tuple[s, e: int] =
   # Given a regex match result and a group index, returns the start and end positions of that group.
@@ -385,11 +403,11 @@ proc makeRange(l: SweetLexer, k: SweetTokenKind, startPos, startLine, startCol: 
       result.start = startPos
       result.stop = stopPos
   elif k == tkIdentifier:
-    let identAttr = lookupAttrByLexeme(l.identifiers, lexeme)
+    let identAttr = lookupAttrByLexeme(l, lexeme, true)
     if identAttr.len > 0:
       result.attr.addAttrOnce(identAttr)
   elif k == tkPunct:
-    let symAttr = lookupAttrByLexeme(l.symbols, lexeme)
+    let symAttr = lookupAttrByLexeme(l, lexeme, false)
     if symAttr.len > 0:
       result.attr.addAttrOnce(symAttr)
   # elif k == tkRegex:

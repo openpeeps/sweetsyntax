@@ -57,6 +57,10 @@ type
     braceHandler*: proc(p: var GenericParser, minPrec: int = 0): Node {.nimcall.}
     expectRegexTokens*: seq[string]
     expectRegexKeywords*: seq[string]
+    expectRegexTokenSet*: HashSet[string]
+      ## hash-set mirror of `expectRegexTokens` for O(1) checks in `walk`
+    expectRegexKeywordSet*: HashSet[string]
+      ## hash-set mirror of `expectRegexKeywords` for O(1) checks in `walk`
     blockOpen*, blockClose*: string
     features*: set[LanguageFeature]
       ## Set of enabled language features (e.g. featAsync, featGenerators) that can be used
@@ -84,8 +88,8 @@ proc walk*(p: var GenericParser, offset = 1) {.inline.} =
   # correctly distinguish regex literals from division after tokens
   # like `=`, `(`, `return`, `var`, etc.
   p.lexer.expectRegex =
-    (p.curr.kind == tkPunct and p.curr.value in p.expectRegexTokens) or
-    (p.curr.kind == tkIdentifier and p.curr.value in p.expectRegexKeywords)
+    (p.curr.kind == tkPunct and p.curr.value in p.expectRegexTokenSet) or
+    (p.curr.kind == tkIdentifier and p.curr.value in p.expectRegexKeywordSet)
   p.next = p.getToken()
 
 proc walkOpt*(p: var GenericParser, val: string) {.inline.} =
@@ -245,7 +249,7 @@ proc parseGroupExpr*(p: var GenericParser, minPrec: int = 0): Node =
              children: @[Node(kind: nkIdent, name: "comma")] & items)
 
 proc parseArrayLiteral*(p: var GenericParser, minPrec: int = 0): Node =
-  result = Node(kind: nkBracketExpr)
+  result = Node(kind: nkArrayLit)
   walk p # consume '['
   while not (p.curr.kind == tkPunct and p.curr.value == "]"):
     if p.curr.kind == tkEOF: error(p, "Unexpected EOF in array")
@@ -289,11 +293,13 @@ proc parseObjectLiteral*(p: var GenericParser, minPrec: int = 0): Node =
       isGenerator = true
     let key =
       if p.curr.kind == tkPunct and p.curr.value == "[":
-        # Computed property key: [expr]
+        # Computed property key: [expr] — marked so consumers can tell
+        # `{[k]: v}` apart from `{k: v}`
         walk p
         let k = parseExpression(p)
         p.expectWalk("]")
-        k
+        Node(kind: nkStatement,
+          children: @[Node(kind: nkIdent, name: "computed"), k])
       elif p.curr.kind == tkString:
         let n = Node(kind: nkLitString, valStr: p.curr.value); walk p; n
       else:
@@ -374,7 +380,16 @@ proc parseExpression*(p: var GenericParser, minPrec: int = 0): Node =
     # Skip interleaved comments
     while p.curr.kind in {tkComment, tkDocComment}:
       let c = parseCommentGeneric(p)
-      lhs = Node(kind: nkBlock, children: @[lhs, c])
+      lhs = Node(kind: nkCommentGroup, children: @[lhs, c])
+
+    # Tagged template: `tag`...``` — a string token directly after an
+    # expression is only valid as a template tag call.
+    if p.curr.kind == tkString and featTemplateLit in p.features and
+       lhs.kind in {nkIdent, nkDotExpr, nkCall, nkBracketExpr, nkInfix}:
+      lhs = Node(kind: nkCall,
+        children: @[lhs, Node(kind: nkLitString, valStr: p.curr.value)])
+      walk p
+      continue
 
     case p.curr.kind
     of tkPunct:
@@ -561,9 +576,8 @@ proc parseExpression*(p: var GenericParser, minPrec: int = 0): Node =
       result = handled
   # Prepend any leading comments
   if leadingComments.len > 0:
-    leadingComments.add(lhs)
-    result = if leadingComments.len == 2: Node(kind: nkBlock, children: leadingComments)
-             else: Node(kind: nkBlock, children: leadingComments)
+    result = Node(kind: nkCommentGroup,
+      children: leadingComments & @[result])
 
 #
 # Statement parsing
@@ -843,6 +857,8 @@ proc compile*(spec: SweetSpec): GenericParser =
     let era = spec.statements["expect_regex_after"]
     result.expectRegexTokens = era.tokens
     result.expectRegexKeywords = era.keywords
+    result.expectRegexTokenSet = era.tokens.toHashSet()
+    result.expectRegexKeywordSet = era.keywords.toHashSet()
 
   # Feature flags
   if spec.features != nil:
@@ -894,6 +910,8 @@ proc applyPrecompiled*(p: var GenericParser, init: SweetLexerInit) =
   p.stmtKeywords = init.stmtKeywords
   p.expectRegexTokens = init.expectRegexTokens
   p.expectRegexKeywords = init.expectRegexKeywords
+  p.expectRegexTokenSet = init.expectRegexTokens.toHashSet()
+  p.expectRegexKeywordSet = init.expectRegexKeywords.toHashSet()
   p.blockOpen = init.blockOpen
   p.blockClose = init.blockClose
 

@@ -47,6 +47,12 @@ type
     nkVar
     nkStatement
     nkBlock
+    nkArrayLit
+      ## Array literal `[a, b, c]` — distinct from `nkBracketExpr`,
+      ## which is reserved for subscript access `a[i]`.
+    nkCommentGroup
+      ## An expression with interleaved comments attached:
+      ## `[expr, comment]`. Chains nest.
 
   Node* {.acyclic.} = ref object
     ## A node in the abstract syntax tree, representing a construct in the source code.
