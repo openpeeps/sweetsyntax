@@ -14,7 +14,6 @@
 ## 😍 Key Features
 - Fast, compiled and efficient ([check benchmarks section](#benchmarks))
 - Generic parser & AST explorer
-- **Embeddable in other languages** via FFI 👉 Lua, JavaScript (N-API), Ruby, Python, PHP
 - Easy-to-use API for integration into various applications
 - Built-in syntax support for: C, Crystal, D lang, Go, JavaScript, Nim, PHP, Python, Ruby, and Rust
 - Zero-copy parsing using MemFiles
@@ -85,20 +84,35 @@ var lx = initLexer(syntax.spec, "int main() {\n  return 0;\n}")
 echo foldsToJsonLd(computeFolds(lx))   # fold regions as NDJSON
 ```
 
-### Embeddable SweetSyntax
-SweetSyntax is written in Nim, and thanks to Nim's versatile compilation model, can be embedded natively into a wide range of host languages. This is WIP via https://github.com/openpeeps/clue toolkit
-
-| Language | Integration |
-|----------|------------|
-| **Lua** | Load the compiled `.so`/`.dll` via LuaJIT FFI or a lightweight C binding |
-| **JavaScript** | Use as a Node.js native addon via N-API |
-| **Ruby** | Bundle as a Ruby C extension |
-| **Python** | Call through Python's CFFI or `ctypes` |
-| **PHP** | Expose as a PHP extension written in C |
-
-The Nim library compiles to a small, self-contained shared object that any FFI-capable language can load, making SweetSyntax a portable parsing engine for your polyglot projects.
-
 ## Examples
+
+### CLI
+The `sweetsyntax` binary explores source files by extension:
+
+```
+sweetsyntax parse hello.nim   # validate: parse and report errors
+sweetsyntax ast hello.nim     # print the full AST as JSON
+sweetsyntax tree hello.nim    # print the AST as an indent-based tree
+```
+
+`tree` prints the AST Nim `dumpTree`-style (2 spaces per level, `=value` on leaf nodes). For `echo "hi", 42`:
+
+```
+nkCall
+  nkIdent=echo
+  nkLitString="hi"
+  nkLitInt=42
+```
+
+The same rendering is available from the API via `dumpTree` (and `treeRepr` for a single line):
+
+```nim
+import sweetsyntax
+import sweetsyntax/languages/nim
+
+let ast = parseScript("hello.nim", nimHandlers, {})
+echo dumpTree(ast)
+```
 
 Parse a C file into an AST:
 
@@ -163,6 +177,7 @@ Error (2:33) Unexpected prefix token: '#'
 
 ### Projects using SweetSyntax
 - [Squeezy](https://github.com/openpeeps/squeezy) - A dead simple JavaScript and CSS validator, bundler and minifier
+- [ZenCode.app](https://github.com/onebuckapp/zencode) - A free and open-source cross-platform code editor built with Flutter, Nim and WebAPI
 
 ### Benchmarks
 SweetSyntax is built for speed. Below is a **hyperfine** benchmark parsing and validating a full copy of **d3.js** (v7.9.0, ~20k lines, unminified, [from cdnjs.com](https://cdnjs.com/libraries/d3)). The entire pipeline (**lexing**, **parsing**, and **AST generation**) completes in under 120ms on my 🔥 rastafarian Ryzen 5 with 6 cores/12 threads:
