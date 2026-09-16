@@ -250,6 +250,9 @@ statements:
   defer_stmt:
     keyword: "defer"
     handler: defer
+  echo_stmt:
+    keyword: "echo"
+    handler: echo_handler
   raise_stmt:
     keyword: "raise"
     handler: raise

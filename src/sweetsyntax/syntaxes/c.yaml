@@ -126,6 +126,7 @@ features:
   arrow_functions: false
   template_literals: false
   labeled_statements: true
+  adjacent_concat: true
 
 operators:
   prefix:
@@ -139,14 +140,6 @@ operators:
 
   postfix:
     - tokens: ["++", "--"]
-    - tokens: ["."]
-      handler: dot
-    - tokens: ["->"]
-      handler: arrow
-    - tokens: ["("]
-      handler: call
-    - tokens: ["["]
-      handler: bracket
 
   infix:
     - precedence: 1

@@ -32,7 +32,7 @@ when isMainModule:
     of "nim", "nims":
       (nim.nimHandlers, {})
     of "c", "h":
-      (c.cHandlers, {featLabeledStmt})
+      (c.cHandlers, {featLabeledStmt, featAdjacentConcat})
     of "php", "phtml", "php3", "php4", "php5", "phps":
       (php.phpHandlers, {featLabeledStmt, featGenerators})
     of "rb", "ruby", "rake", "gemspec":
@@ -76,9 +76,28 @@ when isMainModule:
       echo e.msg
       quit 1    
 
+  proc treeCommand(v: Values) =
+    # kapsis command handler for printing the AST of a script file
+    # as an indent-based tree (2 spaces per level), Nim dumpTree-style
+    let srcPath = absolutePath($(v.get("script").getPath))
+    let splitFileTuple = srcPath.splitFile()
+    let ext = splitFileTuple.ext[1..^1].toLowerAscii
+    let (handler, features) = getLanguageHandlers(ext)
+    if handler == nil:
+      echo "Unsupported file extension: ." & ext
+      quit 1
+    try:
+      let astProgram = parseScript(srcPath, handler, features)
+      stdout.write dumpTree(astProgram)
+    except OpenAstParsingError as e:
+      echo e.msg
+      quit 1
+
   initKapsis do:
     commands:
       parse path(script):
         ## Parse a script by extension
       ast path(script), ?bool("-o"), ?bool("-y"):
         ## Generate AST of a script by extension
+      tree path(script):
+        ## Print the AST of a script as an indent-based tree

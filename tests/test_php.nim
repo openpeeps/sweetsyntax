@@ -14,6 +14,31 @@ proc parsePHP(code: string): Node =
   p.next = p.getToken()
   parseStatement(p)
 
+const phpFixtureDir = currentSourcePath().parentDir / "data" / "php"
+
+proc parsePHPFile(path: string): seq[Node] =
+  let syntax = getKnownSyntax(KnownSyntax.php)
+  var p = compile(syntax.spec)
+  p.lexer = initLexerFromFile(syntax.spec, path)
+  phpHandlersMod.phpHandlers(p)
+  p.features.incl(featLabeledStmt)
+  p.features.incl(featGenerators)
+  p.curr = p.getToken()
+  p.next = p.getToken()
+  while p.curr.kind != tkEOF:
+    result.add(parseStatement(p))
+
+proc countNodes(n: Node): int =
+  result = 1
+  if n != nil:
+    case n.kind
+    of nkEmpty, nkNil, nkLitBool, nkLitInt, nkLitFloat, nkLitString,
+       nkLitBigInt, nkIdent:
+      discard
+    else:
+      for c in n.children:
+        result += countNodes(c)
+
 suite "PHP parser":
   test "variable declaration":
     let n = parsePHP("var $x = 5;")
@@ -228,3 +253,23 @@ suite "PHP parser":
       discard parseStatement(p)
       inc count
     check count == 2
+
+  test "heredoc and nowdoc":
+    let n = parsePHP("$x = <<<EOT\nhello\nEOT;")
+    check n.kind == nkInfix
+    check n[2].kind == nkLitString
+    check n[2].valStr == "<<<EOT\nhello\nEOT"
+    let nowdoc = parsePHP("$x = <<<'EOT'\nhello\nEOT;")
+    check nowdoc[2].kind == nkLitString
+
+  test "shift operators are not heredocs":
+    check parsePHP("$a << $b;").kind == nkInfix
+
+suite "PHP fixtures":
+  test "symfony ContainerBuilder.php parses":
+    let nodes = parsePHPFile(phpFixtureDir / "ContainerBuilder.php")
+    check nodes.len >= 1
+    var total = 0
+    for n in nodes: total += countNodes(n)
+    echo "ContainerBuilder AST nodes: ", total
+    check total > 1000

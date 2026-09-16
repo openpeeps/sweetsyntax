@@ -166,7 +166,7 @@ features:
 
 operators:
   prefix:
-    - tokens: ["!", "~", "@", "-", "+"]
+    - tokens: ["!", "~", "@", "-", "+", "&", "++", "--"]
     - tokens: ["..."]
 
   postfix:
@@ -308,6 +308,9 @@ statements:
   global_stmt:
     keyword: "global"
     handler: global
+  yield_stmt:
+    keyword: "yield"
+    handler: yield
 
   expect_regex_after:
     tokens: ["=", "+=", "-=", "*=", "/=", "%=",

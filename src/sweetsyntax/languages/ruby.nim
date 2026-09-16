@@ -79,21 +79,26 @@ proc maybeModifier(p: var GenericParser, node: Node): Node =
     result = Node(kind: nkStatement,
       children: @[Node(kind: nkIdent, name: kw), result, cond])
 
-proc parseRubyHashAfter(p: var GenericParser): Node =
-  ## Parse hash pairs; assumes '{' consumed, consumes up to '}'.
+proc parseRubyHashAfter(p: var GenericParser, firstKey: Node = nil): Node =
+  ## Parse hash pairs; assumes '{' consumed, consumes up to '}'. When
+  ## `firstKey` is given it was already parsed (optimistic `{ expr => ... }`
+  ## disambiguation in `parseRubyBraceContent`).
   result = Node(kind: nkStatement, children: @[Node(kind: nkIdent, name: "hash")])
+  var key = firstKey
   while not (p.curr.kind == tkPunct and p.curr.value == "}"):
     if p.curr.kind == tkEOF: error(p, "Unexpected EOF in hash")
-    let savedNoSymbol = p.noSymbolArgCall
-    p.noSymbolArgCall = true
-    let key = parseExpression(p, 0)
-    p.noSymbolArgCall = savedNoSymbol
+    if key == nil:
+      let savedNoSymbol = p.noSymbolArgCall
+      p.noSymbolArgCall = true
+      key = parseExpression(p, 0)
+      p.noSymbolArgCall = savedNoSymbol
     if p.curr.kind == tkPunct and p.curr.value in [":", "=>"]:
       walk p
       result.children.add(Node(kind: nkColonExpr,
         children: @[key, parseExpression(p, 0)]))
     else:
       result.children.add(key)
+    key = nil
     p.walkOpt(",")
   p.expectWalk("}")
 
@@ -113,7 +118,7 @@ proc parseBlockParams(p: var GenericParser): Node =
   walk p
   while not (p.curr.kind == tkPunct and p.curr.value == "|"):
     if p.curr.kind == tkEOF: error(p, "Unexpected EOF in block params")
-    result.children.add(Node(kind: nkIdent, name: p.curr.value))
+    result.children.add(Node(kind: nkIdent, name: p.curr.value).stamp(p.curr))
     walk p
     p.walkOpt(",")
   p.expectWalk("|")
@@ -130,8 +135,25 @@ proc parseRubyBraceContent(p: var GenericParser): RubyBraceContent =
   if looksLikeHashStart(p):
     result.isHash = true
     result.body = parseRubyHashAfter(p)
+    return
+  # Optimistic parse: a complex hash key (`a.b => 1`, `@x => 1`) is
+  # indistinguishable from a block statement with 2-token lookahead,
+  # so parse one expression and decide by its follower.
+  result.body = Node(kind: nkBlock)
+  while p.curr.kind in {tkComment, tkDocComment}:
+    result.body.children.add(parseCommentGeneric(p))
+  if p.curr.kind == tkPunct and p.curr.value == "}":
+    p.expectWalk("}")
+    return
+  let savedNoSymbol = p.noSymbolArgCall
+  p.noSymbolArgCall = true
+  let first = parseExpression(p, 0)
+  p.noSymbolArgCall = savedNoSymbol
+  if p.curr.kind == tkPunct and p.curr.value in [":", "=>"]:
+    result.isHash = true
+    result.body = parseRubyHashAfter(p, first)
   else:
-    result.body = Node(kind: nkBlock)
+    result.body.children.add(first)
     while not (p.curr.kind == tkPunct and p.curr.value == "}"):
       if p.curr.kind == tkEOF: error(p, "Unexpected EOF in block")
       let stmt = parseStatement(p)
@@ -195,7 +217,7 @@ proc parseRubyParams(p: var GenericParser): Node =
       else:
         param = Node(kind: nkIdentDefs, children: @[Node(kind: nkIdent, name: name)])
     else:
-      param = Node(kind: nkIdentDefs, children: @[Node(kind: nkIdent, name: p.curr.value)])
+      param = Node(kind: nkIdentDefs, children: @[Node(kind: nkIdent, name: p.curr.value).stamp(p.curr)])
       walk p
     result.children.add(param)
     p.walkOpt(",")
@@ -203,7 +225,7 @@ proc parseRubyParams(p: var GenericParser): Node =
 
 proc parseRubyMethodName(p: var GenericParser): Node =
   ## `foo`, `foo?`, `foo=`, `self.foo`, `Foo.bar`
-  result = Node(kind: nkIdent, name: p.curr.value)
+  result = Node(kind: nkIdent, name: p.curr.value).stamp(p.curr)
   walk p
   if p.curr.kind == tkPunct and p.curr.value == ".":
     walk p
@@ -228,20 +250,30 @@ proc parseRescueClauses(p: var GenericParser, parent: Node): Node =
       let clause = Node(kind: nkStatement, children: @[Node(kind: nkIdent, name: "rescue")])
       if p.curr.kind == tkPunct and p.curr.value == "=>":
         walk p
-        clause.children.add(Node(kind: nkIdent, name: p.curr.value))
+        clause.children.add(Node(kind: nkIdent, name: p.curr.value).stamp(p.curr))
         walk p
       else:
         while p.curr.kind == tkIdentifier and
               p.curr.value notin ["then", "end", "else", "ensure", "rescue"]:
-          clause.children.add(Node(kind: nkIdent, name: p.curr.value))
+          # Exception class, possibly scoped (`Gem::LoadError`) and
+          # comma/pipe separated (`rescue A, B => e`).
+          var name = p.curr.value
           walk p
-          if p.curr.kind == tkPunct and p.curr.value == "|":
+          while p.curr.kind == tkPunct and p.curr.value in ["::", "."]:
+            name &= p.curr.value
+            walk p
+            if p.curr.kind != tkIdentifier:
+              error(p, "Expected constant after '" & name & "'")
+            name &= p.curr.value
+            walk p
+          clause.children.add(Node(kind: nkIdent, name: name))
+          if p.curr.kind == tkPunct and p.curr.value in ["|", ","]:
             walk p
           else:
             break
         if p.curr.kind == tkPunct and p.curr.value == "=>":
           walk p
-          clause.children.add(Node(kind: nkIdent, name: p.curr.value))
+          clause.children.add(Node(kind: nkIdent, name: p.curr.value).stamp(p.curr))
           walk p
       clause.children.add(parseRubyBody(p, @["rescue", "else", "ensure", "end"]))
       result.children.add(clause)
@@ -257,7 +289,7 @@ proc parseRubyName(p: var GenericParser): Node =
     result = Node(kind: nkIdent, name: ":" & p.curr.value)
     walk p
   else:
-    result = Node(kind: nkIdent, name: p.curr.value)
+    result = Node(kind: nkIdent, name: p.curr.value).stamp(p.curr)
     walk p
 
 proc parseSimpleControl(p: var GenericParser, name: string): Node =
@@ -267,6 +299,34 @@ proc parseSimpleControl(p: var GenericParser, name: string): Node =
   if canStartRubyExpr(p):
     result.children.add(parseExpression(p, 0))
   result = maybeModifier(p, result)
+
+proc attachBlockMemberChain(p: var GenericParser, node: Node): Node =
+  ## Member/index continuation after a block: `find_all{true}.each`.
+  ## The generic Pratt loop already ran before the `do`/`{` block was
+  ## attached, so `.name`/`[i]` following the block would otherwise leak
+  ## into the next statement. Same-line only, so a `[` array on the next
+  ## line is not swallowed.
+  result = node
+  while p.curr.kind == tkPunct and p.curr.value in [".", "&.", "::"] and
+        p.curr.line == p.prev.line:
+    walk p
+    let prop = Node(kind: nkIdent, name: p.curr.value).stamp(p.curr)
+    walk p
+    result = Node(kind: nkDotExpr, children: @[result, prop])
+  if p.curr.kind == tkPunct and p.curr.value == "[" and
+     p.curr.line == p.prev.line:
+    walk p
+    var items: seq[Node]
+    if p.curr.kind == tkPunct and p.curr.value == "]":
+      walk p
+      items.add(Node(kind: nkEmpty))
+    else:
+      items.add(parseExpression(p, 0))
+      while p.curr.kind == tkPunct and p.curr.value == ",":
+        walk p
+        items.add(parseExpression(p, 0))
+      p.expectWalk("]")
+    result = Node(kind: nkBracketExpr, children: @[result] & items)
 
 proc rubyHandlers*(p: var GenericParser) =
   # Register Ruby-specific statement and prefix handlers.
@@ -296,7 +356,7 @@ proc rubyHandlers*(p: var GenericParser) =
       walk p
       result.children.add(Node(kind: nkStatement,
         children: @[Node(kind: nkIdent, name: "superclass"),
-                    Node(kind: nkIdent, name: p.curr.value)]))
+                    Node(kind: nkIdent, name: p.curr.value).stamp(p.curr)]))
       walk p
     result.children.add(parseRubyBody(p, @["end"]))
     p.expectRubyKeyword("end")
@@ -462,6 +522,18 @@ proc rubyHandlers*(p: var GenericParser) =
     result = Node(kind: nkIdent, name: "@@" & p.curr.value)
     walk p
 
+  prefixHandler p, "::":
+    ## Top-level scope: ::Foo, ::Foo::Bar
+    walk p # consume leading '::'
+    var name = "::" & p.curr.value
+    walk p
+    while p.curr.kind == tkPunct and p.curr.value == "::":
+      name &= "::"
+      walk p
+      name &= p.curr.value
+      walk p
+    result = Node(kind: nkIdent, name: name)
+
   prefixHandler p, ":":
     ## :symbol
     walk p
@@ -514,6 +586,7 @@ proc rubyHandlers*(p: var GenericParser) =
         let (params, body) = parseRubyDoBlock(p)
         node = Node(kind: nkStatement,
           children: @[Node(kind: nkIdent, name: "block"), node, params, body])
+        node = p.attachBlockMemberChain(node)
         changed = true
         continue
       if p.curr.kind == tkPunct and p.curr.value == "{" and
@@ -523,6 +596,7 @@ proc rubyHandlers*(p: var GenericParser) =
         node = Node(kind: nkStatement,
           children: @[Node(kind: nkIdent, name: "block"), node,
                       content.params, content.body])
+        node = p.attachBlockMemberChain(node)
         changed = true
         continue
       # Modifiers: `expr if cond`

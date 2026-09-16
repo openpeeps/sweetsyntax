@@ -117,6 +117,7 @@ blocks:
   close: ""
 
 features:
+  regex_literals: true
   command_syntax: false
 
 operators:
@@ -127,8 +128,10 @@ operators:
 
   infix:
     - precedence: 1
+      tokens: ["||"]
       keywords: ["or"]
     - precedence: 2
+      tokens: ["&&"]
       keywords: ["and"]
     - precedence: 3
       tokens: ["..", "..."]
@@ -226,3 +229,16 @@ statements:
   end_stmt:
     keyword: "end"
     handler: end
+
+  expect_regex_after:
+    tokens: ["=", "==", "!=", "=~", "!~",
+             "+=", "-=", "*=", "/=", "%=", "**=",
+             "&&=", "||=", "<<=", ">>=", "&=", "|=", "^=",
+             "(", "[", "{", ",", ";", ":",
+             "?", "!", "~", "&&", "||", "=>",
+             "+", "-", "*", "/", "%", "**",
+             "<<", ">>", "<", ">", "<=", ">=", "<=>",
+             "|", "&", "^", "..", "..."]
+    keywords: ["return", "if", "elsif", "while", "until", "unless",
+               "when", "in", "and", "or", "not", "then", "else", "do",
+               "yield"]

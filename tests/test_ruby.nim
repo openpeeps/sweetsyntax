@@ -1,7 +1,9 @@
-import std/unittest
+import std/[unittest, os]
 import ../src/sweetsyntax
 import ../src/sweetsyntax/tokenizer
 import ../src/sweetsyntax/languages/ruby as rubyHandlersMod
+
+const rubyFixtureDir = currentSourcePath().parentDir / "data" / "ruby"
 
 proc parseRuby(code: string): Node =
   let syntax = getKnownSyntax(KnownSyntax.ruby)
@@ -11,6 +13,16 @@ proc parseRuby(code: string): Node =
   p.curr = p.getToken()
   p.next = p.getToken()
   parseStatement(p)
+
+proc parseRubyFile(path: string): seq[Node] =
+  let syntax = getKnownSyntax(KnownSyntax.ruby)
+  var p = compile(syntax.spec)
+  p.lexer = initLexerFromFile(syntax.spec, path)
+  rubyHandlersMod.rubyHandlers(p)
+  p.curr = p.getToken()
+  p.next = p.getToken()
+  while p.curr.kind != tkEOF:
+    result.add(parseStatement(p))
 
 suite "Ruby parser":
   test "method definition":
@@ -75,6 +87,11 @@ suite "Ruby parser":
     check n.kind == nkStatement
     check n[0].name == "block"
 
+  test "member chain after brace block":
+    let n = parseRuby("Gem::Specification.find_all{true}.each do |spec|\n  puts spec\nend")
+    check n.kind == nkStatement
+    check n[0].name == "block"
+
   test "block with modifier":
     let n = parseRuby("items.each do |x|\n  puts x\nend if enabled")
     check n.kind == nkStatement
@@ -94,6 +111,11 @@ suite "Ruby parser":
     check n[2].kind == nkStatement
     check n[2][0].name == "hash"
     check parseRuby("h = { :name => 'Ruby', 'key' => 1 }").kind == nkInfix
+    # complex keys: dotted paths, ivars, method calls
+    let ck = parseRuby("h = { a.b => 1, @x => 2 }")
+    check ck[2].kind == nkStatement
+    check ck[2][0].name == "hash"
+    check ck[2][1].kind == nkColonExpr
 
   test "instance, class and global variables":
     check parseRuby("@name = :sym").kind == nkInfix
@@ -150,3 +172,38 @@ suite "Ruby parser":
     check parseRuby("puts defined?(foo)").kind == nkCall
     check parseRuby("alias new_name old_name").kind == nkStatement
     check parseRuby("undef old_name, other").kind == nkStatement
+
+  test "heredoc forms":
+    let n = parseRuby("msg = <<EOS\nhello\nEOS")
+    check n.kind == nkInfix
+    check n[2].kind == nkLitString
+    check n[2].valStr == "<<EOS\nhello\nEOS"
+    let squiggly = parseRuby("msg = <<~EOS\n  hello\n  EOS")
+    check squiggly.kind == nkInfix
+    check squiggly[2].kind == nkLitString
+    check squiggly[2].valStr == "<<~EOS\n  hello\n  EOS"
+    let dash = parseRuby("msg = <<-EOS\n  hello\n    EOS")
+    check dash[2].kind == nkLitString
+    let quoted = parseRuby("msg = <<'EOS'\nhello\nEOS")
+    check quoted[2].kind == nkLitString
+
+  test "heredoc lexer emits string with heredoc attr":
+    let syntax = getKnownSyntax(KnownSyntax.ruby)
+    var lx = initLexer(syntax.spec, "msg = <<EOS\nhello\nEOS\n")
+    discard lx.getToken() # msg
+    discard lx.getToken() # =
+    let tok = lx.getToken()
+    check tok.kind == tkString
+    check "heredoc" in tok.attr
+
+  test "shift operators are not heredocs":
+    let n = parseRuby("a << b")
+    check n.kind == nkInfix
+    check n[0].name == "<<"
+    check parseRuby("x <<= 1").kind == nkInfix
+    # `a<<b` with no lone `b` line falls back to shift
+    check parseRuby("a<<b\nc = 1").kind == nkInfix
+
+  test "vagrant bundler.rb fixture parses":
+    let nodes = parseRubyFile(rubyFixtureDir / "vagrant_bundler.rb")
+    check nodes.len > 10

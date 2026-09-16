@@ -55,7 +55,7 @@ proc jsHandlers*(p: var GenericParser) =
         else: break
       elif p.curr.kind == tkIdentifier:
         let varDef = Node(kind: nkIdentDefs)
-        varDef.children.add(Node(kind: nkIdent, name: p.curr.value))
+        varDef.children.add(Node(kind: nkIdent, name: p.curr.value).stamp(p.curr))
         walk p
 
         # optional type annotation: `: Type`
@@ -87,7 +87,7 @@ proc jsHandlers*(p: var GenericParser) =
     walk p # consume 'const'
     var name: Node
     expectIdent:
-      name = Node(kind: nkIdent, name: p.curr.value)
+      name = Node(kind: nkIdent, name: p.curr.value).stamp(p.curr)
     walk p
     # optional type annotation
     var typeNode: Node
@@ -193,7 +193,7 @@ proc jsHandlers*(p: var GenericParser) =
     elif p.curr.kind == tkIdentifier and p.curr.value in ["var", "let", "const"]:
       # for (var/let/const decl; ...) or for (var/let/const x in/of ...)
       initNode = Node(kind: nkStatement)
-      initNode.children.add(Node(kind: nkIdent, name: p.curr.value))
+      initNode.children.add(Node(kind: nkIdent, name: p.curr.value).stamp(p.curr))
       walk p
       while true:
         if p.curr.kind == tkPunct and p.curr.value in ["{", "["]:
@@ -209,7 +209,7 @@ proc jsHandlers*(p: var GenericParser) =
           let varDef = Node(kind: nkIdentDefs)
           if p.curr.kind != tkIdentifier:
             error(p, "Expected identifier in variable declaration")
-          varDef.children.add(Node(kind: nkIdent, name: p.curr.value))
+          varDef.children.add(Node(kind: nkIdent, name: p.curr.value).stamp(p.curr))
           walk p
           # optional type annotation
           if p.curr.kind == tkPunct and p.curr.value == ":":
@@ -239,7 +239,7 @@ proc jsHandlers*(p: var GenericParser) =
       if p.curr.kind == tkIdentifier and p.next.kind == tkIdentifier and
          p.next.value in ["in", "of"]:
         # for (variable in/of ...) — single variable, no var/let/const
-        initNode = Node(kind: nkIdent, name: p.curr.value)
+        initNode = Node(kind: nkIdent, name: p.curr.value).stamp(p.curr)
         walk p
         loopType = p.curr.value
       else:
@@ -304,7 +304,7 @@ proc jsHandlers*(p: var GenericParser) =
         if p.curr.kind == tkPunct and p.curr.value == "(":
           walk p
           if p.curr.kind == tkIdentifier:
-            param = Node(kind: nkIdent, name: p.curr.value)
+            param = Node(kind: nkIdent, name: p.curr.value).stamp(p.curr)
             walk p
           elif p.curr.kind == tkPunct and p.curr.value == "{":
             # destructured catch param — keep the raw braces
@@ -340,7 +340,7 @@ proc jsHandlers*(p: var GenericParser) =
     walk p # consume 'class'
     var name: Node
     expectIdent:
-      name = Node(kind: nkIdent, name: p.curr.value)
+      name = Node(kind: nkIdent, name: p.curr.value).stamp(p.curr)
     walk p
     var parent: Node
     if p.curr.kind == tkIdentifier and p.curr.value == "extends":
@@ -380,7 +380,7 @@ proc jsHandlers*(p: var GenericParser) =
           let isName = nxt.kind == tkEOF or
             (nxt.kind == tkPunct and nxt.value in ["(", "=", ";", "}"])
           if isName: break
-          flags.add(Node(kind: nkIdent, name: p.curr.value))
+          flags.add(Node(kind: nkIdent, name: p.curr.value).stamp(p.curr))
           walk p
           continue
         break
@@ -392,10 +392,10 @@ proc jsHandlers*(p: var GenericParser) =
           children: @[Node(kind: nkIdent, name: "computed"), parseExpression(p)])
         p.expectWalk("]")
       elif p.curr.kind == tkString:
-        key = Node(kind: nkLitString, valStr: p.curr.value)
+        key = Node(kind: nkLitString, valStr: p.curr.value).stamp(p.curr)
         walk p
       else:
-        key = Node(kind: nkIdent, name: p.curr.value)
+        key = Node(kind: nkIdent, name: p.curr.value).stamp(p.curr)
         walk p
       if p.curr.kind == tkPunct and p.curr.value == "(":
         # Method
@@ -547,7 +547,7 @@ proc jsHandlers*(p: var GenericParser) =
       # optional exception type(s)
       if p.curr.kind != tkPunct or p.curr.value != "{":
         # parse exception type: `ExceptDefect` or `AssertionDefect` etc.
-        exceptBlock.children.add(Node(kind: nkIdent, name: p.curr.value))
+        exceptBlock.children.add(Node(kind: nkIdent, name: p.curr.value).stamp(p.curr))
         walk p
       exceptBlock.children.add(parseBlock(p))
       result.children.add(exceptBlock)
@@ -566,12 +566,12 @@ proc jsHandlers*(p: var GenericParser) =
         walk p
         var lbl: Node
         expectIdent:
-          lbl = Node(kind: nkIdent, name: p.curr.value)
+          lbl = Node(kind: nkIdent, name: p.curr.value).stamp(p.curr)
         walk p
         p.expectWalk(")")
         lbl
       elif p.curr.kind == tkIdentifier:
-        let lbl = Node(kind: nkIdent, name: p.curr.value)
+        let lbl = Node(kind: nkIdent, name: p.curr.value).stamp(p.curr)
         walk p
         lbl
       else:
@@ -588,7 +588,7 @@ proc jsHandlers*(p: var GenericParser) =
     # Side-effect import: import 'module'
     if p.curr.kind == tkString:
       result.children.add(newEmptyNode())
-      result.children.add(Node(kind: nkLitString, valStr: p.curr.value))
+      result.children.add(Node(kind: nkLitString, valStr: p.curr.value).stamp(p.curr))
       walk p
       p.walkOpt(";")
       return
@@ -603,14 +603,14 @@ proc jsHandlers*(p: var GenericParser) =
         if p.curr.kind in {tkComment, tkDocComment}:
           discard parseCommentGeneric(p); continue
         if p.curr.kind == tkIdentifier:
-          let name = Node(kind: nkIdent, name: p.curr.value)
+          let name = Node(kind: nkIdent, name: p.curr.value).stamp(p.curr)
           walk p
           if p.curr.kind == tkIdentifier and p.curr.value == "as":
             walk p
             expectIdent:
               named.children.add(Node(kind: nkInfix,
                 children: @[Node(kind: nkIdent, name: "as"), name,
-                            Node(kind: nkIdent, name: p.curr.value)]))
+                            Node(kind: nkIdent, name: p.curr.value).stamp(p.curr)]))
             walk p
           else:
             named.children.add(name)
@@ -620,7 +620,7 @@ proc jsHandlers*(p: var GenericParser) =
       if p.curr.kind == tkIdentifier and p.curr.value == "from":
         walk p
         expectString:
-          result.children.add(Node(kind: nkLitString, valStr: p.curr.value))
+          result.children.add(Node(kind: nkLitString, valStr: p.curr.value).stamp(p.curr))
         walk p
       p.walkOpt(";")
       return
@@ -635,19 +635,19 @@ proc jsHandlers*(p: var GenericParser) =
           result.children.add(Node(kind: nkInfix,
             children: @[Node(kind: nkIdent, name: "as"),
                         Node(kind: nkIdent, name: "*"),
-                        Node(kind: nkIdent, name: p.curr.value)]))
+                        Node(kind: nkIdent, name: p.curr.value).stamp(p.curr)]))
         walk p
       if p.curr.kind == tkIdentifier and p.curr.value == "from":
         walk p
         expectString:
-          result.children.add(Node(kind: nkLitString, valStr: p.curr.value))
+          result.children.add(Node(kind: nkLitString, valStr: p.curr.value).stamp(p.curr))
         walk p
       p.walkOpt(";")
       return
 
     # import identifier ...
     if p.curr.kind == tkIdentifier:
-      let defaultName = Node(kind: nkIdent, name: p.curr.value)
+      let defaultName = Node(kind: nkIdent, name: p.curr.value).stamp(p.curr)
       walk p
 
       # import defaultExport from 'module'
@@ -655,7 +655,7 @@ proc jsHandlers*(p: var GenericParser) =
         result.children.add(defaultName)
         walk p
         expectString:
-          result.children.add(Node(kind: nkLitString, valStr: p.curr.value))
+          result.children.add(Node(kind: nkLitString, valStr: p.curr.value).stamp(p.curr))
         walk p
         p.walkOpt(";")
         return
@@ -674,14 +674,14 @@ proc jsHandlers*(p: var GenericParser) =
             if p.curr.kind in {tkComment, tkDocComment}:
               discard parseCommentGeneric(p); continue
             if p.curr.kind == tkIdentifier:
-              let name = Node(kind: nkIdent, name: p.curr.value)
+              let name = Node(kind: nkIdent, name: p.curr.value).stamp(p.curr)
               walk p
               if p.curr.kind == tkIdentifier and p.curr.value == "as":
                 walk p
                 expectIdent:
                   named.children.add(Node(kind: nkInfix,
                     children: @[Node(kind: nkIdent, name: "as"), name,
-                                Node(kind: nkIdent, name: p.curr.value)]))
+                                Node(kind: nkIdent, name: p.curr.value).stamp(p.curr)]))
                 walk p
               else:
                 named.children.add(name)
@@ -691,7 +691,7 @@ proc jsHandlers*(p: var GenericParser) =
           if p.curr.kind == tkIdentifier and p.curr.value == "from":
             walk p
             expectString:
-              result.children.add(Node(kind: nkLitString, valStr: p.curr.value))
+              result.children.add(Node(kind: nkLitString, valStr: p.curr.value).stamp(p.curr))
             walk p
           p.walkOpt(";")
           return
@@ -705,23 +705,23 @@ proc jsHandlers*(p: var GenericParser) =
               result.children.add(Node(kind: nkInfix,
                 children: @[Node(kind: nkIdent, name: "as"),
                             Node(kind: nkIdent, name: "*"),
-                            Node(kind: nkIdent, name: p.curr.value)]))
+                            Node(kind: nkIdent, name: p.curr.value).stamp(p.curr)]))
             walk p
           if p.curr.kind == tkIdentifier and p.curr.value == "from":
             walk p
             expectString:
-              result.children.add(Node(kind: nkLitString, valStr: p.curr.value))
+              result.children.add(Node(kind: nkLitString, valStr: p.curr.value).stamp(p.curr))
             walk p
           p.walkOpt(";")
           return
 
         # Nim-style: import a, b, c
-        result.children.add(Node(kind: nkIdent, name: p.curr.value))
+        result.children.add(Node(kind: nkIdent, name: p.curr.value).stamp(p.curr))
         walk p
         while p.curr.kind == tkPunct and p.curr.value == ",":
           walk p
           expectIdent:
-            result.children.add(Node(kind: nkIdent, name: p.curr.value))
+            result.children.add(Node(kind: nkIdent, name: p.curr.value).stamp(p.curr))
           walk p
         p.walkOpt(";")
         return
@@ -735,7 +735,7 @@ proc jsHandlers*(p: var GenericParser) =
     walk p # consume 'include'
     result = Node(kind: nkInclude)
     expectString:
-      result.children.add(Node(kind: nkLitString, valStr: p.curr.value))
+      result.children.add(Node(kind: nkLitString, valStr: p.curr.value).stamp(p.curr))
     walk p
     p.walkOpt(";")
 
@@ -764,14 +764,14 @@ proc jsHandlers*(p: var GenericParser) =
         if p.curr.kind in {tkComment, tkDocComment}:
           discard parseCommentGeneric(p); continue
         if p.curr.kind == tkIdentifier:
-          let name = Node(kind: nkIdent, name: p.curr.value)
+          let name = Node(kind: nkIdent, name: p.curr.value).stamp(p.curr)
           walk p
           if p.curr.kind == tkIdentifier and p.curr.value == "as":
             walk p
             expectIdent:
               named.children.add(Node(kind: nkInfix,
                 children: @[Node(kind: nkIdent, name: "as"), name,
-                            Node(kind: nkIdent, name: p.curr.value)]))
+                            Node(kind: nkIdent, name: p.curr.value).stamp(p.curr)]))
             walk p
           else:
             named.children.add(name)
@@ -781,7 +781,7 @@ proc jsHandlers*(p: var GenericParser) =
       if p.curr.kind == tkIdentifier and p.curr.value == "from":
         walk p
         expectString:
-          result.children.add(Node(kind: nkLitString, valStr: p.curr.value))
+          result.children.add(Node(kind: nkLitString, valStr: p.curr.value).stamp(p.curr))
         walk p
       p.walkOpt(";")
       return
@@ -795,14 +795,14 @@ proc jsHandlers*(p: var GenericParser) =
           result.children.add(Node(kind: nkInfix,
             children: @[Node(kind: nkIdent, name: "as"),
                         Node(kind: nkIdent, name: "*"),
-                        Node(kind: nkIdent, name: p.curr.value)]))
+                        Node(kind: nkIdent, name: p.curr.value).stamp(p.curr)]))
         walk p
       else:
         result.children.add(Node(kind: nkIdent, name: "*"))
       if p.curr.kind == tkIdentifier and p.curr.value == "from":
         walk p
         expectString:
-          result.children.add(Node(kind: nkLitString, valStr: p.curr.value))
+          result.children.add(Node(kind: nkLitString, valStr: p.curr.value).stamp(p.curr))
         walk p
       p.walkOpt(";")
       return
@@ -824,7 +824,7 @@ proc jsHandlers*(p: var GenericParser) =
 
     # Nim-style: export name
     expectIdent:
-      result.children.add(Node(kind: nkIdent, name: p.curr.value))
+      result.children.add(Node(kind: nkIdent, name: p.curr.value).stamp(p.curr))
     walk p
     p.walkOpt(";")
 
@@ -864,7 +864,7 @@ proc jsHandlers*(p: var GenericParser) =
       while not (p.curr.kind == tkPunct and p.curr.value == "]"):
         if p.curr.kind == tkEOF: error(p, "Unexpected EOF in generic parameters")
         if p.curr.kind == tkIdentifier:
-          generics.children.add(Node(kind: nkIdent, name: p.curr.value))
+          generics.children.add(Node(kind: nkIdent, name: p.curr.value).stamp(p.curr))
           walk p
           if p.curr.kind == tkPunct and p.curr.value == ",":
             walk p
@@ -895,7 +895,7 @@ proc jsHandlers*(p: var GenericParser) =
         walk p
         if p.curr.kind != tkIdentifier:
           error(p, "Expected rest parameter name")
-        let paramName = Node(kind: nkIdent, name: p.curr.value)
+        let paramName = Node(kind: nkIdent, name: p.curr.value).stamp(p.curr)
         walk p
         params.children.add(Node(kind: nkPrefix,
           children: @[Node(kind: nkIdent, name: "..."), paramName]))
@@ -910,7 +910,7 @@ proc jsHandlers*(p: var GenericParser) =
 
       if p.curr.kind != tkIdentifier:
         error(p, "Expected parameter name")
-      let paramName = Node(kind: nkIdent, name: p.curr.value)
+      let paramName = Node(kind: nkIdent, name: p.curr.value).stamp(p.curr)
       walk p
       if p.curr.kind == tkPunct and p.curr.value == ":":
         walk p
@@ -1057,7 +1057,7 @@ proc jsHandlers*(p: var GenericParser) =
       children: @[Node(kind: nkIdent, name: "break")])
     # optional label
     if p.curr.kind == tkIdentifier:
-      result.children.add(Node(kind: nkIdent, name: p.curr.value))
+      result.children.add(Node(kind: nkIdent, name: p.curr.value).stamp(p.curr))
       walk p
     p.walkOpt(";")
 
@@ -1106,7 +1106,7 @@ proc jsHandlers*(p: var GenericParser) =
             error(p, "Expected ',' or ')' in async arrow parameters")
         p.expectWalk(")")
       else:
-        params.children.add(Node(kind: nkIdent, name: p.curr.value))
+        params.children.add(Node(kind: nkIdent, name: p.curr.value).stamp(p.curr))
         walk p
       p.expectWalk("=>")
       let body = if p.curr.kind == tkPunct and p.curr.value == "{": parseBlock(p)
@@ -1134,7 +1134,7 @@ proc jsHandlers*(p: var GenericParser) =
     else:
       # inline asm string
       expectString:
-        result.children.add(Node(kind: nkLitString, valStr: p.curr.value))
+        result.children.add(Node(kind: nkLitString, valStr: p.curr.value).stamp(p.curr))
       walk p
     p.walkOpt(";")
 

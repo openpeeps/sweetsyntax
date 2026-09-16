@@ -6,6 +6,7 @@
 #          https://github.com/openpeeps/sweetsyntax
 
 import std/sequtils
+import std/strutils
 import ../tokenizer
 
 type
@@ -170,3 +171,61 @@ proc newPostfix*(op: Node, operand: Node): Node =
 proc newEmptyNode*: Node =
   ## Create a new empty node, which can be used as a placeholder in the AST.
   Node(kind: nkEmpty)
+
+proc stamp*(n: Node, line, col: int): Node {.discardable, inline.} =
+  ## Generic helper: attach source position to any node.
+  ## Every language handler (`c`, `js`, `php`, `ruby`, `nim`) can use this
+  ## so AST nodes always carry `ln`/`col` from the token that produced them.
+  if n != nil:
+    n.ln = line
+    n.col = col
+  n
+
+proc stamp*(n: Node, tk: TokenTuple): Node {.discardable, inline.} =
+  ## Overload taking a token tuple directly.
+  if n != nil:
+    n.ln = tk.line
+    n.col = tk.col
+  n
+
+proc stampFrom*(n, src: Node): Node {.discardable, inline.} =
+  ## Copy position from another node (e.g. an `nkInfix` takes the
+  ## position of its left-hand side, so the node points at the start
+  ## of the expression).
+  if n != nil and src != nil:
+    n.ln = src.ln
+    n.col = src.col
+  n
+
+proc treeRepr*(n: Node): string =
+  ## Single-line representation of a node: its kind plus `=value`
+  ## for leaf payloads (e.g. `nkIdent=folds`), Nim `dumpTree`-style.
+  ## String values keep their stored form; only control characters
+  ## are escaped so each node stays on one line.
+  result = $n.kind
+  case n.kind
+  of nkIdent: result.add("=" & n.name)
+  of nkLitBool: result.add("=" & $n.valBool)
+  of nkLitInt: result.add("=" & $n.valInt)
+  of nkLitFloat: result.add("=" & $n.valFloat)
+  of nkLitString:
+    result.add("=" & n.valStr.multiReplace(
+      ("\\", "\\\\"), ("\n", "\\n"), ("\r", "\\r"), ("\t", "\\t")))
+  of nkLitBigInt: result.add("=" & n.valBigInt)
+  of nkEmpty, nkNil: discard
+  else: discard
+
+proc dumpTree*(n: Node, indent = 0): string =
+  ## Render a node and its children as an indent-based tree
+  ## (2 spaces per level), just like Nim's `dumpTree`.
+  result = "  ".repeat(indent) & treeRepr(n) & "\n"
+  if n.kind notin LeafNodes and n.children.len > 0:
+    for child in n.children:
+      if child != nil:
+        result.add dumpTree(child, indent + 1)
+
+proc dumpTree*(program: OpenAstProgram): string =
+  ## Render every top-level node of a program as an indent-based tree.
+  for node in program.nodes:
+    if node != nil:
+      result.add dumpTree(node, 0)

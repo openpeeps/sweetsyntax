@@ -17,25 +17,43 @@ proc parseClassBody(p: var GenericParser, isEnum = false): Node
 # Shared helpers
 #
 
+proc parsePhpQualifiedName(p: var GenericParser): string =
+  ## Parses `[\Segment\...]Name`, e.g. `\ReflectionClass`, `Foo\Bar`.
+  ## Caller must ensure a name follows (no leading `$`).
+  if p.curr.kind == tkPunct and p.curr.value == "\\":
+    result = "\\"
+    walk p
+  result &= p.curr.value
+  walk p
+  while p.curr.kind == tkPunct and p.curr.value == "\\":
+    walk p
+    result &= "\\" & p.curr.value
+    walk p
+
+proc hasPhpTypeName(p: var GenericParser): bool =
+  ## Whether the current token starts a type name (never `$var`).
+  if p.curr.kind == tkPunct and p.curr.value == "\\":
+    p.next.kind == tkIdentifier and p.next.value[0] != '$'
+  else:
+    p.curr.kind == tkIdentifier and p.curr.value[0] != '$'
+
 proc parsePhpTypeName(p: var GenericParser): Node =
-  ## Parse a PHP type: ?Type, Type, or union Type1|Type2|...
+  ## Parse a PHP type: ?Type, \Ns\Type, or union Type1|Type2|...
   ## Returns nkEmpty when no type is present (e.g. the parameter is `$var`).
   result = Node(kind: nkEmpty)
   var nullable = false
   if p.curr.kind == tkPunct and p.curr.value == "?":
     nullable = true
     walk p
-  if p.curr.kind != tkIdentifier or p.curr.value[0] == '$':
+  if not p.hasPhpTypeName():
     return
-  var typeNode = Node(kind: nkIdent, name: p.curr.value)
-  walk p
+  var typeNode = Node(kind: nkIdent, name: p.parsePhpQualifiedName())
   while p.curr.kind == tkPunct and p.curr.value == "|":
     walk p
     if typeNode.kind != nkStatement:
       typeNode = Node(kind: nkStatement,
         children: @[Node(kind: nkIdent, name: "union"), typeNode])
-    typeNode.children.add(Node(kind: nkIdent, name: p.curr.value))
-    walk p
+    typeNode.children.add(Node(kind: nkIdent, name: p.parsePhpQualifiedName()))
   if nullable:
     result = Node(kind: nkPrefix,
       children: @[Node(kind: nkIdent, name: "?"), typeNode])
@@ -56,7 +74,7 @@ proc parseFunctionParams(p: var GenericParser): Node =
     if p.curr.kind != tkIdentifier or p.curr.value[0] != '$':
       error(p, "Expected parameter variable")
     let param = Node(kind: nkIdentDefs)
-    param.children.add(Node(kind: nkIdent, name: p.curr.value))
+    param.children.add(Node(kind: nkIdent, name: p.curr.value).stamp(p.curr))
     walk p
     if typeNode != nil and typeNode.kind != nkEmpty:
       param.children.add(typeNode)
@@ -80,11 +98,27 @@ proc parseFunctionDecl(p: var GenericParser): Node =
   if p.curr.kind == tkPunct and p.curr.value == "&":
     walk p # by-reference return
   if p.curr.kind == tkIdentifier:
-    result.children.add(Node(kind: nkIdent, name: p.curr.value))
+    result.children.add(Node(kind: nkIdent, name: p.curr.value).stamp(p.curr))
     walk p
   else:
     result.children.add(Node(kind: nkEmpty))
   result.children.add(parseFunctionParams(p))
+  # Closure captures: `function () use ($a, &$b) [: Type] { ... }`
+  # (the `use` list precedes an optional return type)
+  if p.curr.kind == tkIdentifier and p.curr.value == "use":
+    walk p
+    let captures = Node(kind: nkStatement,
+      children: @[Node(kind: nkIdent, name: "use")])
+    p.expectWalk("(")
+    while not (p.curr.kind == tkPunct and p.curr.value == ")"):
+      if p.curr.kind == tkEOF: error(p, "Unexpected EOF in closure captures")
+      if p.curr.kind == tkPunct and p.curr.value == "&":
+        walk p # by-reference capture
+      captures.children.add(Node(kind: nkIdent, name: p.curr.value).stamp(p.curr))
+      walk p
+      p.walkOpt(",")
+    p.expectWalk(")")
+    result.children.add(captures)
   parseFunctionReturnType(p)
   if p.curr.kind == tkPunct and p.curr.value == p.blockOpen:
     result.children.add(parseBlock(p))
@@ -119,7 +153,7 @@ proc parseConstClause(p: var GenericParser): Node =
   result = Node(kind: nkStatement, children: @[Node(kind: nkIdent, name: "const")])
   walk p # consume 'const'
   while true:
-    let name = Node(kind: nkIdent, name: p.curr.value)
+    let name = Node(kind: nkIdent, name: p.curr.value).stamp(p.curr)
     walk p
     p.expectWalk("=")
     let val = parseExpression(p)
@@ -140,7 +174,7 @@ proc parseUseClause(p: var GenericParser): Node =
     p.expectWalk(";")
     return
   if p.curr.kind == tkIdentifier and p.curr.value in ["function", "const"]:
-    result.children.add(Node(kind: nkIdent, name: p.curr.value))
+    result.children.add(Node(kind: nkIdent, name: p.curr.value).stamp(p.curr))
     walk p
   proc parseNsPath(p: var GenericParser): string =
     result = p.curr.value
@@ -155,7 +189,7 @@ proc parseUseClause(p: var GenericParser): Node =
     result.children.add(Node(kind: nkIdent, name: parseNsPath(p)))
   if p.curr.kind == tkIdentifier and p.curr.value == "as":
     walk p
-    result.children.add(Node(kind: nkIdent, name: p.curr.value))
+    result.children.add(Node(kind: nkIdent, name: p.curr.value).stamp(p.curr))
     walk p
   p.expectWalk(";")
 
@@ -167,7 +201,7 @@ proc parseProperty(p: var GenericParser, typeNode: Node): Node =
   while true:
     if p.curr.kind != tkIdentifier or p.curr.value[0] != '$':
       error(p, "Expected property variable")
-    let name = Node(kind: nkIdent, name: p.curr.value)
+    let name = Node(kind: nkIdent, name: p.curr.value).stamp(p.curr)
     walk p
     let def = Node(kind: nkIdentDefs, children: @[name])
     if p.curr.kind == tkPunct and p.curr.value == "=":
@@ -185,7 +219,7 @@ proc parseEnumCase(p: var GenericParser): Node =
   walk p # consume 'case'
   result = Node(kind: nkStatement,
     children: @[Node(kind: nkIdent, name: "case"),
-                Node(kind: nkIdent, name: p.curr.value)])
+                Node(kind: nkIdent, name: p.curr.value).stamp(p.curr)])
   walk p
   if p.curr.kind == tkPunct and p.curr.value == "=":
     walk p
@@ -238,7 +272,7 @@ proc parseClassBody(p: var GenericParser, isEnum = false): Node =
     while p.curr.kind == tkIdentifier and
           p.curr.value in ["public", "private", "protected", "static",
                            "abstract", "final", "readonly", "var"]:
-      mods.add(Node(kind: nkIdent, name: p.curr.value))
+      mods.add(Node(kind: nkIdent, name: p.curr.value).stamp(p.curr))
       walk p
     var member: Node
     if p.curr.kind == tkPunct and p.curr.value == "?":
@@ -393,7 +427,7 @@ proc parseVarDeclarator(p: var GenericParser, kw: string): Node =
   walk p
   while true:
     let varDef = Node(kind: nkIdentDefs)
-    varDef.children.add(Node(kind: nkIdent, name: p.curr.value))
+    varDef.children.add(Node(kind: nkIdent, name: p.curr.value).stamp(p.curr))
     walk p
     if p.curr.kind == tkPunct and p.curr.value == "=":
       walk p
@@ -419,7 +453,7 @@ proc phpHandlers*(p: var GenericParser) =
       result = parseVarDeclarator(p, p.curr.value)
     else:
       # Treat as a plain identifier; the Pratt loop resolves `::` access.
-      result = Node(kind: nkIdent, name: p.curr.value)
+      result = Node(kind: nkIdent, name: p.curr.value).stamp(p.curr)
       walk p
 
   stmtHandler p, "const_decl":
@@ -591,15 +625,13 @@ proc phpHandlers*(p: var GenericParser) =
       let catchBlock = Node(kind: nkStatement)
       catchBlock.children.add(Node(kind: nkIdent, name: "catch"))
       let types = Node(kind: nkStatement)
-      types.children.add(Node(kind: nkIdent, name: p.curr.value))
-      walk p
+      types.children.add(Node(kind: nkIdent, name: p.parsePhpQualifiedName()))
       while p.curr.kind == tkPunct and p.curr.value == "|":
         walk p
-        types.children.add(Node(kind: nkIdent, name: p.curr.value))
-        walk p
+        types.children.add(Node(kind: nkIdent, name: p.parsePhpQualifiedName()))
       catchBlock.children.add(types)
       if p.curr.kind == tkIdentifier and p.curr.value[0] == '$':
-        catchBlock.children.add(Node(kind: nkIdent, name: p.curr.value))
+        catchBlock.children.add(Node(kind: nkIdent, name: p.curr.value).stamp(p.curr))
         walk p
       p.expectWalk(")")
       catchBlock.children.add(parseBlock(p))
@@ -634,23 +666,23 @@ proc phpHandlers*(p: var GenericParser) =
     result = Node(kind: nkStatement)
     result.children.add(Node(kind: nkIdent, name: "class"))
     walk p # consume 'class'
-    result.children.add(Node(kind: nkIdent, name: p.curr.value))
+    result.children.add(Node(kind: nkIdent, name: p.curr.value).stamp(p.curr))
     walk p
     if p.curr.kind == tkIdentifier and p.curr.value == "extends":
       walk p
       result.children.add(Node(kind: nkStatement,
         children: @[Node(kind: nkIdent, name: "extends"),
-                    Node(kind: nkIdent, name: p.curr.value)]))
+                    Node(kind: nkIdent, name: p.curr.value).stamp(p.curr)]))
       walk p
     if p.curr.kind == tkIdentifier and p.curr.value == "implements":
       walk p
       let ifaces = Node(kind: nkStatement)
       ifaces.children.add(Node(kind: nkIdent, name: "implements"))
-      ifaces.children.add(Node(kind: nkIdent, name: p.curr.value))
+      ifaces.children.add(Node(kind: nkIdent, name: p.curr.value).stamp(p.curr))
       walk p
       while p.curr.kind == tkPunct and p.curr.value == ",":
         walk p
-        ifaces.children.add(Node(kind: nkIdent, name: p.curr.value))
+        ifaces.children.add(Node(kind: nkIdent, name: p.curr.value).stamp(p.curr))
         walk p
       result.children.add(ifaces)
     result.children.add(parseClassBody(p))
@@ -660,17 +692,17 @@ proc phpHandlers*(p: var GenericParser) =
     result = Node(kind: nkStatement)
     result.children.add(Node(kind: nkIdent, name: "interface"))
     walk p
-    result.children.add(Node(kind: nkIdent, name: p.curr.value))
+    result.children.add(Node(kind: nkIdent, name: p.curr.value).stamp(p.curr))
     walk p
     if p.curr.kind == tkIdentifier and p.curr.value == "extends":
       walk p
       let exts = Node(kind: nkStatement)
       exts.children.add(Node(kind: nkIdent, name: "extends"))
-      exts.children.add(Node(kind: nkIdent, name: p.curr.value))
+      exts.children.add(Node(kind: nkIdent, name: p.curr.value).stamp(p.curr))
       walk p
       while p.curr.kind == tkPunct and p.curr.value == ",":
         walk p
-        exts.children.add(Node(kind: nkIdent, name: p.curr.value))
+        exts.children.add(Node(kind: nkIdent, name: p.curr.value).stamp(p.curr))
         walk p
       result.children.add(exts)
     result.children.add(parseClassBody(p))
@@ -680,7 +712,7 @@ proc phpHandlers*(p: var GenericParser) =
     result = Node(kind: nkStatement)
     result.children.add(Node(kind: nkIdent, name: "trait"))
     walk p
-    result.children.add(Node(kind: nkIdent, name: p.curr.value))
+    result.children.add(Node(kind: nkIdent, name: p.curr.value).stamp(p.curr))
     walk p
     result.children.add(parseClassBody(p))
 
@@ -689,11 +721,11 @@ proc phpHandlers*(p: var GenericParser) =
     result = Node(kind: nkStatement)
     result.children.add(Node(kind: nkIdent, name: "enum"))
     walk p
-    result.children.add(Node(kind: nkIdent, name: p.curr.value))
+    result.children.add(Node(kind: nkIdent, name: p.curr.value).stamp(p.curr))
     walk p
     if p.curr.kind == tkPunct and p.curr.value == ":":
       walk p
-      result.children.add(Node(kind: nkIdent, name: p.curr.value))
+      result.children.add(Node(kind: nkIdent, name: p.curr.value).stamp(p.curr))
       walk p
     result.children.add(parseClassBody(p, isEnum = true))
 
@@ -743,7 +775,7 @@ proc phpHandlers*(p: var GenericParser) =
     walk p # consume 'goto'
     result = Node(kind: nkStatement,
       children: @[Node(kind: nkIdent, name: "goto"),
-                  Node(kind: nkIdent, name: p.curr.value)])
+                  Node(kind: nkIdent, name: p.curr.value).stamp(p.curr)])
     walk p
     p.expectWalk(";")
 
@@ -754,7 +786,7 @@ proc phpHandlers*(p: var GenericParser) =
     let entries = Node(kind: nkIdentDefs)
     while not (p.curr.kind == tkPunct and p.curr.value == ")"):
       if p.curr.kind == tkEOF: error(p, "Unexpected EOF in declare")
-      let name = Node(kind: nkIdent, name: p.curr.value)
+      let name = Node(kind: nkIdent, name: p.curr.value).stamp(p.curr)
       walk p
       p.expectWalk("=")
       entries.children.add(Node(kind: nkColonExpr,
@@ -785,12 +817,31 @@ proc phpHandlers*(p: var GenericParser) =
       children: @[Node(kind: nkIdent, name: "global")])
     walk p # consume 'global'
     while true:
-      result.children.add(Node(kind: nkIdent, name: p.curr.value))
+      result.children.add(Node(kind: nkIdent, name: p.curr.value).stamp(p.curr))
       walk p
       if p.curr.kind == tkPunct and p.curr.value == ",":
         walk p
       else:
         break
+    p.expectWalk(";")
+
+  stmtHandler p, "yield":
+    ## yield;  |  yield expr;  |  yield $k => $v;  |  yield from $gen;
+    walk p # consume 'yield'
+    result = Node(kind: nkStatement,
+      children: @[Node(kind: nkIdent, name: "yield")])
+    if p.curr.kind == tkIdentifier and p.curr.value == "from":
+      walk p
+      result.children.add(Node(kind: nkStatement,
+        children: @[Node(kind: nkIdent, name: "from"), parseExpression(p)]))
+    elif not (p.curr.kind == tkPunct and p.curr.value == ";"):
+      let val = parseExpression(p)
+      if p.curr.kind == tkPunct and p.curr.value == "=>":
+        walk p
+        result.children.add(Node(kind: nkColonExpr,
+          children: @[val, parseExpression(p)]))
+      else:
+        result.children.add(val)
     p.expectWalk(";")
 
   #

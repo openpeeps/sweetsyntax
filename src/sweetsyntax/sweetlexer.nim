@@ -110,9 +110,11 @@ proc getContext*(l: SweetLexer, posOverride: int = -1, maxContext: int = 80): st
   let windowEnd = min(lineEnd, atPos + maxContext)
 
   var snippet: string
-  if l.input.len > 0:
+  if l.data == nil and l.input.len > 0:
     snippet = l.input[windowStart ..< windowEnd]
   else:
+    # MemFile-backed (or empty) input: `input` holds a path, not source,
+    # so read through charAt which covers both buffers.
     snippet = newStringOfCap(max(0, windowEnd - windowStart))
     for i in windowStart ..< windowEnd:
       snippet.add(l.charAt(i))
@@ -217,6 +219,8 @@ proc skipWhitespace(l: var SweetLexer) =
 
 proc getLexeme*(l: SweetLexer, startPos, stopPos: int): string =
   # Extracts the substring from startPos to stopPos (exclusive) as the lexeme for the current token.
+  if stopPos <= startPos:
+    return ""
   if l.data != nil:
     let n = stopPos - startPos
     result = newString(n)
@@ -227,6 +231,35 @@ proc getLexeme*(l: SweetLexer, startPos, stopPos: int): string =
 proc getTokenValue*(l: SweetLexer, tok: Token): string {.inline.} =
   ## Returns the source text for the given token.
   l.getLexeme(tok.start, tok.stop)
+
+type
+  LexerMark* = object
+    ## Opaque snapshot of the lexer's mutable scan state, for speculative
+    ## parsing with rewind (e.g. C `(type)expr` casts vs `(expr)` groups).
+    pos*, line*, col*: int
+    current*: char
+    expectRegex*, tagTerminated*: bool
+    filterScanIdx*, filterHitsLen*: int
+
+proc markLexer*(l: SweetLexer): LexerMark {.inline.} =
+  ## Snapshot the current scan state. Only valid while no filter
+  ## configuration changes (filter hits are append-only during `getToken`).
+  LexerMark(pos: l.pos, line: l.line, col: l.col, current: l.current,
+    expectRegex: l.expectRegex, tagTerminated: l.tagTerminated,
+    filterScanIdx: l.filterScanIdx, filterHitsLen: l.filterHits.len)
+
+proc restoreLexer*(l: var SweetLexer, m: LexerMark) {.inline.} =
+  ## Rewind the lexer to a snapshot from `markLexer`, discarding any
+  ## tokens scanned since (parser `prev`/`curr`/`next` must be restored
+  ## by the caller as well).
+  l.pos = m.pos
+  l.line = m.line
+  l.col = m.col
+  l.current = m.current
+  l.expectRegex = m.expectRegex
+  l.tagTerminated = m.tagTerminated
+  l.filterScanIdx = m.filterScanIdx
+  l.filterHits.setLen(m.filterHitsLen)
 
 proc getFullInput*(l: SweetLexer): string =
   ## Returns full source text as string (needed for regex filters).
@@ -415,6 +448,109 @@ proc makeRange(l: SweetLexer, k: SweetTokenKind, startPos, startLine, startCol: 
 
   l.applyFilterAttrs(result)
 
+proc isHeredocIdentChar(c: char): bool {.inline.} =
+  c.isAlphaAscii or c == '_' or c.isDigit()
+
+proc scanHeredoc(l: var SweetLexer, startPos, startLine, startCol: int): Token =
+  ## Try to lex a Ruby (`<<EOS`, `<<-EOS`, `<<~EOS`, `<<"EOS"`, `<<'EOS'`,
+  ## "<<`EOS`") or PHP (`<<<EOT`, `<<<'EOT'`, `<<<"EOT"`) heredoc starting
+  ## at `l.pos`. Returns nil when the text is not a heredoc (e.g. the `<<`
+  ## shift operator or `<<=`), so the caller falls back to normal operator
+  ## scanning. Lookahead is pure (via charAt) until a terminator line is
+  ## confirmed; the lexer only advances on success, which also keeps
+  ## shift expressions like `a<<b` safe (no lone `b` line means no match).
+  ## The opener must end the line (a trailing `#` comment is allowed);
+  ## inline uses such as `foo(<<A, x)` stay on the operator path.
+  ## The token is a `tkString` spanning opener..terminator with a
+  ## `heredoc` attr, so parsers and renderers work unchanged.
+  # Caller guarantees current == '<' and peek == '<'.
+  if l.charAt(l.pos + 2) == '=':
+    return nil # `<<=` assignment, not a heredoc
+  var i = l.pos + 2
+  var allowIndent = false
+  var isPhp = false
+  if l.charAt(i) == '<':
+    # PHP style: `<<<EOT`, `<<<'EOT'`, `<<<"EOT"`
+    isPhp = true
+    allowIndent = true
+    i += 1
+  elif l.charAt(i) == '-' or l.charAt(i) == '~':
+    # Ruby style: `-` (indented terminator) or `~` (squiggly) marker
+    allowIndent = true
+    i += 1
+  var quote = '\0'
+  if l.charAt(i) in {'"', '\'', '`'}:
+    # Backtick form is Ruby-only (`<<`EOS``); reject it for `<<<`.
+    if isPhp and l.charAt(i) == '`':
+      return nil
+    quote = l.charAt(i)
+    i += 1
+  let nameStart = i
+  while isHeredocIdentChar(l.charAt(i)):
+    i += 1
+  if i == nameStart:
+    return nil # `<< ` shift, `<<1`, `<<(` etc.
+  var terminator = newStringOfCap(i - nameStart)
+  for k in nameStart ..< i:
+    terminator.add(l.charAt(k))
+  if quote != '\0':
+    if l.charAt(i) != quote:
+      return nil
+    i += 1
+  var j = i
+  while l.charAt(j) == ' ' or l.charAt(j) == '\t':
+    j += 1
+  if l.charAt(j) == '#':
+    while l.charAt(j) != '\0' and l.charAt(j) != '\n':
+      j += 1
+  if l.charAt(j) == '\r' and l.charAt(j + 1) == '\n':
+    j += 2
+  elif l.charAt(j) == '\n':
+    j += 1
+  else:
+    return nil # trailing code after the opener: not a v1 heredoc
+  # Search for the terminator line.
+  var lineStart = j
+  var termStop = -1
+  while lineStart < l.len:
+    var lineEnd = lineStart
+    while lineEnd < l.len and l.charAt(lineEnd) != '\n':
+      lineEnd += 1
+    var contentEnd = lineEnd
+    if contentEnd > lineStart and l.charAt(contentEnd - 1) == '\r':
+      contentEnd -= 1
+    var s = lineStart
+    if allowIndent:
+      while s < contentEnd and (l.charAt(s) == ' ' or l.charAt(s) == '\t'):
+        s += 1
+    var ok = (contentEnd - s) >= terminator.len
+    if ok:
+      for k in 0 ..< terminator.len:
+        if l.charAt(s + k) != terminator[k]:
+          ok = false
+          break
+    if ok:
+      var rest = s + terminator.len
+      if isPhp and l.charAt(rest) == ';':
+        rest += 1
+      while rest < contentEnd and (l.charAt(rest) == ' ' or l.charAt(rest) == '\t'):
+        rest += 1
+      if rest == contentEnd:
+        if isPhp:
+          # Leave a trailing `;` to the statement parser: the token
+          # stops right after the terminator identifier.
+          termStop = s + terminator.len
+        else:
+          termStop = if lineEnd < l.len: lineEnd + 1 else: lineEnd
+        break
+    lineStart = lineEnd + 1
+  if termStop < 0:
+    return nil # unterminated: leave `<<` to the operator scanner
+  while l.pos < termStop:
+    discard l.advance()
+  result = l.makeRange(tkString, startPos, startLine, startCol)
+  result.attr.addAttrOnce("heredoc")
+
 proc getToken*(l: var SweetLexer): Token =
   ## Retrieve the next token from the input stream, advancing the lexer's position
   if l.enableFilters: l.prepareFilters() # Ensure filters are prepared if enabled
@@ -498,6 +634,11 @@ proc getToken*(l: var SweetLexer): Token =
           discard l.advance()
         let isBigInt = l.current == 'n'
         if isBigInt: discard l.advance()
+        # Nim type suffix like 0xFF'u8 (mirrors the decimal branch below)
+        if l.current == '\'':
+          discard l.advance()
+          while l.current.isIdentPart():
+            discard l.advance()
         return l.makeRange(
           if isBigInt: tkBigInt else: tkHex,
           startPos, startLine, startCol)
@@ -507,6 +648,11 @@ proc getToken*(l: var SweetLexer): Token =
           discard l.advance()
         let isBigInt = l.current == 'n'
         if isBigInt: discard l.advance()
+        # Nim type suffix like 0o17'u8 (mirrors the decimal branch below)
+        if l.current == '\'':
+          discard l.advance()
+          while l.current.isIdentPart():
+            discard l.advance()
         return l.makeRange(
           if isBigInt: tkBigInt else: tkOctal,
           startPos, startLine, startCol)
@@ -516,6 +662,11 @@ proc getToken*(l: var SweetLexer): Token =
           discard l.advance()
         let isBigInt = l.current == 'n'
         if isBigInt: discard l.advance()
+        # Nim type suffix like 0b1010'u8 (mirrors the decimal branch below)
+        if l.current == '\'':
+          discard l.advance()
+          while l.current.isIdentPart():
+            discard l.advance()
         return l.makeRange(
           if isBigInt: tkBigInt else: tkBinary,
           startPos, startLine, startCol)
@@ -715,6 +866,12 @@ proc getToken*(l: var SweetLexer): Token =
     return l.makeRange(tkPunct, startPos, startLine, startCol)
 
   if isOperatorPunct(l.current):
+    if l.current == '<' and l.peek() == '<':
+      # Ruby/PHP heredoc (`<<EOS`, `<<~EOS`, `<<<EOT`, ...). Falls back
+      # to normal operator scanning when it is not a heredoc.
+      let hd = l.scanHeredoc(startPos, startLine, startCol)
+      if hd != nil:
+        return hd
     if l.current == '/':
       # Only treat as regex when the parser explicitly signals it.
       # Otherwise fall through to normal operator scanning (division).
@@ -734,7 +891,8 @@ proc getToken*(l: var SweetLexer): Token =
             discard l.advance()
           elif l.current == '/' and not inCharClass:
             discard l.advance()
-            while l.current in {'g', 'i', 'm', 's', 'u', 'v', 'y', 'd'}:
+            # JS flags (g,i,m,s,u,v,y,d) and Ruby flags (i,m,x,o)
+            while l.current in {'g', 'i', 'm', 's', 'u', 'v', 'y', 'd', 'x', 'o'}:
               discard l.advance()
             break
           elif l.current in {'\n', '\r'}:
@@ -917,6 +1075,56 @@ proc initLexer*(pre: SweetLexerInit, input: sink string, enableFilters: bool = f
   )
   if result.len > 0:
     result.current = result.charAt(0)
+
+proc initLexerFromMemFile*(spec: SweetSpec, mf: MemFile, path: string = "", enableFilters: bool = false): SweetLexer =
+  ## Initialize lexer from an already-opened MemFile (e.g. from Flysystem's
+  ## `readStream`). Zero-copy: the returned lexer borrows `mf.mem`.
+  if mf.size == 0 or mf.mem.isNil:
+    var empty = ""
+    result = initLexer(spec, empty, enableFilters)
+    return
+  result = SweetLexer(
+    input: path,
+    mf: mf,
+    data: cast[ptr UncheckedArray[char]](mf.mem),
+    len: mf.size,
+    line: 1, col: 1, pos: 0,
+    symbols: spec.symbols,
+    identifiers: spec.identifiers,
+    inlineComment: spec.inline_comment,
+    blockComment: spec.block_comment,
+    hashComments: spec.hash_comments,
+    trailingBangQuestion: spec.trailing_bang_question,
+    openTag: spec.open_tag,
+    closeTag: spec.close_tag,
+    filters: spec.filters,
+    enableFilters: enableFilters,
+    usingMemFile: true,
+    filtersReady: false,
+    filterHits: @[],
+    filterScanIdx: 0
+  )
+  if spec.features != nil:
+    if spec.features.regexLiterals: result.features.incl(featRegex)
+    if spec.features.asyncAwait: result.features.incl(featAsync)
+    if spec.features.generators: result.features.incl(featGenerators)
+    if spec.features.arrowFunctions: result.features.incl(featArrowFn)
+    if spec.features.templateLiterals: result.features.incl(featTemplateLit)
+    if spec.features.labeledStatements: result.features.incl(featLabeledStmt)
+    if spec.features.commandSyntax: result.features.incl(featCommandSyntax)
+  if spec.operators != nil:
+    result.allOps = @[]
+    for k in spec.symbols.keys: result.allOps.add(k)
+    for g in spec.operators.prefix:
+      for tok in g.tokens: result.allOps.add(tok)
+    for g in spec.operators.infix:
+      for tok in g.tokens: result.allOps.add(tok)
+      for kw in g.keywords: result.allOps.add(kw)
+    if spec.operators.assignment != nil:
+      for tok in spec.operators.assignment.tokens: result.allOps.add(tok)
+    if spec.operators.ternary != nil:
+      result.allOps.add(spec.operators.ternary.token)
+  result.current = result.charAt(0)
 
 proc resetLexer*(l: SweetLexer) =
   ## Rewind the lexer to offset 0 so its token stream can be consumed again.

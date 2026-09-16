@@ -122,6 +122,8 @@ type
       ## whether the language supports labeled statements (e.g. label: statement in JavaScript)
     commandSyntax*: bool
       ## whether the language supports command call syntax (e.g. Nim's `command arg1, arg2:`)
+    adjacentConcat*: bool
+      ## whether adjacent string literals concatenate (e.g. C's `"a" "b"`)
 
   Assoc* = enum
     leftAssoc = "left"
@@ -140,6 +142,7 @@ type
     featTemplateLit = "template_literals"
     featLabeledStmt = "labeled_statements"
     featCommandSyntax = "command_syntax"
+    featAdjacentConcat = "adjacent_concat"
 
   SweetLexerInit* = object
     ## Compile-time prebuilt data for initializing the lexer without a SweetSpec.
@@ -306,6 +309,7 @@ proc parseHook*(p: var YamlParser, v: var FeaturesSpec) =
     of "template_literals":   p.parseHook(v.templateLiterals)
     of "labeled_statements":  p.parseHook(v.labeledStatements)
     of "command_syntax":      p.parseHook(v.commandSyntax)
+    of "adjacent_concat":     p.parseHook(v.adjacentConcat)
     else: discard
 
 proc parseHook*(p: var YamlParser, v: var StatementSpec) =

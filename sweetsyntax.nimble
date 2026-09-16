@@ -5,6 +5,8 @@ author        = "George Lemon"
 description   = "A generic syntax highlighter, tokenizer, parser and AST explorer"
 license       = "MIT"
 srcDir        = "src"
+bin           = @["sweetsyntax"]
+binDir        = "bin"
 
 # Dependencies
 
