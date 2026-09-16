@@ -1,4 +1,5 @@
 <p align="center">
+  <img src="https://raw.githubusercontent.com/openpeeps/sweetsyntax/main/.github/sweetsyntax_logo.png" alt="SweetSyntax" width="120px" height="120px"><br>
   SweetSyntax 🍭 A generic parser and AST explorer<br>for analyzing programming languages 
 </p>
 
@@ -17,8 +18,9 @@
 - Easy-to-use API for integration into various applications
 - Built-in syntax support for: C, Crystal, D lang, Go, JavaScript, Nim, PHP, Python, Ruby, and Rust
 - Zero-copy parsing using MemFiles
+- Syntactic validation
 - **Context-aware error** reporting while parsing
-- Written in Nim
+- Written in Nim language
 
 ## What's this for?
 SweetSyntax is a powerful and flexible generic parser and AST explorer for analyzing programming languages! It is designed to be integrated into other applications, such as code editors, documentation generators, linting tools and other sweet things!
