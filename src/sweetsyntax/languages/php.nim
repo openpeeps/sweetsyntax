@@ -933,6 +933,15 @@ proc phpHandlers*(p: var GenericParser) =
     walk p
     result.children.add(parseExpression(p, 0))
 
+  prefixHandler p, "[":
+    ## `[k => v, ...]` keyed arrays are `nkBracketExpr` of `nkColonExpr`
+    ## pairs; plain `[a, b]` stays a shared `nkArrayLit`.
+    result = parseArrayLiteral(p)
+    for c in result.children:
+      if c.kind == nkColonExpr:
+        result.kind = nkBracketExpr
+        break
+
   prefixHandler p, "#":
     ## #[Attr, ...] followed by a class/function/... declaration
     result = parseAttributes(p)
