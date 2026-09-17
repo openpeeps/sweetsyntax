@@ -2,6 +2,14 @@ name: Go
 extension:
   - go
 
+inline_comment: '//'
+block_comment:
+  - '/*'
+  - '*/'
+
+raw_strings: true
+extended_numbers: true
+
 symbols:
   plus: '+'
   minus: '-'
@@ -20,6 +28,7 @@ symbols:
   xor: '^'
   andNot: '&^'
   not: '!'
+  tilde: '~'
   shiftLeft: '<<'
   shiftRight: '>>'
   plusAssign: '+='
@@ -81,3 +90,116 @@ identifiers:
   true: "true"
   false: "false"
   nil: "nil"
+
+blocks:
+  open: "{"
+  close: "}"
+
+features:
+  regex_literals: false
+  async_await: false
+  generators: false
+  arrow_functions: false
+  template_literals: false
+  labeled_statements: true
+  adjacent_concat: false
+
+operators:
+  prefix:
+    - tokens: ["+", "-", "!", "^", "~", "*", "&", "<-"]
+
+  postfix:
+    - tokens: ["++", "--"]
+
+  infix:
+    - precedence: 1
+      tokens: ["||"]
+    - precedence: 2
+      tokens: ["&&"]
+    - precedence: 3
+      tokens: ["==", "!=", "<", "<=", ">", ">="]
+    - precedence: 4
+      tokens: ["+", "-", "|", "^"]
+    - precedence: 5
+      tokens: ["*", "/", "%", "<<", ">>", "&", "&^"]
+    - precedence: 6
+      tokens: ["."]
+      handler: dot
+    - precedence: 6
+      tokens: ["["]
+      handler: bracket
+    - precedence: 7
+      tokens: ["("]
+      handler: call
+
+  assignment:
+    tokens: ["=", ":=", "+=", "-=", "*=", "/=", "%=",
+             "<<=", ">>=", "&=", "^=", "|=", "&^="]
+
+statements:
+  package_clause:
+    keyword: "package"
+    handler: package
+  import_decl:
+    keyword: "import"
+    handler: import
+  func_decl:
+    keyword: "func"
+    handler: function
+  const_decl:
+    keyword: "const"
+    handler: const_decl
+  var_decl:
+    keyword: "var"
+    handler: declarator
+  type_decl:
+    keyword: "type"
+    handler: type_decl
+  struct_type:
+    keyword: "struct"
+    handler: struct_type
+  interface_type:
+    keyword: "interface"
+    handler: interface_type
+  map_type:
+    keyword: "map"
+    handler: map_type
+  chan_type:
+    keyword: "chan"
+    handler: chan_type
+  return_stmt:
+    keyword: "return"
+    handler: return
+  if_stmt:
+    keyword: "if"
+    handler: conditional
+  for_stmt:
+    keyword: "for"
+    handler: for_loop
+  switch_stmt:
+    keyword: "switch"
+    handler: switch
+  select_stmt:
+    keyword: "select"
+    handler: select
+  case_clause:
+    keywords: ["case", "default"]
+    handler: case
+  go_stmt:
+    keyword: "go"
+    handler: go_stmt
+  defer_stmt:
+    keyword: "defer"
+    handler: defer
+  break_stmt:
+    keyword: "break"
+    handler: break
+  continue_stmt:
+    keyword: "continue"
+    handler: continue
+  goto_stmt:
+    keyword: "goto"
+    handler: goto
+  fallthrough_stmt:
+    keyword: "fallthrough"
+    handler: fallthrough
