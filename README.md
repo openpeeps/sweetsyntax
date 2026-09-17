@@ -14,16 +14,19 @@
 
 ## 😍 Key Features
 - Fast, compiled and efficient ([check benchmarks section](#benchmarks))
-- Generic parser & AST explorer
+- Generic parser & AST explorer with Syntactic validation
 - Easy-to-use API for integration into various applications
-- Built-in syntax support for: C, Crystal, D lang, Go, JavaScript, Nim, PHP, Python, Ruby, and Rust
 - Zero-copy parsing using MemFiles
-- Syntactic validation
+- Tree-sitter code folding
+- JSON-based AST generator / indent-based dump tree
+- ANSI, HTML and JSON-LD Renderers
+- Built-in syntax support for: C, Crystal, D lang, Go, JavaScript, Nim, PHP, Python, Ruby, and Rust
 - **Context-aware error** reporting while parsing
+- Plugin System for creating custom syntaxes (soon 🔥)
 - Written in Nim language
 
 ## What's this for?
-SweetSyntax is a powerful and flexible generic parser and AST explorer for analyzing programming languages! It is designed to be integrated into other applications, such as code editors, documentation generators, linting tools and other sweet things!
+SweetSyntax is a powerful and flexible generic parser and AST explorer for analyzing programming languages! It is designed to be integrated into other applications, such as [code editors](https://github.com/onebuckapp/zencode), documentation generators, [AI agents](https://github.com/openpeeps/datengine), linting tools, [minifiers](https:://github.com/openpeeps/squeezy), and other sweet things!
 
 Parse any language by defining its grammar in a YAML specification file: **tokens**, **operators** (prefix, infix, postfix, assignment), **statement keywords**, block delimiters, and **feature flags** (arrow functions, generators, async/await, template literals). The parser uses a **Pratt parsing** approach with a language-agnostic core and per-language statement handlers.
 
