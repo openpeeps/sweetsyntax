@@ -17,7 +17,7 @@
 ## - `compile`: A function that takes a `SweetSpec` (parsed from YAML) and builds the necessary tables for parsing.
 ## - `parseScript`: A high-level function that reads a source file, initializes the parser, and produces an AST.
 
-import std/[tables, strutils, options, sets, os, macros]
+import std/[tables, strutils, math, options, sets, os, macros]
 
 import pkg/openparser/json
 import ../[config, sweetlexer]
@@ -74,6 +74,26 @@ type
       ## When set, language-specific bare-call handlers must not treat a
       ## leading `:` symbol as a call argument (used for Ruby `if x: ...`,
       ## hash keys and keyword arguments, which conflict with `attr_accessor :x`).
+    inControlClause*: bool
+      ## When set, a `{` after a bare TypeName-form operand (`T`, `pkg.T`,
+      ## `T[P]`) does NOT start a composite literal: it opens the block of
+      ## an `if`/`for`/`switch` header (cf. go/parser's `exprLev < 0`).
+      ## Structural literal types (`[]T`, `map[K]V`, `struct{...}`) still do.
+    funcDepth*: int
+      ## Function-body nesting depth, maintained by language handlers that
+      ## need declaration-context checks (e.g. Go rejects nested named
+      ## function declarations and imports inside function bodies, while
+      ## allowing anonymous function literals there). The engine itself
+      ## never touches this counter.
+    inTypeContext*: bool
+      ## In a type expression: `(` never starts call arguments. Set by
+      ## language handlers around type parsing (Go conversions like
+      ## `[]byte(s)` apply OUTSIDE the type: the call binds after the
+      ## full `[]byte`, not inside its element type).
+    inParenGroup*: bool
+      ## Inside a `(...)` group (set by parseGroupExpr): a `;` separates
+      ## group items, so item parsers must not consume it as their own
+      ## statement terminator (Nim `if (let x = ...; x):`, Ruby `(a; b)`).
 
   
   OpenAstParsingError* = object of CatchableError
@@ -154,6 +174,36 @@ proc concatCString(a, b: string): string =
 # Generic prefix handlers
 #
 
+proc parseHexFloat*(s: string): float =
+  ## Parse a hexadecimal floating-point literal (`0x1.8p3`, `0x.8p-1`,
+  ## `0x1P+2`; underscores allowed). The lexer's `extended_numbers`
+  ## mode produces these as `tkFloat`, but Nim's `parseFloat` only
+  ## handles decimal — so this mirrors it for base 16.
+  var t = s.replace("_", "")
+  var i = 2 # skip `0x`
+  var mant = 0.0
+  while i < t.len and t[i] in {'0'..'9', 'a'..'f', 'A'..'F'}:
+    mant = mant * 16.0 + float(parseHexInt($t[i]))
+    inc i
+  if i < t.len and t[i] == '.':
+    inc i
+    var f = 1.0 / 16.0
+    while i < t.len and t[i] in {'0'..'9', 'a'..'f', 'A'..'F'}:
+      mant += float(parseHexInt($t[i])) * f
+      f /= 16.0
+      inc i
+  inc i # skip `p`/`P`
+  var neg = false
+  if i < t.len and t[i] in {'+', '-'}:
+    neg = t[i] == '-'
+    inc i
+  var exp = 0
+  while i < t.len and t[i] in {'0'..'9'}:
+    exp = exp * 10 + (ord(t[i]) - ord('0'))
+    inc i
+  if neg: exp = -exp
+  result = mant * pow(2.0, float(exp))
+
 proc parseLiteral(p: var GenericParser, minPrec: int = 0): Node =
   ## Handles int, float, string, hex, octal, binary, bigint literals
   case p.curr.kind
@@ -167,7 +217,16 @@ proc parseLiteral(p: var GenericParser, minPrec: int = 0): Node =
     result = Node(kind: nkLitInt, valInt: parseInt(val)).stamp(tk)
     walk p
   of tkFloat:
-    result = Node(kind: nkLitFloat, valFloat: parseFloat(p.curr.value)).stamp(p.curr)
+    let fv = p.curr.value
+    if fv.len > 1 and fv[0] == '0' and fv[1] in {'x', 'X'}:
+      result = Node(kind: nkLitFloat, valFloat: parseHexFloat(fv)
+      ).stamp(p.curr)
+    else:
+      result = Node(kind: nkLitFloat, valFloat: parseFloat(fv)
+      ).stamp(p.curr)
+    walk p
+  of tkImag:
+    result = Node(kind: nkImaginary, valImag: p.curr.value).stamp(p.curr)
     walk p
   of tkHex:
     var hexVal = p.curr.value
@@ -278,7 +337,10 @@ proc parseGroupExpr*(p: var GenericParser, minPrec: int = 0): Node =
     walk p
     return Node(kind: nkEmpty)
 
-  var items: seq[Node] = @[parseExpression(p, 0)]
+  var items: seq[Node] = @[]
+  let savedInParenGroup = p.inParenGroup
+  p.inParenGroup = true
+  items.add(parseExpression(p, 0))
   # Handle Nim tuple/colon syntax: `(name: value, ...)` or `(name: Type, ...)`
   if p.curr.kind == tkPunct and p.curr.value == ":":
     let colonTk = p.curr
@@ -286,8 +348,9 @@ proc parseGroupExpr*(p: var GenericParser, minPrec: int = 0): Node =
     items[^1] = Node(kind: nkColonExpr,
       children: @[items[^1], parseExpression(p, 0)]).stampFrom(items[^1])
 
-  while p.curr.kind == tkPunct and p.curr.value == ",":
-    walk p # consume ','
+  while p.curr.kind == tkPunct and p.curr.value in [",", ";"]:
+    walk p # consume ','/';' (`;` separates group items in Nim
+    # `if (let x = ...; x):` and Ruby `(a; b)`)
     # Skip comments after comma before next expression
     while p.curr.kind in {tkComment, tkDocComment}:
       discard parseCommentGeneric(p)
@@ -298,6 +361,7 @@ proc parseGroupExpr*(p: var GenericParser, minPrec: int = 0): Node =
       items[^1] = Node(kind: nkColonExpr,
         children: @[items[^1], parseExpression(p, 0)]).stampFrom(items[^1])
 
+  p.inParenGroup = savedInParenGroup
   p.expectWalk(")")
 
   result = if items.len == 1: items[0]
@@ -319,7 +383,7 @@ proc parseGroupExpr*(p: var GenericParser, minPrec: int = 0): Node =
       isOperand = not (p.stmtKeywords.hasKey(p.curr.value) or
                        p.infixTable.hasKey(p.curr.value))
     of tkInt, tkFloat, tkString, tkHex, tkOctal, tkBinary, tkBigInt,
-       tkChar, tkRegex:
+       tkImag, tkChar, tkRegex:
       isOperand = true
     of tkPunct:
       isOperand = p.curr.value == "("
@@ -606,6 +670,14 @@ proc parseExpression*(p: var GenericParser, minPrec: int = 0): Node =
           p.expectWalk("}")
           lhs = Node(kind: nkBracketExpr, children: @[lhs, propExpr]).stampFrom(lhs)
           continue
+        if p.curr.kind == tkPunct and p.curr.value == "(" and
+           p.expressionHandlers.hasKey("dotParen"):
+          # Opt-in: `x.(...)` type assertion or similar (Go). A nil
+          # return declines back to plain member access below.
+          let handled = p.expressionHandlers["dotParen"](p, lhs, minPrec)
+          if handled != nil:
+            lhs = handled
+            continue
         let prop = Node(kind: nkIdent, name: p.curr.value).stamp(p.curr); walk p
         lhs = Node(kind: nkDotExpr, children: @[lhs, prop]).stampFrom(lhs)
         continue
@@ -614,6 +686,13 @@ proc parseExpression*(p: var GenericParser, minPrec: int = 0): Node =
       if p.infixTable.hasKey(op) and p.infixTable[op].special == "bracket":
         let entry = p.infixTable[op]
         if entry.precedence < minPrec: break
+        if p.expressionHandlers.hasKey("bracket"):
+          # Opt-in: language-specific index/slice/instantiation (Go).
+          # A nil return declines back to the generic logic below.
+          let handled = p.expressionHandlers["bracket"](p, lhs, minPrec)
+          if handled != nil:
+            lhs = handled
+            continue
         let openTk = p.curr
         walk p
         # Handle empty brackets `[]` (pointer dereference in Nim)
@@ -651,6 +730,8 @@ proc parseExpression*(p: var GenericParser, minPrec: int = 0): Node =
       if p.infixTable.hasKey(op) and p.infixTable[op].special == "call":
         let entry = p.infixTable[op]
         if entry.precedence < minPrec: break
+        if p.inTypeContext: break # calls are never types; the `(` belongs
+          # to an outer conversion or grouping, handled after the type
         let openTk = p.curr
         walk p
         let call = Node(kind: nkCall, children: @[lhs]).stampFrom(lhs)
@@ -675,7 +756,15 @@ proc parseExpression*(p: var GenericParser, minPrec: int = 0): Node =
                             parseExpression(p, 0)]).stamp(spreadTk))
             p.walkOpt(",")
             continue
-          let arg = parseExpression(p, 0)
+          let arg0 = parseExpression(p, 0)
+          # Trailing `...`: spread call argument (`f(s...)`).
+          var arg = arg0
+          if p.curr.kind == tkPunct and p.curr.value == "...":
+            let dotsTk = p.curr
+            walk p
+            arg = Node(kind: nkCall, children: @[
+              Node(kind: nkIdent, name: "spread").stamp(dotsTk),
+              arg]).stamp(dotsTk)
           # Named/keyword args: `name: value`
           if p.curr.kind == tkPunct and p.curr.value == ":":
             walk p
@@ -752,7 +841,7 @@ proc parsePrefix(p: var GenericParser, minPrec: int = 0): Node =
     return result.stampMissing(entryTk)
 
   case p.curr.kind
-  of tkInt, tkFloat, tkString, tkHex, tkOctal, tkBinary, tkBigInt, tkRegex:
+  of tkInt, tkFloat, tkString, tkHex, tkOctal, tkBinary, tkBigInt, tkImag, tkRegex:
     result = parseLiteral(p)
   of tkComment, tkDocComment:
     result = parseCommentGeneric(p)
@@ -856,8 +945,11 @@ proc parseStatement*(p: var GenericParser, parentCol: int = -1): Node =
   if p.curr.kind == tkPunct and p.curr.value == ";":
     if p.strictStatements:
       error(p, "unexpected token `;`")
+    # Stray `;` is an empty statement (cf. go/parser's EmptyStmt): keep a
+    # stamped placeholder so statement lists never hold nil children.
+    let semiTk = p.curr
     walk p
-    return
+    return Node(kind: nkEmpty).stamp(semiTk)
 
   # Generator method: *name(params) { body } — used in class/object bodies
   # (gated: a leading `*` is dereference in C-like languages).
@@ -892,8 +984,15 @@ proc parseStatement*(p: var GenericParser, parentCol: int = -1): Node =
     let label = Node(kind: nkIdent, name: p.curr.value).stamp(labelTk)
     walk p
     p.expectWalk(":")
+    var inner: Node
+    if p.curr.kind == tkPunct and p.curr.value == p.blockClose:
+      # `label: }` labels an empty statement (cf. go/parser, which yields
+      # an EmptyStmt at `}`); the block loop consumes the `}` itself.
+      inner = Node(kind: nkEmpty).stamp(p.curr)
+    else:
+      inner = parseStatement(p)
     result = Node(kind: nkStatement,
-      children: @[Node(kind: nkIdent, name: "label").stamp(labelTk), label, parseStatement(p)]).stamp(labelTk)
+      children: @[Node(kind: nkIdent, name: "label").stamp(labelTk), label, inner]).stamp(labelTk)
     return
 
   # Nim command call: identifier arg1, arg2: body

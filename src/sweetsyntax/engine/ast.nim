@@ -48,12 +48,26 @@ type
     nkVar
     nkStatement
     nkBlock
+    nkPragmaBlock
+      ## Pragma applied to a statement: `[pragma, body]`
+      ## (Nim `{.cast(...).}: stmt` — cf. `parseStmtPragma`).
     nkArrayLit
       ## Array literal `[a, b, c]` — distinct from `nkBracketExpr`,
       ## which is reserved for subscript access `a[i]`.
     nkCommentGroup
       ## An expression with interleaved comments attached:
       ## `[expr, comment]`. Chains nest.
+    nkObjConstr
+      ## Composite literal / object construction: `[base, elements...]`
+      ## (Go `T{...}`; elided nested literals use `nkEmpty` as base).
+      ## Elements are bare values or `nkColonExpr [key, value]`.
+    nkTypeAssert
+      ## Type assertion: `[x, type]` (Go `x.(T)`; `x.(type)` uses
+      ## an `nkIdent("type")` as the type child).
+    nkImaginary
+      ## Imaginary literal (Go `1i`, `1.5i`, `0x1p-2i`): raw source
+      ## text, e.g. `"1.5i"`. A string payload like bigint (parsing
+      ## hex-float mantissas is a language quirk, not AST business).
 
   Node* {.acyclic.} = ref object
     ## A node in the abstract syntax tree, representing a construct in the source code.
@@ -65,6 +79,7 @@ type
     of nkLitFloat: valFloat*: float
     of nkLitString: valStr*: string
     of nkLitBigInt: valBigInt*: string
+    of nkImaginary: valImag*: string
     of nkIdent: name*: string
     else:
       children*: seq[Node]
@@ -77,7 +92,7 @@ type
       ## The root of the AST, containing a sequence of top-level
       ## nodes (e.g., statements or declarations)
 
-const LeafNodes* = {nkEmpty..nkIdent}
+const LeafNodes* = {nkEmpty..nkIdent, nkImaginary}
   ## A set of node kinds that are considered leaf
   ## nodes (i.e., they do not have children)
 
@@ -212,6 +227,7 @@ proc treeRepr*(n: Node): string =
     result.add("=" & n.valStr.multiReplace(
       ("\\", "\\\\"), ("\n", "\\n"), ("\r", "\\r"), ("\t", "\\t")))
   of nkLitBigInt: result.add("=" & n.valBigInt)
+  of nkImaginary: result.add("=" & n.valImag)
   of nkEmpty, nkNil: discard
   else: discard
 

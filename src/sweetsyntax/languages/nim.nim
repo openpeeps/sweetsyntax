@@ -32,11 +32,44 @@ template isPragmaOpen: bool {.dirty.} =
   ## (see `pragmaOpen` in nim.yaml), not `{` + `.`.
   p.curr.kind == tkPunct and p.curr.value == "{."
 
+proc parseNimBracketTail(p: var GenericParser, base: Node): Node =
+  ## `[args...]` tail for generic/bracketed names (`warning[GcMem]`,
+  ## `static[int]`): curr must be `[`. Args use minPrec 2 so `.`/calls/
+  ## brackets work while `=` stays outside; `,`/`]` always terminate the
+  ## arg expressions, so a missing `]` ends in a clean error nearby.
+  walk p # consume '['
+  result = Node(kind: nkBracketExpr, children: @[base]).stampFrom(base)
+  if p.curr.kind == tkPunct and p.curr.value == "]":
+    result.children.add(ast.newEmptyNode())
+  while not (p.curr.kind == tkPunct and p.curr.value == "]"):
+    if p.curr.kind == tkEOF: error(p, "Unexpected EOF in brackets")
+    if p.curr.kind in {tkComment, tkDocComment}:
+      discard parseCommentGeneric(p); continue
+    result.children.add(parseExpression(p, 2))
+    if p.curr.kind == tkPunct and p.curr.value == ",":
+      walk p
+      continue
+    break
+  if p.curr.kind == tkPunct and p.curr.value == "]":
+    walk p
+  else:
+    error(p, "Expected ']'")
+
 proc parseNimPragma(p: var GenericParser): Node =
   ## Parse a Nim pragma starting after `{.` is consumed.
-  ## Supports {.abc.}, {.abc, efg.}, {.deprecated: [TFile: File].}
+  ## Mirrors the compiler (`parsePragma`/`exprColonEqExpr`): each item is an
+  ## expression with an optional `:`/`=` tail, comma-separated, closed by
+  ## `.}` (or `}`). Supports {.abc.}, {.abc, efg.},
+  ## {.deprecated: [TFile: File].}, generic keys like
+  ## {.push warning[GcMem]: off.} and calls like {.cast(raises: []).}.
   ## Module-level (not nested in `nimHandlers`) so declaration helpers
   ## defined earlier in the file can call it.
+  ##
+  ## NOTE: the lexer emits `.}` as `.` + `}` (see nim.yaml), so items are
+  ## parsed with minPrec 15: high enough that the Pratt loop can never
+  ## consume the closing `.` via the dot/call/bracket continuations, while
+  ## still taking call parens. Bracket tails (generic keys) are parsed
+  ## manually below for the same reason.
   result = Node(kind: nkStatement)
   result.children.add(Node(kind: nkIdent, name: "pragma"))
   if p.curr.kind == tkPunct and p.curr.value == ".":
@@ -45,26 +78,44 @@ proc parseNimPragma(p: var GenericParser): Node =
     if p.curr.kind == tkEOF: error(p, "Unexpected EOF in pragma")
     if p.curr.kind in {tkComment, tkDocComment}:
       discard parseCommentGeneric(p); continue
-    if p.curr.kind == tkIdentifier:
-      let identTk = p.curr
-      let identVal = identTk.value
+    if p.curr.kind == tkPunct and p.curr.value == ".":
+      # Trailing `.` of `.}` (or a stray dot): the loop condition itself
+      # consumes the `}`.
       walk p
-      if p.curr.kind == tkPunct and p.curr.value == ":":
-        walk p
-        result.children.add(Node(kind: nkColonExpr,
-          children: @[Node(kind: nkIdent, name: identVal).stamp(identTk),
-                       parseExpression(p, 15)]).stamp(identTk))
-      else:
-        result.children.add(Node(kind: nkIdent, name: identVal).stamp(identTk))
-    elif p.curr.kind == tkPunct and p.curr.value == ".":
-      if p.next.kind == tkPunct and p.next.value == "}":
-        walk p
-      else:
-        walk p
-    elif p.curr.kind == tkPunct and p.curr.value == ",":
+      continue
+    if p.curr.kind == tkPunct and p.curr.value == ",":
+      walk p
+      continue
+    # One pragma item. A plain identifier that is NOT followed by `(`/`[`
+    # is taken literally: routing it through parseExpression would either
+    # glue a following identifier/literal into a command call
+    # (`push warning`) or dispatch statement-keyword names (`static`)
+    # into their handlers. Identifiers followed by `(`/`[` (calls,
+    # generic keys) and every other item shape go through the engine as
+    # a single expression.
+    var keyNode: Node
+    if p.curr.kind == tkIdentifier and
+       not (p.next.kind == tkPunct and p.next.value in ["(", "["]) and
+       (p.stmtKeywords.hasKey(p.curr.value) or
+        p.infixTable.hasKey(p.curr.value) or
+        p.keywordPrefixOps.contains(p.curr.value) or
+        (p.next.kind in {tkIdentifier, tkString, tkInt, tkFloat, tkHex,
+                         tkOctal, tkBinary, tkBigInt, tkImag, tkChar,
+                         tkRegex} and
+         p.next.line == p.curr.line)):
+      keyNode = Node(kind: nkIdent, name: p.curr.value).stamp(p.curr)
       walk p
     else:
-      result.children.add(parseExpression(p))
+      keyNode = parseExpression(p, 15)
+      if p.curr.kind == tkPunct and p.curr.value == "[":
+        # Generic instantiation key, e.g. `warning[GcMem]` (nested and
+        # multi-arg generics included).
+        keyNode = parseNimBracketTail(p, keyNode)
+    if p.curr.kind == tkPunct and p.curr.value in [":", "="]:
+      walk p
+      keyNode = Node(kind: nkColonExpr,
+        children: @[keyNode, parseExpression(p, 15)]).stampFrom(keyNode)
+    result.children.add(keyNode)
   if p.curr.kind == tkPunct and p.curr.value == ".":
     walk p
   p.expectWalk("}")
@@ -166,19 +217,110 @@ proc nimHandlers*(p: var GenericParser) =
     result = Node(kind: nkPrefix,
       children: @[Node(kind: nkIdent, name: "%").stamp(pctTk), operand]).stamp(pctTk)
 
+  prefixHandler p, "type":
+    ## `type` in expression/type position: the type-class modifier
+    ## (`type array`) or `typeof`-style `type(x)`. Statement-level `type`
+    ## sections are untouched (parseStatement dispatches stmt keywords
+    ## before expressions). Returns a bare identifier so calls
+    ## (`type(x)`) and command application (`type array`, like the
+    ## compiler's `commandStart`) work through the normal Pratt loop.
+    result = Node(kind: nkIdent, name: "type").stamp(p.curr)
+    walk p # consume 'type'
+
+  prefixHandler p, "ref":
+    ## `ref` with an operand (`ref T`) stays a prefix operator (same
+    ## `nkPrefix` shape as the engine's `parsePrefixOp`); with a closing
+    ## follower (`t is ref)`, `of ref:`) it is a bare type name instead
+    ## of erroring on the missing operand.
+    let refTk = p.curr
+    walk p # consume 'ref'
+    if p.curr.kind == tkEOF or
+       (p.curr.kind == tkPunct and
+        p.curr.value in [")", "]", "}", ",", ":", ";"]):
+      result = Node(kind: nkIdent, name: "ref").stamp(refTk)
+    else:
+      result = Node(kind: nkPrefix,
+        children: @[Node(kind: nkIdent, name: "ref").stamp(refTk),
+                    parseExpression(p, 13)]).stamp(refTk)
+
+  prefixHandler p, "ptr":
+    ## `ptr` with an operand (`ptr T`) stays a prefix operator; with a
+    ## closing follower it is a bare type name (mirrors `ref` above).
+    let ptrTk = p.curr
+    walk p # consume 'ptr'
+    if p.curr.kind == tkEOF or
+       (p.curr.kind == tkPunct and
+        p.curr.value in [")", "]", "}", ",", ":", ";"]):
+      result = Node(kind: nkIdent, name: "ptr").stamp(ptrTk)
+    else:
+      result = Node(kind: nkPrefix,
+        children: @[Node(kind: nkIdent, name: "ptr").stamp(ptrTk),
+                    parseExpression(p, 13)]).stamp(ptrTk)
+
+  prefixHandler p, "[":
+    ## Array literal with `key: value` elements (e.g. `[TFile: File]`, an
+    ## array holding a tuple). Mirrors the engine's bracket-item colon
+    ## handling; the shared `parseArrayLiteral` only takes `=>` pairs, so
+    ## Nim needs its own `[` prefix — plain arrays parse exactly as before.
+    let openTk = p.curr
+    walk p # consume '['
+    result = Node(kind: nkArrayLit).stamp(openTk)
+    while not (p.curr.kind == tkPunct and p.curr.value == "]"):
+      if p.curr.kind == tkEOF: error(p, "Unexpected EOF in array")
+      if p.curr.kind in {tkComment, tkDocComment}:
+        result.children.add(parseCommentGeneric(p)); continue
+      # Handle holes: [a,,b] or [,,a]
+      if p.curr.kind == tkPunct and p.curr.value in [",", "]"]:
+        result.children.add(Node(kind: nkEmpty))
+      else:
+        let key = parseExpression(p)
+        if p.curr.kind == tkPunct and p.curr.value == ":":
+          walk p
+          result.children.add(Node(kind: nkColonExpr,
+            children: @[key, parseExpression(p)]).stampFrom(key))
+        else:
+          result.children.add(key)
+      p.walkOpt(",")
+    p.expectWalk("]")
+
   prefixHandler p, "{.":
     ## Top-level (or expression-position) pragma: {.experimental: "x".}.
     ## The lexer emits `{.` as one token, so the brace handler never sees it.
+    ## A trailing `:` at end-of-line turns the pragma into a pragma block
+    ## (Nim `pragmaStmt = pragma (':' COMMENT? stmt)?`), e.g.
+    ## {.cast(raises: []).}:
+    ##   `=wasMoved`(obj)
+    ## This lives here — not in parseNimPragma — so the `:` type/return
+    ## slots after directly-called pragmas (`x {.p.}: int`,
+    ## `proc f() {.p.}: T`) keep working.
     let pragmaTk = p.curr
     walk p # consume '{.'
     result = parseNimPragma(p).stamp(pragmaTk)
+    if p.curr.kind == tkPunct and p.curr.value == ":" and
+       p.next.line != p.curr.line:
+      let colonTk = p.curr
+      walk p # consume ':'
+      while p.curr.kind in {tkComment, tkDocComment}:
+        discard parseCommentGeneric(p)
+      if p.curr.kind == tkEOF or p.curr.line == colonTk.line or
+         p.curr.col <= pragmaTk.col:
+        error(p, "Expected statement after ':'")
+      let bodyStmt = parseStatement(p)
+      result = Node(kind: nkPragmaBlock,
+        children: @[result, bodyStmt]).stamp(pragmaTk)
 
   proc parseNimType(p: var GenericParser): Node =
     ## A type annotation: optional `var`/`lent`/`sink`/`out`/`static`
     ## modifier plus the type. Uses minPrec 2 so `=` stays outside the
     ## type (`x: T = v` splits into type + default) and command syntax
     ## cannot trigger. A bare `static[int]` keeps its bracket shape (the
-    ## modifier requires a plain identifier after it).
+    ## statement-level `static` handler would misfire in expression
+    ## position, so the tail is parsed directly).
+    if p.curr.kind == tkIdentifier and p.curr.value == "static" and
+       p.next.kind == tkPunct and p.next.value == "[":
+      let staticBase = Node(kind: nkIdent, name: "static").stamp(p.curr)
+      walk p # consume 'static'
+      return parseNimBracketTail(p, staticBase)
     var modifier = ""
     if p.curr.kind == tkIdentifier and
        p.curr.value in ["var", "lent", "sink", "out", "static"] and
@@ -269,14 +411,15 @@ proc nimHandlers*(p: var GenericParser) =
         # column check above.
         p.walkOpt(";")
     else:
-      # Single-line mode: comma-separated definitions.
+      # Single-line mode: comma-separated definitions. A trailing `;` is
+      # left for the caller: at statement level it ends the declaration,
+      # but inside a paren group (`if (let x = ...; x):`) it separates
+      # the group items.
       while true:
         parseNimVarDef(p, result, kwCol)
         if p.curr.kind == tkPunct and p.curr.value == ",":
           walk p
         else: break
-    p.walkOpt(";")
-    p.walkOpt(";")
 
   proc parseNimRoutineParams(p: var GenericParser): Node =
     ## `(name, name2: Type = default; ...)`: routine parameter list shared
@@ -330,6 +473,8 @@ proc nimHandlers*(p: var GenericParser) =
   proc parseNimGenerics(p: var GenericParser): Node =
     ## `[T, U: Constraint = Default]`: generic parameter list. Returns nil
     ## when there is no `[`. Constrained params become `nkIdentDefs`.
+    ## Groups split on `,` or `;` (e.g. `[I: Ordinal; T]`), mirroring
+    ## routine parameters.
     result = nil
     if p.curr.kind != tkPunct or p.curr.value != "[":
       return
@@ -358,6 +503,7 @@ proc nimHandlers*(p: var GenericParser) =
         result.children.add(Node(kind: nkIdentDefs,
           children: @[name, typeNode, defaultVal]).stampFrom(name))
       p.walkOpt(",")
+      p.walkOpt(";")
     p.expectWalk("]")
 
   stmtHandler p, "declarator":
@@ -367,6 +513,13 @@ proc nimHandlers*(p: var GenericParser) =
     let kw = kwTk.value
     walk p
     result = parseNimDeclarator(p, kw, kwTk)
+    # A trailing `;` terminates the declaration — unless inside a paren
+    # group, where it separates group items (`if (let x = ...; x):`).
+    # Each walkOpt takes at most one `;`; the pair also tolerates `;;`
+    # without emitting an empty-statement node.
+    if not p.inParenGroup:
+      p.walkOpt(";")
+      p.walkOpt(";")
 
   stmtHandler p, "return":
     walk p # consume 'return'
@@ -438,16 +591,22 @@ proc nimHandlers*(p: var GenericParser) =
     let whileTk = p.curr
     walk p # consume 'while'
     let whileCol = whileTk.col
-    let cond = if p.curr.kind == tkPunct and p.curr.value == "(":
-                 walk p; let c = parseExpression(p); p.expectWalk(")"); c
-               else:
-                 # minPrec 1 keeps command syntax out of the condition so a
-                 # trailing `:` still introduces the loop body (`while x:`).
-                 parseExpression(p, 1)
-    let body = if p.curr.kind == tkPunct and p.curr.value == "{": parseBlock(p)
-               elif p.curr.kind == tkPunct and p.curr.value == ":":
-                 walk p; parseBlock(p, whileCol)
-               else: parseStatement(p)
+    let cond =
+      if p.curr.kind == tkPunct and p.curr.value == "(":
+        # Parenthesized condition runs through the engine group parser
+        # (same as `if`): `;`-separated items (`while (let b = ...; b > 0):`)
+        # work, and infix after `)` (`(a) != 0`) continues in the Pratt loop.
+        parseExpression(p, 1)
+      else:
+        # minPrec 1 keeps command syntax out of the condition so a
+        # trailing `:` still introduces the loop body (`while x:`).
+        parseExpression(p, 1)
+    let body =
+      if p.curr.kind == tkPunct and p.curr.value == "{":
+        parseBlock(p)
+      elif p.curr.kind == tkPunct and p.curr.value == ":":
+        walk p; parseBlock(p, whileCol)
+      else: parseStatement(p)
     result = Node(kind: nkStatement,
       children: @[Node(kind: nkIdent, name: "while").stamp(whileTk), cond, body]).stamp(whileTk)
 
@@ -470,7 +629,12 @@ proc nimHandlers*(p: var GenericParser) =
       expectIdent:
         vars.children.add(Node(kind: nkIdent, name: p.curr.value).stamp(p.curr))
       walk p
-    # `in` keyword
+    # `in` keyword (`for (i, x) in ...` closes destructuring parens
+    # first; brace-style `for (i in ...)` keeps `in` inside the parens).
+    var closedParens = false
+    if hasParens and p.curr.kind == tkPunct and p.curr.value == ")":
+      walk p # consume ')' closing destructured vars
+      closedParens = true
     if p.curr.kind == tkIdentifier and p.curr.value == "in":
       walk p
     else:
@@ -478,7 +642,7 @@ proc nimHandlers*(p: var GenericParser) =
     # right-hand side: range / iterable expression (minPrec 1 keeps a
     # trailing `:` for the loop body: `for i in x:`)
     let iterable = parseExpression(p, 1)
-    if hasParens:
+    if hasParens and not closedParens:
       p.expectWalk(")")
     let body = if p.curr.kind == tkPunct and p.curr.value == "{": parseBlock(p)
                elif p.curr.kind == tkPunct and p.curr.value == ":":
@@ -508,10 +672,12 @@ proc nimHandlers*(p: var GenericParser) =
           walk p
           let pattern = Node(kind: nkStatement).stamp(ofTk)
           pattern.children.add(Node(kind: nkIdent, name: "of").stamp(ofTk))
-          pattern.children.add(parseExpression(p, 6))
+          # minPrec 2 takes `..` range patterns (`of '0'..'9':`) while
+          # keeping `=` outside the pattern.
+          pattern.children.add(parseExpression(p, 2))
           while p.curr.kind == tkPunct and p.curr.value == ",":
             walk p
-            pattern.children.add(parseExpression(p, 6))
+            pattern.children.add(parseExpression(p, 2))
           p.expectWalk(":")
           pattern.children.add(
             if p.curr.kind == tkPunct and p.curr.value == "{": parseBlock(p)
@@ -552,10 +718,12 @@ proc nimHandlers*(p: var GenericParser) =
         if isOf:
           let pattern = Node(kind: nkStatement).stamp(branchTk)
           pattern.children.add(Node(kind: nkIdent, name: "of").stamp(branchTk))
-          pattern.children.add(parseExpression(p, 6))
+          # minPrec 2 takes `..` range patterns (`of '0'..'9':`) while
+          # keeping `=` outside the pattern.
+          pattern.children.add(parseExpression(p, 2))
           while p.curr.kind == tkPunct and p.curr.value == ",":
             walk p
-            pattern.children.add(parseExpression(p, 6))
+            pattern.children.add(parseExpression(p, 2))
           if p.curr.kind == tkPunct and p.curr.value == ":":
             walk p
           var savedOf: Option[InfixEntry]
@@ -955,6 +1123,47 @@ proc nimHandlers*(p: var GenericParser) =
         continue
       if p.curr.kind == tkIdentifier:
         let key = p.curr.value
+        if key == "when":
+          # `when` inside an object/tuple body: the branches hold field
+          # declarations, not statements, so they are parsed with
+          # parseObjectBody (recursively) instead of the generic
+          # `conditional` handler. Shape mirrors it:
+          # nkStatement [when, cond, body, (elifCond, body)*, (elseBody)?].
+          let whenTk = p.curr
+          walk p # consume 'when'
+          let whenCol = whenTk.col
+          let whenNode = Node(kind: nkStatement).stamp(whenTk)
+          whenNode.children.add(Node(kind: nkIdent, name: "when").stamp(whenTk))
+          # minPrec 1 keeps a trailing `:` for the branch body.
+          whenNode.children.add(parseExpression(p, 1))
+          template whenBranch(colonLn: int) {.dirty.} =
+            if p.curr.kind == tkPunct and p.curr.value == "{":
+              whenNode.children.add(parseBlock(p))
+            elif p.curr.kind == tkPunct and p.curr.value == ":":
+              walk p
+              if p.curr.line == colonLn:
+                whenNode.children.add(parseStatement(p))
+              else:
+                whenNode.children.add(parseObjectBody(p, whenCol + 1))
+            else:
+              whenNode.children.add(parseStatement(p))
+          var colonLine = p.curr.line
+          whenBranch(colonLine)
+          # Continuation branches align with (or indent past) this `when`.
+          while p.curr.kind == tkIdentifier and
+                p.curr.value in ["elif", "else"] and p.curr.col >= whenCol:
+            let isElif = p.curr.value == "elif"
+            walk p
+            if isElif:
+              whenNode.children.add(parseExpression(p, 1))
+            colonLine = p.curr.line
+            whenBranch(colonLine)
+            if not isElif: break
+            if p.curr.kind != tkIdentifier or
+               p.curr.value notin ["elif", "else"]:
+              break
+          result.children.add(whenNode)
+          continue
         if key == "case":
           let caseTk = p.curr
           walk p
@@ -996,10 +1205,12 @@ proc nimHandlers*(p: var GenericParser) =
             if isOf:
               let pattern = Node(kind: nkStatement).stamp(branchTk)
               pattern.children.add(Node(kind: nkIdent, name: "of").stamp(branchTk))
-              pattern.children.add(parseExpression(p, 6))
+              # minPrec 2 takes `..` range patterns while keeping `=`
+              # outside the pattern (mirrors statement-level `case`).
+              pattern.children.add(parseExpression(p, 2))
               while p.curr.kind == tkPunct and p.curr.value == ",":
                 walk p
-                pattern.children.add(parseExpression(p, 6))
+                pattern.children.add(parseExpression(p, 2))
               if p.curr.kind == tkPunct and p.curr.value == ":":
                 walk p
               pattern.children.add(parseObjectBody(p, branchCol + 2))
@@ -1110,22 +1321,54 @@ proc nimHandlers*(p: var GenericParser) =
         if p.stmtKeywords.hasKey(p.curr.value):
           body.children.add(parseStatement(p, indent))
           break
+        # Body blocks anchor at the start of the typedef entry: the name
+        # column for section entries (`type` NL `  Foo`), the `type`
+        # keyword column for inline definitions (`    type Foo = enum`,
+        # whose body may sit left of the name).
+        let nameCol = p.curr.col
+        let entryCol = if p.curr.line == typeTk.line: typeTk.col
+                       else: nameCol
         var fieldName = Node(kind: nkIdent, name: p.curr.value).stamp(p.curr)
         walk p
         if p.curr.kind == tkPunct and p.curr.value == "*":
           fieldName = Node(kind: nkPostfix,
             children: @[fieldName, Node(kind: nkIdent, name: "*").stamp(p.curr)]).stampFrom(fieldName)
           walk p
+        # Generic type definition: `Name[T, ...]` (e.g. `HSlice*[T, U]`).
+        if p.curr.kind == tkPunct and p.curr.value == "[":
+          let genParams = parseNimGenerics(p)
+          fieldName = Node(kind: nkBracketExpr,
+            children: @[fieldName] & genParams.children).stampFrom(fieldName)
         # Handle Nim pragma {.xxx.} after field/type name
         while isPragmaOpen:
           walk p # consume '{.'
           body.children.add(parseNimPragma(p))
+        # Same-line trailing comments belong to this definition
+        # (`Foo ## doc`); anything after them starts on a later line.
+        while p.curr.kind in {tkComment, tkDocComment} and
+              p.curr.line == fieldName.ln:
+          body.children.add(parseCommentGeneric(p))
         template addTypeDef(rhsName: string) {.dirty.} =
           ## `Name = rhsName`: op and infix stamped, rhs anchored at its token.
           body.children.add(Node(kind: nkInfix,
             children: @[Node(kind: nkIdent, name: "=").stamp(eqTk),
-                        fieldName,
-                        Node(kind: nkIdent, name: rhsName).stamp(p.curr)]).stampFrom(fieldName))
+                         fieldName,
+                         Node(kind: nkIdent, name: rhsName).stamp(p.curr)]).stampFrom(fieldName))
+        template skipBodyDocs {.dirty.} =
+          ## Comments between `object`/`enum`/etc. (or the base type) and
+          ## the first body token: keep them in the type body. The body
+          ## indent is measured from the first real token — never from a
+          ## comment's column (neither trailing `X = object ## doc` nor
+          ## continuation `##` lines carry a meaningful column).
+          while p.curr.kind in {tkComment, tkDocComment}:
+            body.children.add(parseCommentGeneric(p))
+        template bodyIndent(): int {.dirty.} =
+          ## Body blocks (object/enum/tuple fields) must sit deeper than
+          ## the typedef name: a token at the same column starts a new
+          ## typedef (e.g. an empty `X = object` followed by `Y = ...`).
+          ## Yields an unsatisfiable indent when there is no body, so the
+          ## body parser returns an empty block consuming nothing.
+          if p.curr.col > entryCol: p.curr.col else: entryCol + 1
         # Handle comma-separated fields: prev*, curr*: Type
         if p.curr.kind == tkPunct and p.curr.value == ",":
           body.children.add(fieldName)
@@ -1137,39 +1380,46 @@ proc nimHandlers*(p: var GenericParser) =
           if rhsStart == "object":
             addTypeDef("object")
             walk p
-            let objIndent = p.curr.col
+            skipBodyDocs()
             if p.curr.kind == tkIdentifier and p.curr.value == "of":
               walk p
               body.children.add(Node(kind: nkIdent, name: p.curr.value).stamp(p.curr))
               walk p
+              skipBodyDocs()
+            let objIndent = bodyIndent()
             body.children.add(parseObjectBody(p, objIndent))
           elif rhsStart == "ref" and p.next.kind == tkIdentifier and
                 p.next.value == "object":
             walk p
             addTypeDef("ref object")
             walk p # consume 'object'
-            let objIndent = p.curr.col
+            skipBodyDocs()
             if p.curr.kind == tkIdentifier and p.curr.value == "of":
               walk p
               body.children.add(Node(kind: nkIdent, name: p.curr.value).stamp(p.curr))
               walk p
-            body.children.add(parseObjectBody(p, objIndent))
+              skipBodyDocs()
+            let refIndent = bodyIndent()
+            body.children.add(parseObjectBody(p, refIndent))
           elif rhsStart == "ptr" and p.next.kind == tkIdentifier and
                 p.next.value == "object":
             walk p
             addTypeDef("ptr object")
             walk p # consume 'object'
-            let objIndent = p.curr.col
-            body.children.add(parseObjectBody(p, objIndent))
+            skipBodyDocs()
+            # let ptrIndent = bodyIndent()
+            # body.children.add(parseObjectBody(p, ptrIndent))
           elif rhsStart == "enum":
             addTypeDef("enum")
             walk p
-            let enumIndent = p.curr.col
+            skipBodyDocs()
+            let enumIndent = bodyIndent()
             body.children.add(parseEnumBody(p, enumIndent))
           elif rhsStart == "tuple":
             addTypeDef("tuple")
             walk p
-            let tupIndent = p.curr.col
+            skipBodyDocs()
+            let tupIndent = bodyIndent()
             body.children.add(parseObjectBody(p, tupIndent))
           else:
             body.children.add(Node(kind: nkInfix,
@@ -1181,9 +1431,16 @@ proc nimHandlers*(p: var GenericParser) =
           walk p
           body.children.add(Node(kind: nkInfix,
             children: @[Node(kind: nkIdent, name: ":").stamp(colonTk),
-                        fieldName,
-                        parseExpression(p)]).stampFrom(fieldName))
+                         fieldName,
+                         parseExpression(p)]).stampFrom(fieldName))
         else:
+          # A typedef name must be followed by `,`/`=`/`:` (or end its
+          # line, as in `type Foo` forward declarations). Anything else
+          # on the same line (e.g. `assert f1` after a complete
+          # definition) starts a new statement — hand back to the caller.
+          if p.curr.kind != tkEOF and p.curr.line == fieldName.ln and
+             not (p.curr.kind == tkPunct and p.curr.value == ";"):
+            break
           body.children.add(fieldName)
       else:
         body.children.add(parseStatement(p, indent))
@@ -1229,6 +1486,12 @@ proc nimHandlers*(p: var GenericParser) =
     result.children.add(Node(kind: nkIdent, name: "discard").stamp(discardTk))
     while p.curr.kind in {tkComment, tkDocComment}:
       result.children.add(parseCommentGeneric(p))
+    # Bare `discard`: the next statement starts on a later line at the
+    # same or lower indentation (mirrors the `return`/`raise` guards) —
+    # a dedented keyword like `type` is a new statement, not the operand.
+    if p.curr.line != discardTk.line and p.curr.col <= discardTk.col:
+      p.walkOpt(";")
+      return result
     if p.curr.kind notin {tkEOF} and
        not (p.curr.kind == tkPunct and p.curr.value in [";", "}", ":"]) and
        not (p.curr.kind == tkIdentifier and p.curr.value in ["of", "else", "elif"]):
@@ -1263,6 +1526,10 @@ proc nimHandlers*(p: var GenericParser) =
     result.children.add(Node(kind: nkIdent, name: "yield").stamp(yieldTk))
     while p.curr.kind in {tkComment, tkDocComment}:
       result.children.add(parseCommentGeneric(p))
+    # Bare `yield`: same dedent guard as `discard`/`return`/`raise`.
+    if p.curr.line != yieldTk.line and p.curr.col <= yieldTk.col:
+      p.walkOpt(";")
+      return result
     if p.curr.kind notin {tkEOF} and
        not (p.curr.kind == tkPunct and p.curr.value in [";", "}", ":"]) and
        not (p.curr.kind == tkIdentifier and p.curr.value in ["of", "else", "elif"]):
@@ -1341,6 +1608,9 @@ proc nimHandlers*(p: var GenericParser) =
       result.children.add(parseBlock(p))
     else:
       result = parseNimDeclarator(p, "static", staticTk)
+      if not p.inParenGroup:
+        p.walkOpt(";")
+        p.walkOpt(";")
 
   stmtHandler p, "with":
     ## with resource: body

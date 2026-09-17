@@ -53,6 +53,7 @@ proc scopeForToken*(lexer: SweetLexer, tok: Token): string =
   of tkRegex: result = "string.regexp"
   of tkInt, tkHex, tkOctal, tkBinary, tkBigInt: result = "constant.numeric.integer"
   of tkFloat: result = "constant.numeric.float"
+  of tkImag: result = "constant.numeric.imaginary"
   of tkPunct:
     let value = lexer.getTokenValue(tok)
     if value.len > 0 and value[0] in operatorChars:

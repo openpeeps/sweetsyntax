@@ -25,6 +25,8 @@ type
     tkOctal       ## octal literal: 0o777
     tkBinary      ## binary literal: 0b1010
     tkBigInt      ## bigint literal: 42n, 0xFFn
+    tkImag        ## imaginary literal: 1i, 1.5i, 0x1p-2i
+                  ## (only with `extended_numbers`, e.g. Go)
     tkChar = "char"
     tkString = "string"
     tkPunct = "punct"
@@ -54,6 +56,13 @@ type
       # (PHP 8 attributes)
     trailingBangQuestion*: bool
       # whether identifiers may end with '?' or '!' (e.g. Ruby method names)
+    rawStrings*: bool
+      # whether backquotes delimit raw string literals that may span lines
+      # with no escapes or interpolation (e.g. Go). Without this, backquotes
+      # lex as Nim quoted identifiers or JS template literals.
+    extendedNumbers*: bool
+      # Go-style number literals: imaginary suffix (`1i`, `0x1p-2i`),
+      # hex floats (`0x1p-2`), trailing-dot floats (`1.`)
     openTag*: Option[string]
     closeTag*: Option[string]
     features*: set[LanguageFeature]
@@ -630,8 +639,47 @@ proc getToken*(l: var SweetLexer): Token =
       case l.current
       of 'x', 'X':
         discard l.advance()
+        var hexIntDigits = 0
         while l.current in {'0'..'9', 'a'..'f', 'A'..'F', '_'}:
+          if l.current != '_': inc hexIntDigits
           discard l.advance()
+        if l.extendedNumbers:
+          # Hex float `0x1p-2`, `0x1.8p3`, `0x.8p1` (Go; the `p`
+          # exponent is mandatory — without it `0x1.8` splits into
+          # `0x1` + `.8`, an error downstream just like gc).
+          var expOff = -1
+          var fracDigits = 0
+          if l.current == '.' and l.peek() != '.':
+            var k = 1
+            if l.peek(k) in {'0'..'9', 'a'..'f', 'A'..'F'}:
+              while l.peek(k) in {'0'..'9', 'a'..'f', 'A'..'F', '_'}:
+                if l.peek(k) != '_': inc fracDigits
+                inc k
+            if l.peek(k) in {'p', 'P'}:
+              expOff = k
+          elif l.current in {'p', 'P'}:
+            expOff = 0
+          if expOff >= 0:
+            var k = expOff + 1
+            if l.peek(k) in {'+', '-'}: inc k
+            var expDigits = 0
+            while l.peek(k) in {'0'..'9', '_'}:
+              if l.peek(k) != '_': inc expDigits
+              inc k
+            if expDigits > 0 and (hexIntDigits > 0 or fracDigits > 0):
+              if l.current == '.':
+                discard l.advance()
+                while l.current in {'0'..'9', 'a'..'f', 'A'..'F', '_'}:
+                  discard l.advance()
+              discard l.advance() # `p`/`P`
+              if l.current in {'+', '-'}:
+                discard l.advance()
+              while l.current.isDigit() or l.current == '_':
+                discard l.advance()
+              if l.current == 'i' and not l.peek().isIdentPart():
+                discard l.advance()
+                return l.makeRange(tkImag, startPos, startLine, startCol)
+              return l.makeRange(tkFloat, startPos, startLine, startCol)
         let isBigInt = l.current == 'n'
         if isBigInt: discard l.advance()
         # Nim type suffix like 0xFF'u8 (mirrors the decimal branch below)
@@ -639,6 +687,11 @@ proc getToken*(l: var SweetLexer): Token =
           discard l.advance()
           while l.current.isIdentPart():
             discard l.advance()
+        if not isBigInt and l.extendedNumbers and l.current == 'i' and
+           not l.peek().isIdentPart():
+          # Imaginary `0xFFi`
+          discard l.advance()
+          return l.makeRange(tkImag, startPos, startLine, startCol)
         return l.makeRange(
           if isBigInt: tkBigInt else: tkHex,
           startPos, startLine, startCol)
@@ -653,6 +706,11 @@ proc getToken*(l: var SweetLexer): Token =
           discard l.advance()
           while l.current.isIdentPart():
             discard l.advance()
+        if not isBigInt and l.extendedNumbers and l.current == 'i' and
+           not l.peek().isIdentPart():
+          # Imaginary `0o17i`
+          discard l.advance()
+          return l.makeRange(tkImag, startPos, startLine, startCol)
         return l.makeRange(
           if isBigInt: tkBigInt else: tkOctal,
           startPos, startLine, startCol)
@@ -667,10 +725,32 @@ proc getToken*(l: var SweetLexer): Token =
           discard l.advance()
           while l.current.isIdentPart():
             discard l.advance()
+        if not isBigInt and l.extendedNumbers and l.current == 'i' and
+           not l.peek().isIdentPart():
+          # Imaginary `0b101i`
+          discard l.advance()
+          return l.makeRange(tkImag, startPos, startLine, startCol)
         return l.makeRange(
           if isBigInt: tkBigInt else: tkBinary,
           startPos, startLine, startCol)
       else:
+        # Legacy octal `0755` (Go; flag-gated): `0` followed by octal
+        # digits — including `0_755`. `0.5`/`0e1`/`0i` are not digits
+        # and stay on the decimal path; `09` finds no octal digit and
+        # also stays decimal (lenient, as before).
+        if l.extendedNumbers and l.current in {'0'..'9', '_'}:
+          var k = 0
+          var octDigits = 0
+          while l.peek(k) in {'0'..'7', '_'}:
+            if l.peek(k) != '_': inc octDigits
+            inc k
+          if octDigits > 0:
+            while l.current in {'0'..'7', '_'}:
+              discard l.advance()
+            if l.current == 'i' and not l.peek().isIdentPart():
+              discard l.advance()
+              return l.makeRange(tkImag, startPos, startLine, startCol)
+            return l.makeRange(tkOctal, startPos, startLine, startCol)
         discard # fall through to decimal scanning
 
     # decimal integer or float
@@ -684,6 +764,13 @@ proc getToken*(l: var SweetLexer): Token =
       discard l.advance() # consume '.'
       while l.current.isDigit() or l.current == '_':
         discard l.advance()
+    elif l.extendedNumbers and l.current == '.' and l.peek() != '.':
+      # `1.` / `1.e10` (Go; `1.e` errors downstream as juxtaposition,
+      # same as gc — and `1..2` keeps its dots for other uses).
+      isFloat = true
+      discard l.advance() # consume '.'
+      while l.current.isDigit() or l.current == '_':
+        discard l.advance()
 
     # exponent
     if l.current in {'e', 'E'}:
@@ -691,8 +778,22 @@ proc getToken*(l: var SweetLexer): Token =
       discard l.advance() # consume 'e'/'E'
       if l.current in {'+', '-'}:
         discard l.advance()
+      var expDigits = 0
       while l.current.isDigit():
         discard l.advance()
+        inc expDigits
+      if l.extendedNumbers and expDigits > 0:
+        # Underscores between exponent digits (`1e1_0`).
+        while l.current == '_' and l.peek().isDigit():
+          discard l.advance()
+          while l.current.isDigit():
+            discard l.advance()
+
+    # Imaginary suffix `1i`, `1.5i`, `1e10i`
+    if l.extendedNumbers and l.current == 'i' and
+       not l.peek().isIdentPart():
+      discard l.advance()
+      return l.makeRange(tkImag, startPos, startLine, startCol)
 
     # BigInt suffix
     if l.current == 'n':
@@ -813,8 +914,19 @@ proc getToken*(l: var SweetLexer): Token =
       discard l.advance()
     return l.makeRange(tkComment, commentStart, startLine, startCol)
 
-  # Backtick-quoted identifiers (Nim) or template literals (JS)
+  # Backtick-quoted identifiers (Nim), template literals (JS),
+  # or raw string literals (Go).
   if l.current == '`':
+    if l.rawStrings:
+      # Go raw string: any character except backquote, including newlines;
+      # backslashes have no special meaning, `\r` is discarded from the
+      # value (per spec) but kept in the token slice for positions.
+      discard l.advance() # consume opening '`'
+      while l.current != '\0' and l.current != '`':
+        discard l.advance()
+      if l.current == '`':
+        discard l.advance() # consume closing '`'
+      return l.makeRange(tkString, startPos, startLine, startCol)
     # Check if this is a template literal language
     let isTemplateLit = featTemplateLit in l.features
     if isTemplateLit:
@@ -937,6 +1049,8 @@ proc initLexerFromFile*(spec: SweetSpec, path: string, enableFilters: bool = fal
     blockComment: spec.block_comment,
     hashComments: spec.hash_comments,
     trailingBangQuestion: spec.trailing_bang_question,
+    rawStrings: spec.raw_strings,
+    extendedNumbers: spec.extended_numbers,
     openTag: spec.open_tag,
     closeTag: spec.close_tag,
     filters: spec.filters,
@@ -987,6 +1101,8 @@ proc initLexerFromFile*(pre: SweetLexerInit, path: string, enableFilters: bool =
     blockComment: pre.blockComment,
     hashComments: pre.hashComments,
     trailingBangQuestion: pre.trailingBangQuestion,
+    rawStrings: pre.rawStrings,
+    extendedNumbers: pre.extendedNumbers,
     openTag: pre.openTag,
     closeTag: pre.closeTag,
     features: pre.features,
@@ -1017,6 +1133,8 @@ proc initLexer*(spec: SweetSpec, input: sink string, enableFilters: bool = false
     blockComment: spec.block_comment,
     hashComments: spec.hash_comments,
     trailingBangQuestion: spec.trailing_bang_question,
+    rawStrings: spec.raw_strings,
+    extendedNumbers: spec.extended_numbers,
     openTag: spec.open_tag,
     closeTag: spec.close_tag,
     filters: spec.filters,
@@ -1064,6 +1182,8 @@ proc initLexer*(pre: SweetLexerInit, input: sink string, enableFilters: bool = f
     blockComment: pre.blockComment,
     hashComments: pre.hashComments,
     trailingBangQuestion: pre.trailingBangQuestion,
+    rawStrings: pre.rawStrings,
+    extendedNumbers: pre.extendedNumbers,
     openTag: pre.openTag,
     closeTag: pre.closeTag,
     features: pre.features,
@@ -1095,6 +1215,8 @@ proc initLexerFromMemFile*(spec: SweetSpec, mf: MemFile, path: string = "", enab
     blockComment: spec.block_comment,
     hashComments: spec.hash_comments,
     trailingBangQuestion: spec.trailing_bang_question,
+    rawStrings: spec.raw_strings,
+    extendedNumbers: spec.extended_numbers,
     openTag: spec.open_tag,
     closeTag: spec.close_tag,
     filters: spec.filters,

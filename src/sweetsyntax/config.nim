@@ -155,6 +155,11 @@ type
       # whether '#' starts an inline comment (e.g. PHP), unless followed by '['
     trailingBangQuestion*: bool
       # whether identifiers may end with '?' or '!' (e.g. Ruby method names)
+    rawStrings*: bool
+      # whether backquotes delimit raw string literals (e.g. Go)
+    extendedNumbers*: bool
+      # Go-style number literals: imaginary suffix (`1i`, `0x1p-2i`),
+      # hex floats (`0x1p-2`), trailing-dot floats (`1.`)
     openTag*: Option[string]
     closeTag*: Option[string]
     features*: set[LanguageFeature]
@@ -184,6 +189,12 @@ type
       ## (PHP 8 attributes)
     trailing_bang_question*: bool
       ## whether identifiers may end with '?' or '!' (e.g. Ruby method names)
+    raw_strings*: bool
+      ## whether backquotes delimit raw string literals that may span lines
+      ## with no escapes or interpolation (e.g. Go)
+    extended_numbers*: bool
+      ## Go-style number literals: imaginary suffix (`1i`, `0x1p-2i`),
+      ## hex floats (`0x1p-2`), trailing-dot floats (`1.`)
     symbols*: SymbolsTable
       ## mapping of symbol names to their literal representations, e.g. "plus" -> "+"
     identifiers*: IdentsTable

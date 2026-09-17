@@ -50,6 +50,14 @@ macro buildPrepared*(yamlPath: static string): untyped =
   if spec.trailing_bang_question:
     body.add parseStmt("t.trailingBangQuestion = true")
 
+  # backquote raw strings
+  if spec.raw_strings:
+    body.add parseStmt("t.rawStrings = true")
+
+  # Go-style number literals (imaginary, hex floats, `1.`)
+  if spec.extended_numbers:
+    body.add parseStmt("t.extendedNumbers = true")
+
   # open/close tags
   if spec.open_tag.isSome:
     body.add parseStmt("t.openTag = some(" & q(spec.open_tag.get) & ")")
