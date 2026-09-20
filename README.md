@@ -26,7 +26,7 @@
 - Written in Nim language
 
 ## What's this for?
-SweetSyntax is a powerful and flexible generic parser and AST explorer for analyzing programming languages! It is designed to be integrated into other applications, such as [code editors](https://github.com/onebuckapp/zencode), documentation generators, [AI agents](https://github.com/openpeeps/datengine), linting tools, [minifiers](https:://github.com/openpeeps/squeezy), and other sweet things!
+SweetSyntax is a powerful and flexible generic parser and AST explorer for analyzing programming languages! It is designed to be integrated into other applications, such as [code editors](https://github.com/onebuckapp/zencode), documentation generators, [AI agents](https://github.com/openpeeps/datengine), linting tools, [minifiers](https://github.com/openpeeps/squeezy), and other sweet things!
 
 Parse any language by defining its grammar in a YAML specification file: **tokens**, **operators** (prefix, infix, postfix, assignment), **statement keywords**, block delimiters, and **feature flags** (arrow functions, generators, async/await, template literals). The parser uses a **Pratt parsing** approach with a language-agnostic core and per-language statement handlers.
 
