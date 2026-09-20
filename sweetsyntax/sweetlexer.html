@@ -78,6 +78,7 @@
   trailingBangQuestion*: bool
   rawStrings*: bool
   extendedNumbers*: bool
+  intSuffixes*: bool
   openTag*: Option[string]
   closeTag*: Option[string]
   features*: set[LanguageFeature]
@@ -197,7 +198,7 @@
   <span class="Identifier">filterScanIdx</span><span class="Operator">*</span><span class="Other">,</span> <span class="Identifier">filterHitsLen</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">int</span></pre></dt>
   <dd>
     
-    Opaque snapshot of the lexer's mutable scan state, for speculative parsing with rewind (e.g. C <tt class="docutils literal"><span class="pre"><span class="Punctuation">(</span><span class="Keyword">type</span><span class="Punctuation">)</span><span class="Identifier">expr</span></span></tt> casts vs <tt class="docutils literal"><span class="pre"><span class="Punctuation">(</span><span class="Identifier">expr</span><span class="Punctuation">)</span></span></tt> groups).
+    Opaque snapshot of the lexer's mutable scan state, for read-only lookahead (e.g. the C cast-vs-group paren scan).
     
   </dd>
 </div>
@@ -214,6 +215,7 @@
   <span class="Identifier">trailingBangQuestion</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">bool</span>
   <span class="Identifier">rawStrings</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">bool</span>
   <span class="Identifier">extendedNumbers</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">bool</span>
+  <span class="Identifier">intSuffixes</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">bool</span>
   <span class="Identifier">openTag</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">Option</span><span class="Other">[</span><span class="Identifier">string</span><span class="Other">]</span>
   <span class="Identifier">closeTag</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">Option</span><span class="Other">[</span><span class="Identifier">string</span><span class="Other">]</span>
   <span class="Identifier">features</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">set</span><span class="Other">[</span><a href="config.html#LanguageFeature"><span class="Identifier">LanguageFeature</span></a><span class="Other">]</span>
@@ -457,7 +459,7 @@
       <div class="twelve-columns footer">
         <span class="nim-sprite"></span>
         <br>
-        <small style="color: var(--hint);">Made with Nim. Generated: 2026-09-20 11:45:59 UTC</small>
+        <small style="color: var(--hint);">Made with Nim. Generated: 2026-09-20 14:00:46 UTC</small>
       </div>
     </div>
   </div>

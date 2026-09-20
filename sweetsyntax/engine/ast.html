@@ -86,10 +86,10 @@
 <li><a class="reference" href="#NodeKind" title="NodeKind = enum
   nkEmpty, nkLitBool, nkLitInt, nkLitFloat, nkLitString, nkLitBigInt, nkIdent,
   nkVarTy, nkNil, nkIdentDefs, nkPrefix, nkPostfix, nkInfix, nkDotExpr,
-  nkBracketExpr, nkColonExpr, nkCall, nkRegex, nkReturn, nkImport, nkInclude,
-  nkInlineComment, nkDocComment, nkFunction, nkClass, nkInterface, nkVar,
-  nkStatement, nkBlock, nkPragmaBlock, ## Pragma applied to a statement: `[pragma, body]`
-                                        ## (Nim `{.cast(...).}: stmt` — cf. `parseStmtPragma`).
+  nkBracketExpr, nkColonExpr, nkCall, nkCast, ## C-style cast: `[typeNode, operand]` (`(int)x`, `(T*)p`).
+  nkRegex, nkReturn, nkImport, nkInclude, nkInlineComment, nkDocComment,
+  nkFunction, nkClass, nkInterface, nkVar, nkStatement, nkBlock, nkPragmaBlock, ## Pragma applied to a statement: `[pragma, body]`
+                                                                                 ## (Nim `{.cast(...).}: stmt` — cf. `parseStmtPragma`).
   nkArrayLit, ## Array literal `[a, b, c]` — distinct from `nkBracketExpr`,
                ## which is reserved for subscript access `a[i]`.
   nkCommentGroup,           ## An expression with interleaved comments attached:
@@ -275,10 +275,10 @@
   <dt><pre><a href="#NodeKind"><span class="Identifier">NodeKind</span></a> <span class="Other">=</span> <span class="Keyword">enum</span>
   <span class="Identifier">nkEmpty</span><span class="Other">,</span> <span class="Identifier">nkLitBool</span><span class="Other">,</span> <span class="Identifier">nkLitInt</span><span class="Other">,</span> <span class="Identifier">nkLitFloat</span><span class="Other">,</span> <span class="Identifier">nkLitString</span><span class="Other">,</span> <span class="Identifier">nkLitBigInt</span><span class="Other">,</span> <span class="Identifier">nkIdent</span><span class="Other">,</span>
   <span class="Identifier">nkVarTy</span><span class="Other">,</span> <span class="Identifier">nkNil</span><span class="Other">,</span> <span class="Identifier">nkIdentDefs</span><span class="Other">,</span> <span class="Identifier">nkPrefix</span><span class="Other">,</span> <span class="Identifier">nkPostfix</span><span class="Other">,</span> <span class="Identifier">nkInfix</span><span class="Other">,</span> <span class="Identifier">nkDotExpr</span><span class="Other">,</span>
-  <span class="Identifier">nkBracketExpr</span><span class="Other">,</span> <span class="Identifier">nkColonExpr</span><span class="Other">,</span> <span class="Identifier">nkCall</span><span class="Other">,</span> <span class="Identifier">nkRegex</span><span class="Other">,</span> <span class="Identifier">nkReturn</span><span class="Other">,</span> <span class="Identifier">nkImport</span><span class="Other">,</span> <span class="Identifier">nkInclude</span><span class="Other">,</span>
-  <span class="Identifier">nkInlineComment</span><span class="Other">,</span> <span class="Identifier">nkDocComment</span><span class="Other">,</span> <span class="Identifier">nkFunction</span><span class="Other">,</span> <span class="Identifier">nkClass</span><span class="Other">,</span> <span class="Identifier">nkInterface</span><span class="Other">,</span> <span class="Identifier">nkVar</span><span class="Other">,</span>
-  <span class="Identifier">nkStatement</span><span class="Other">,</span> <span class="Identifier">nkBlock</span><span class="Other">,</span> <span class="Identifier">nkPragmaBlock</span><span class="Other">,</span> <span class="Comment">## Pragma applied to a statement: `[pragma, body]`</span>
-                                        <span class="Comment">## (Nim `{.cast(...).}: stmt` — cf. `parseStmtPragma`).</span>
+  <span class="Identifier">nkBracketExpr</span><span class="Other">,</span> <span class="Identifier">nkColonExpr</span><span class="Other">,</span> <span class="Identifier">nkCall</span><span class="Other">,</span> <span class="Identifier">nkCast</span><span class="Other">,</span> <span class="Comment">## C-style cast: `[typeNode, operand]` (`(int)x`, `(T*)p`).</span>
+  <span class="Identifier">nkRegex</span><span class="Other">,</span> <span class="Identifier">nkReturn</span><span class="Other">,</span> <span class="Identifier">nkImport</span><span class="Other">,</span> <span class="Identifier">nkInclude</span><span class="Other">,</span> <span class="Identifier">nkInlineComment</span><span class="Other">,</span> <span class="Identifier">nkDocComment</span><span class="Other">,</span>
+  <span class="Identifier">nkFunction</span><span class="Other">,</span> <span class="Identifier">nkClass</span><span class="Other">,</span> <span class="Identifier">nkInterface</span><span class="Other">,</span> <span class="Identifier">nkVar</span><span class="Other">,</span> <span class="Identifier">nkStatement</span><span class="Other">,</span> <span class="Identifier">nkBlock</span><span class="Other">,</span> <span class="Identifier">nkPragmaBlock</span><span class="Other">,</span> <span class="Comment">## Pragma applied to a statement: `[pragma, body]`</span>
+                                                                                 <span class="Comment">## (Nim `{.cast(...).}: stmt` — cf. `parseStmtPragma`).</span>
   <span class="Identifier">nkArrayLit</span><span class="Other">,</span> <span class="Comment">## Array literal `[a, b, c]` — distinct from `nkBracketExpr`,</span>
                <span class="Comment">## which is reserved for subscript access `a[i]`.</span>
   <span class="Identifier">nkCommentGroup</span><span class="Other">,</span>           <span class="Comment">## An expression with interleaved comments attached:</span>
@@ -617,7 +617,7 @@
       <div class="twelve-columns footer">
         <span class="nim-sprite"></span>
         <br>
-        <small style="color: var(--hint);">Made with Nim. Generated: 2026-09-20 11:45:59 UTC</small>
+        <small style="color: var(--hint);">Made with Nim. Generated: 2026-09-20 14:00:46 UTC</small>
       </div>
     </div>
   </div>
