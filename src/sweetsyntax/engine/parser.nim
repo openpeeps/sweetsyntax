@@ -204,6 +204,58 @@ proc parseHexFloat*(s: string): float =
   if neg: exp = -exp
   result = mant * pow(2.0, float(exp))
 
+proc stripCIntSuffix(s: string): string =
+  ## Remove a C99 integer suffix tail (`u`, `l`, `ul`, `lu`, `ll`,
+  ## `ull`, `llu`, any case). Validates the shape so hex digits that
+  ## merely look like suffix letters (`0xF`, `0xBEEF`) survive, and
+  ## refuses stems with an empty digit part. Returns the input
+  ## unchanged when there is no suffix.
+  var j = s.len
+  while j > 0 and s[j - 1] in {'u', 'U', 'l', 'L'}:
+    dec j
+  if j == s.len:
+    return s
+  const validTails = ["u", "l", "ul", "lu", "ll", "ull", "llu"]
+  if s[j .. ^1].toLowerAscii notin validTails:
+    return s
+  let stem = s[0 ..< j]
+  if stem.len == 0 or stem[^1] in {'x', 'X', 'o', 'O', 'b', 'B'}:
+    return s
+  stem
+
+proc stripCFloatSuffix(s: string): string =
+  ## Remove a C float suffix (`f`/`F`, `l`/`L` long double).
+  if s.len > 1 and s[^1] in {'f', 'F', 'l', 'L'}:
+    let stem = s[0 ..< ^1]
+    if stem[^1] in {'0'..'9', '.'}:
+      return stem
+  s
+
+proc intStemHasDigits(stem: string): bool =
+  ## Does the (suffix-stripped) literal hold at least one digit past
+  ## any `0x`/`0o`/`0b` prefix? Distinguishes overflow (valid shape,
+  ## value too big — kept as bigint) from malformed input (parse error).
+  var s = stem
+  if s.len > 2 and s[0] == '0' and s[1] in {'x', 'X', 'o', 'O', 'b', 'B'}:
+    s = s[2 .. ^1]
+  for c in s:
+    if c in {'0'..'9', 'a'..'f', 'A'..'F'}:
+      return true
+  false
+
+proc parseIntLiteral(p: var GenericParser, raw, stem: string,
+                     parse: proc(s: string): int): Node =
+  ## Parse an integer literal stem; out-of-range but well-formed values
+  ## (e.g. `18446744073709551615ULL`) become `nkLitBigInt` holding the
+  ## raw text instead of crashing. Malformed input is a parse error.
+  let tk = p.curr
+  try:
+    result = Node(kind: nkLitInt, valInt: parse(stem)).stamp(tk)
+  except ValueError:
+    if not intStemHasDigits(stem):
+      error(p, "Invalid integer literal '" & raw & "'")
+    result = Node(kind: nkLitBigInt, valBigInt: raw).stamp(tk)
+
 proc parseLiteral(p: var GenericParser, minPrec: int = 0): Node =
   ## Handles int, float, string, hex, octal, binary, bigint literals
   case p.curr.kind
@@ -214,16 +266,22 @@ proc parseLiteral(p: var GenericParser, minPrec: int = 0): Node =
     let apostrophe = val.find('\'')
     if apostrophe >= 0:
       val = val[0 ..< apostrophe]
-    result = Node(kind: nkLitInt, valInt: parseInt(val)).stamp(tk)
+    # Strip C integer suffix like 1U, 100ULL
+    val = stripCIntSuffix(val)
+    result = parseIntLiteral(p, tk.value, val, parseInt)
     walk p
   of tkFloat:
-    let fv = p.curr.value
-    if fv.len > 1 and fv[0] == '0' and fv[1] in {'x', 'X'}:
-      result = Node(kind: nkLitFloat, valFloat: parseHexFloat(fv)
-      ).stamp(p.curr)
-    else:
-      result = Node(kind: nkLitFloat, valFloat: parseFloat(fv)
-      ).stamp(p.curr)
+    let tk = p.curr
+    let fv = stripCFloatSuffix(tk.value)
+    try:
+      if fv.len > 1 and fv[0] == '0' and fv[1] in {'x', 'X'}:
+        result = Node(kind: nkLitFloat, valFloat: parseHexFloat(fv)
+        ).stamp(tk)
+      else:
+        result = Node(kind: nkLitFloat, valFloat: parseFloat(fv)
+        ).stamp(tk)
+    except ValueError:
+      error(p, "Invalid float literal '" & tk.value & "'")
     walk p
   of tkImag:
     result = Node(kind: nkImaginary, valImag: p.curr.value).stamp(p.curr)
@@ -233,21 +291,24 @@ proc parseLiteral(p: var GenericParser, minPrec: int = 0): Node =
     let hexApos = hexVal.find('\'')
     if hexApos >= 0:
       hexVal = hexVal[0 ..< hexApos]
-    result = Node(kind: nkLitInt, valInt: parseHexInt(hexVal)).stamp(p.curr)
+    hexVal = stripCIntSuffix(hexVal)
+    result = parseIntLiteral(p, p.curr.value, hexVal, parseHexInt)
     walk p
   of tkOctal:
     var octVal = p.curr.value
     let octApos = octVal.find('\'')
     if octApos >= 0:
       octVal = octVal[0 ..< octApos]
-    result = Node(kind: nkLitInt, valInt: parseOctInt(octVal)).stamp(p.curr)
+    octVal = stripCIntSuffix(octVal)
+    result = parseIntLiteral(p, p.curr.value, octVal, parseOctInt)
     walk p
   of tkBinary:
     var binVal = p.curr.value
     let binApos = binVal.find('\'')
     if binApos >= 0:
       binVal = binVal[0 ..< binApos]
-    result = Node(kind: nkLitInt, valInt: parseBinInt(binVal)).stamp(p.curr)
+    binVal = stripCIntSuffix(binVal)
+    result = parseIntLiteral(p, p.curr.value, binVal, parseBinInt)
     walk p
   of tkBigInt:
     result = Node(kind: nkLitBigInt, valBigInt: p.curr.value).stamp(p.curr)
@@ -390,9 +451,8 @@ proc parseGroupExpr*(p: var GenericParser, minPrec: int = 0): Node =
     else:
       discard
     if isOperand:
-      result = Node(kind: nkPrefix,
-        children: @[Node(kind: nkIdent, name: "cast").stamp(openTk), items[0],
-                    parseExpression(p, 13)]).stamp(openTk)
+      result = Node(kind: nkCast,
+        children: @[items[0], parseExpression(p, 13)]).stamp(openTk)
 
 proc parseArrayLiteral*(p: var GenericParser, minPrec: int = 0): Node =
   let openTk = p.curr

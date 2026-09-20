@@ -160,6 +160,9 @@ type
     extendedNumbers*: bool
       # Go-style number literals: imaginary suffix (`1i`, `0x1p-2i`),
       # hex floats (`0x1p-2`), trailing-dot floats (`1.`)
+    intSuffixes*: bool
+      # C-style integer/float suffixes folded into number tokens
+      # (`1U`, `100ULL`, `0xFFL`, `1.5f`)
     openTag*: Option[string]
     closeTag*: Option[string]
     features*: set[LanguageFeature]
@@ -195,6 +198,9 @@ type
     extended_numbers*: bool
       ## Go-style number literals: imaginary suffix (`1i`, `0x1p-2i`),
       ## hex floats (`0x1p-2`), trailing-dot floats (`1.`)
+    int_suffixes*: bool
+      ## C-style integer/float suffixes folded into number tokens
+      ## (`1U`, `100ULL`, `0xFFL`, `1.5f`)
     symbols*: SymbolsTable
       ## mapping of symbol names to their literal representations, e.g. "plus" -> "+"
     identifiers*: IdentsTable

@@ -312,15 +312,40 @@ suite "C typedefs":
 
   test "seed typedefs usable as casts":
     let n = parseC("(size_t)x;")
-    check n.kind == nkPrefix
-    check n[0].name == "cast"
-    check n[1].name == "size_t"
-    check n[2].name == "x"
+    check n.kind == nkCast
+    check n[0].name == "size_t"
+    check n[1].name == "x"
 
   test "custom type name usable in later decl":
     let n = parseC("myu v = 1;")
     check n[0].name == "decl"
     check n[1].name == "myu"
+
+  test "anonymous struct typedef":
+    let n = parseC("typedef struct { NI cap; } Foo;")
+    check n.kind == nkStatement
+    check n[0].name == "typedef"
+    check n[1].name == "struct"
+    check n[2].kind == nkBlock
+    check n[2][0][2][0].name == "cap"
+    check n[3][0].name == "Foo"
+
+  test "anonymous struct name registers as typedef":
+    let nodes = parseCStmts("""
+      typedef struct { NI cap; } Foo;
+      Foo v;
+      """)
+    check nodes.len == 2
+    check nodes[0][3][0].name == "Foo"
+    check nodes[1][0].name == "decl"
+    check nodes[1][1].name == "Foo"
+
+  test "tagged struct with body in typedef":
+    let n = parseC("typedef struct S { int x; } T;")
+    check n[0].name == "typedef"
+    check n[1].name == "struct S"
+    check n[2].kind == nkBlock
+    check n[3][0].name == "T"
 
 suite "C struct and union":
   test "struct with two fields":
@@ -371,6 +396,51 @@ suite "C struct and union":
     check n[2].kind == nkColonExpr
     check n[2][0][0].kind == nkEmpty
     check n[2][1].valInt == 8
+
+  test "static const anonymous struct with init":
+    let n = parseC("static const struct { NI cap; } TM_2 = { 33 | 4 };")
+    check n[0].name == "decl"
+    check n[1].name == "static"
+    check n[2].name == "const"
+    check n[3].name == "struct"
+    check n[4].kind == nkBlock
+    check n[4][0][2][0].name == "cap"
+    check n[5][0].name == "TM_2"
+    check n[5][1].kind == nkArrayLit
+
+  test "nested anonymous struct in union":
+    let n = parseC("""
+      struct Outer {
+        NI kind;
+        union {
+          struct { NI64 intValue; } kind_1;
+          struct { NF floatValue; } kind_2;
+        };
+      };
+      """)
+    check n[1].name == "Outer"
+    check n[2][1][0].name == "union"
+    check n[2][1][1][0][0].name == "struct"
+    check n[2][1][1][0][2][0].name == "kind_1"
+    check n[2][1][1][1][2][0].name == "kind_2"
+
+  test "local anonymous union in function":
+    let nodes = parseCStmts("""
+      void f(void) {
+        union{ NF source; NU64 dest; } LOC1;
+      }
+      """)
+    check nodes[0].kind == nkFunction
+    check nodes[0][2][0][0].name == "union"
+    check nodes[0][2][0][2][0].name == "LOC1"
+
+  test "static anonymous enum":
+    let n = parseC("static enum { A } x;")
+    check n[0].name == "decl"
+    check n[1].name == "static"
+    check n[2].name == "enum"
+    check n[3].kind == nkBlock
+    check n[4][0].name == "x"
 
 suite "C enums":
   test "enum with explicit value":
@@ -649,26 +719,77 @@ suite "C expressions and operators":
 suite "C casts and sizeof":
   test "simple cast":
     let n = parseC("(int)x;")
-    check n.kind == nkPrefix
-    check n[0].name == "cast"
-    check n[1].name == "int"
-    check n[2].name == "x"
+    check n.kind == nkCast
+    check n[0].name == "int"
+    check n[1].name == "x"
 
   test "cast of float literal":
     let n = parseC("int q = (int)3.5;")
-    check n[2][1][0].name == "cast"
-    check n[2][1][2].valFloat == 3.5
+    check n[2][1].kind == nkCast
+    check n[2][1][0].name == "int"
+    check n[2][1][1].valFloat == 3.5
 
   test "pointer cast":
     let n = parseC("int w = (int *)0;")
-    check n[2][1][0].name == "cast"
-    check n[2][1][1].kind == nkPrefix
-    check n[2][1][1][0].name == "*"
+    check n[2][1].kind == nkCast
+    check n[2][1][0].kind == nkPrefix
+    check n[2][1][0][0].name == "*"
+    check n[2][1][1].valInt == 0
 
   test "cast binds tighter than addition":
     let n = parseC("r = (unsigned)x + 1;")
     check n[2][0].name == "+"
-    check n[2][1][0].name == "cast"
+    check n[2][1].kind == nkCast
+
+  test "cast to unknown typedef with literal operand":
+    let n = parseC("int x = (NI)0;")
+    check n[2][1].kind == nkCast
+    check n[2][1][0].name == "NI"
+    check n[2][1][1].valInt == 0
+
+  test "double-paren unknown cast":
+    let n = parseC("int x = ((NI)0);")
+    check n[2][1].kind == nkCast
+    check n[2][1][0].name == "NI"
+    check n[2][1][1].valInt == 0
+
+  test "nimcache-style nested casts":
+    let n = parseC("result = (NI)(x_p0 - ((NI)1));")
+    check n[2].kind == nkCast
+    check n[2][0].name == "NI"
+    check n[2][1].kind == nkInfix
+    check n[2][1][2].kind == nkCast
+    check n[2][1][2][1].valInt == 1
+
+  test "unknown multiply stays a group":
+    let n = parseC("r = (a*b);")
+    check n[2].kind == nkInfix
+    check n[2][0].name == "*"
+    check n[2][1].name == "a"
+    check n[2][2].name == "b"
+
+  test "unknown paren operand becomes a cast":
+    # `(a)(b)` is ambiguous without a symbol table; an unknown name in
+    # type position reads as a cast (consistent with header typedefs
+    # like `(NI)(x)`). Genuine calls use `(*fp)(x)` / `((T)fn)(args)`.
+    let n = parseC("r = (a)(b);")
+    check n[2].kind == nkCast
+    check n[2][0].name == "a"
+    check n[2][1].name == "b"
+
+  test "deref call stays a call":
+    let n = parseC("r = (*fp)(x);")
+    check n[2].kind == nkCall
+    check n[2][0].kind == nkPrefix
+    check n[2][0][0].name == "*"
+    check n[2][1].name == "x"
+
+  test "cast proc then call":
+    let n = parseC("r = ((tyProc__x)fn)(a0);")
+    check n[2].kind == nkCall
+    check n[2][0].kind == nkCast
+    check n[2][0][0].name == "tyProc__x"
+    check n[2][1].name == "a0"
 
   test "sizeof bare type":
     let n = parseC("int n = sizeof(int);")
@@ -693,18 +814,74 @@ suite "C initializers":
     let n = parseC("int a[] = {1, 2};")
     check n[2][0].kind == nkBracketExpr
     check n[2][0][1].kind == nkEmpty
-    check n[2][1].kind == nkBlock
+    check n[2][1].kind == nkArrayLit
+    check n[2][1].len == 2
 
   test "sized array initializer":
     let n = parseC("int arr[3] = {1};")
     check n[2][0][1].valInt == 3
-    check n[2][1].kind == nkBlock
+    check n[2][1].kind == nkArrayLit
     check n[2][1][0].kind == nkLitInt
 
-  test "multi-element init holds comma list":
+  test "multi-element init holds flat elements":
     let n = parseC("int a[3] = {1, 2, 3};")
-    check n[2][1][0].kind == nkStatement
-    check n[2][1][0][0].name == "comma"
+    check n[2][1].kind == nkArrayLit
+    check n[2][1].len == 3
+    check n[2][1][2].valInt == 3
+
+  test "nested initializer lists":
+    let n = parseC("int x[2] = {{1}, {2}};")
+    check n[2][1].kind == nkArrayLit
+    check n[2][1].len == 2
+    check n[2][1][0].kind == nkArrayLit
+    check n[2][1][0][0].valInt == 1
+    check n[2][1][1][0].valInt == 2
+
+  test "designated initializer":
+    let n = parseC("struct P { int x; int y; } p = {.x = 1, .y = 2};")
+    check n[3][1].kind == nkArrayLit
+    check n[3][1][0].kind == nkColonExpr
+    check n[3][1][0][0].name == "x"
+    check n[3][1][0][1].valInt == 1
+
+suite "C integer literals":
+  test "C integer suffixes fold into the literal":
+    check parseC("int a = 1U;")[2][1].valInt == 1
+    check parseC("int a = 8L;")[2][1].valInt == 8
+    check parseC("int a = 100UL;")[2][1].valInt == 100
+    check parseC("int a = 100ULL;")[2][1].valInt == 100
+    check parseC("int a = 7lu;")[2][1].valInt == 7
+    check parseC("int a = 9ll;")[2][1].valInt == 9
+    check parseC("int a = 0xFFUL;")[2][1].valInt == 255
+    check parseC("int a = 0b101U;")[2][1].valInt == 5
+
+  test "hex digits that look like suffixes survive":
+    check parseC("int a = 0xF;")[2][1].valInt == 15
+    check parseC("int a = 0xBEEF;")[2][1].valInt == 48879
+    check parseC("int a = 0xFUL;")[2][1].valInt == 15
+
+  test "cast with suffixed operand":
+    let n = parseC("x = (NU64)(1ULL);")
+    check n[2].kind == nkCast
+    check n[2][0].name == "NU64"
+    check n[2][1].valInt == 1
+
+  test "suffixed zero comparison":
+    let n = parseC("x = (a == 0ULL);")
+    check n[2][0].name == "=="
+    check n[2][1].name == "a"
+    check n[2][2].valInt == 0
+
+  test "out-of-range decimal becomes bigint":
+    let n = parseC("x = 18446744073709551615ULL;")
+    check n[2].kind == nkLitBigInt
+    check n[2].valBigInt == "18446744073709551615ULL"
+
+  test "full-range hex wraps like int64":
+    check parseC("x = 0xFFFFFFFFFFFFFFFF;")[2].valInt == -1
+
+  test "float f suffix":
+    check parseC("float f = 1.5f;")[2][1].valFloat == 1.5
 
 suite "C preprocessor":
   test "includes":

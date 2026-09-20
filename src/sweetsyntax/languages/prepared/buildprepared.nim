@@ -58,6 +58,10 @@ macro buildPrepared*(yamlPath: static string): untyped =
   if spec.extended_numbers:
     body.add parseStmt("t.extendedNumbers = true")
 
+  # C-style integer/float suffixes (`1U`, `100ULL`, `1.5f`)
+  if spec.int_suffixes:
+    body.add parseStmt("t.intSuffixes = true")
+
   # open/close tags
   if spec.open_tag.isSome:
     body.add parseStmt("t.openTag = some(" & q(spec.open_tag.get) & ")")

@@ -208,6 +208,31 @@ proc parseEnumBody(p: var GenericParser): Node =
       break
   p.expectWalk("}")
 
+proc cAnonBodyKind(specifiers: seq[string]): string =
+  ## If the last specifier is `struct`/`union`/`enum` (bare or tagged:
+  ## `struct Tag`), a `{...}` body may follow (anonymous definition).
+  if specifiers.len == 0:
+    return ""
+  let last = specifiers[^1]
+  for k in ["struct", "union", "enum"]:
+    if last == k or last.startsWith(k & " "):
+      return k
+  ""
+
+proc parseCStructBodyOpt(p: var GenericParser, stmtNode: Node,
+                         specifiers: seq[string]) =
+  ## After declaration specifiers, an anonymous `struct`/`union`/`enum`
+  ## `{...}` body (`typedef struct {...} T;`,
+  ## `static const struct {...} x = ...;`): parse and attach it flat
+  ## (like `parseStructUnionDecl`'s anonymous case) so the following
+  ## declarator doesn't choke on `{`.
+  if specifiers.len > 0 and p.curr.kind == tkPunct and p.curr.value == "{":
+    let kind = cAnonBodyKind(specifiers)
+    if kind.len > 0:
+      stmtNode.children.add(
+        if kind == "enum": parseEnumBody(p)
+        else: parseStructBody(p))
+
 proc parseStructUnionDecl(p: var GenericParser, kind: string): Node =
   let kwTk = p.curr
   result = Node(kind: nkStatement).stamp(kwTk)
@@ -257,10 +282,9 @@ proc parseStructUnionDecl(p: var GenericParser, kind: string): Node =
       var init: Node
       if p.curr.kind == tkPunct and p.curr.value == "=":
         walk p
-        init = if p.curr.kind == tkPunct and p.curr.value == "{":
-                 parseBlock(p)
-               else:
-                 parseExpression(p, 0)
+        # `{...}` routes to parseCInitializer via the brace handler
+        # (nested lists and designators included).
+        init = parseExpression(p, 0)
       else:
         init = newEmptyNode()
       result.children.add(Node(kind: nkIdentDefs, children: @[decl, init]).stampFrom(decl))
@@ -279,10 +303,7 @@ proc parseStructUnionDecl(p: var GenericParser, kind: string): Node =
       var init: Node
       if p.curr.kind == tkPunct and p.curr.value == "=":
         walk p
-        init = if p.curr.kind == tkPunct and p.curr.value == "{":
-                 parseBlock(p)
-               else:
-                 parseExpression(p, 0)
+        init = parseExpression(p, 0)
       else:
         init = newEmptyNode()
       result.children.add(Node(kind: nkIdentDefs, children: @[decl, init]).stampFrom(decl))
@@ -334,109 +355,202 @@ proc cTypeNode(names: seq[string], ptrs: int, line = 0, col = 0): Node =
     result = Node(kind: nkPrefix,
       children: @[Node(kind: nkIdent, name: "*").stamp(line, col), inner]).stamp(line, col)
 
-proc tryParseCCast(p: var GenericParser): Node =
-  ## Speculatively parse `(type)operand` (C cast) or a bare `(type)`
-  ## (as in `sizeof(int)`). Returns nil with the parser rewound when the
-  ## parens hold a plain expression instead.
+type
+  CParenScan = object
+    ## Lookahead verdict for `( ... )`: does the paren content form a C
+    ## type name (specifiers / known typedef + abstract declarator)?
+    isType*: bool
+    typeKnown*: bool
+    typeNames*: seq[string]
+    ptrs*: int
+    isOperand*: bool
+      ## The token after `)` starts a cast operand (`(T)expr`).
+    isDelim*: bool
+      ## The token after `)` is a delimiter: a bare `(T)` (as in
+      ## `sizeof(int)`), valid only for known types.
+
+proc scanCParen(p: var GenericParser): CParenScan =
+  ## Read-only lookahead: is `(...)` a C cast or a bare `(T)` type?
+  ##
+  ## Saves the lexer + token window, scans the potential type
+  ## (`parseCSpecifiers`, one optional type name, `*` quals and balanced
+  ## `[...]` / `(...)` abstract-declarator chunks, closing `)`),
+  ## classifies the follower, then restores everything via `finally`.
+  ## Builds no AST and parses no operand — `parseCCast` below parses
+  ## exactly once down the decided path, so there is no
+  ## speculative-parse-and-rewind fallback.
   ##
   ## Like a real C frontend this consults the typedef table: a bare
   ## `(name)` is a type only for known specifiers (`unsigned`,
   ## `struct event_base`, ...) or previously declared typedefs
   ## (`ev_uintptr_t`), so `if (x) foo()` and `(a)*b` still parse as
   ## groups while `(T*)p` and `(ev_uintptr_t)e->ptr` become casts.
-  let mark = (lex: markLexer(p.lexer), prev: p.prev,
-              curr: p.curr, next: p.next)
-  template rewind(): Node =
-    restoreLexer(p.lexer, mark.lex)
-    p.prev = mark.prev
-    p.curr = mark.curr
-    p.next = mark.next
-    nil
-  walk p # consume '('
-  if p.curr.kind == tkPunct and p.curr.value == ")":
-    return rewind() # `()` — a group, handled by the caller
-  let names = parseCSpecifiers(p)
-  let hadSpecs = names.len > 0
-  var typeNames = names
-  if not hadSpecs:
-    if p.curr.kind == tkIdentifier and
-       not p.stmtKeywords.hasKey(p.curr.value):
-      typeNames.add(p.curr.value)
-      walk p
-    else:
-      return rewind()
-  let typeKnown = hadSpecs or (typeNames[0] in cTypedefNames)
-  # Abstract declarator: pointers (with quals) and balanced
-  # `[...]` / `(...)` chunks (arrays, function-pointer params).
-  var ptrs = 0
-  while true:
-    if p.curr.kind == tkPunct and p.curr.value == "*":
-      inc ptrs
-      walk p
-      while p.curr.kind == tkIdentifier and p.curr.value in
-            ["const", "volatile", "restrict", "_Atomic"]:
+  let markLex = markLexer(p.lexer)
+  let markPrev = p.prev
+  let markCurr = p.curr
+  let markNext = p.next
+  try:
+    walk p # consume '('
+    if p.curr.kind == tkPunct and p.curr.value == ")":
+      return result # `()` — empty group
+    let names = parseCSpecifiers(p)
+    let hadSpecs = names.len > 0
+    result.typeNames = names
+    if not hadSpecs:
+      if p.curr.kind == tkIdentifier and
+         not p.stmtKeywords.hasKey(p.curr.value):
+        result.typeNames.add(p.curr.value)
         walk p
-    elif p.curr.kind == tkPunct and
-         (p.curr.value == "[" or p.curr.value == "("):
-      let open = p.curr.value
-      let close = if open == "[": "]" else: ")"
-      var depth = 0
-      while true:
-        if p.curr.kind == tkEOF:
-          return rewind()
-        if p.curr.kind == tkPunct:
-          if p.curr.value == open:
-            inc depth
-          elif p.curr.value == close:
-            dec depth
-            if depth == 0:
-              walk p
-              break
-        walk p
-    else:
-      break
-  if p.curr.kind == tkPunct and p.curr.value == ")":
-    walk p
-  else:
-    return rewind()
-  var isOperand = false
-  var isDelim = false
-  case p.curr.kind
-  of tkIdentifier:
-    if not p.stmtKeywords.hasKey(p.curr.value):
-      if typeKnown:
-        isOperand = true
       else:
+        return result # expression start, not a type
+    result.typeKnown = hadSpecs or (result.typeNames[0] in cTypedefNames)
+    # Abstract declarator: pointers (with quals) and balanced
+    # `[...]` / `(...)` chunks (arrays, function-pointer params).
+    while true:
+      if p.curr.kind == tkPunct and p.curr.value == "*":
+        inc result.ptrs
+        walk p
+        while p.curr.kind == tkIdentifier and p.curr.value in
+              ["const", "volatile", "restrict", "_Atomic"]:
+          walk p
+      elif p.curr.kind == tkPunct and
+           (p.curr.value == "[" or p.curr.value == "("):
+        let open = p.curr.value
+        let close = if open == "[": "]" else: ")"
+        var depth = 0
+        while true:
+          if p.curr.kind == tkEOF:
+            return result
+          if p.curr.kind == tkPunct:
+            if p.curr.value == open:
+              inc depth
+            elif p.curr.value == close:
+              dec depth
+              if depth == 0:
+                walk p
+                break
+          walk p
+      else:
+        break
+    if not (p.curr.kind == tkPunct and p.curr.value == ")"):
+      result.isType = false
+      return result # no closing ')' — not a type
+    walk p # consume ')'
+    result.isType = true
+    let afterIf = markPrev.kind == tkIdentifier and
+                  markPrev.value in ["if", "while", "for", "switch"]
+    case p.curr.kind
+    of tkIdentifier:
+      if not p.stmtKeywords.hasKey(p.curr.value):
         # Unknown `(x) ident`: a cast in expression continuations
         # (`= (T)p`, `f((T)p)`, `return (T)p`), but a condition group
         # after `if`/`while`/`for`/`switch` (`if (x) foo()`).
-        isOperand = not (mark.prev.kind == tkIdentifier and
-                         mark.prev.value in ["if", "while", "for", "switch"])
-  of tkInt, tkFloat, tkString, tkHex, tkOctal, tkBinary, tkBigInt,
-     tkChar, tkRegex:
-    isOperand = typeKnown
-  of tkPunct:
-    if p.curr.value == "(" or p.curr.value == "{":
-      isOperand = typeKnown
-    elif p.curr.value in [",", ";", ")", "]", "}"]:
-      isDelim = true
-    elif typeKnown and p.curr.value in ["&", "*", "-", "+", "!", "~"]:
-      # `(void*)&x`, `(int)-1`: a bare `(T)` is never a valid
-      # expression, so a unary operator after a known type always
-      # starts the cast operand (for unknown names `(a)-b` stays a
-      # group, i.e. binary minus).
-      isOperand = true
-  else:
-    discard
-  if isOperand:
-    let operand = parseExpression(p, 13)
-    result = Node(kind: nkPrefix, children: @[
-      Node(kind: nkIdent, name: "cast").stamp(mark.curr),
-      cTypeNode(typeNames, ptrs, mark.curr.line, mark.curr.col), operand]).stamp(mark.curr)
-  elif isDelim and typeKnown:
-    result = cTypeNode(typeNames, ptrs, mark.curr.line, mark.curr.col)
-  else:
-    return rewind()
+        result.isOperand = result.typeKnown or not afterIf
+    of tkInt, tkFloat, tkString, tkHex, tkOctal, tkBinary, tkBigInt,
+       tkChar, tkRegex:
+      # `(T)0`: two adjacent expressions are never valid C, so a
+      # literal after `)` always starts the cast operand (outside
+      # conditions).
+      result.isOperand = result.typeKnown or not afterIf
+    of tkPunct:
+      if p.curr.value == "(" or p.curr.value == "{":
+        # `(T)(x)`, `(T){...}`: same reasoning as literals.
+        result.isOperand = result.typeKnown or not afterIf
+      elif p.curr.value in [",", ";", ")", "]", "}"]:
+        result.isDelim = true
+      elif result.typeKnown and p.curr.value in ["&", "*", "-", "+", "!", "~"]:
+        # `(void*)&x`, `(int)-1`: a bare `(T)` is never a valid
+        # expression, so a unary operator after a known type always
+        # starts the cast operand (for unknown names `(a)-b` stays a
+        # group, i.e. binary minus).
+        result.isOperand = true
+    else:
+      discard
+  finally:
+    restoreLexer(p.lexer, markLex)
+    p.prev = markPrev
+    p.curr = markCurr
+    p.next = markNext
+
+proc parseCCast(p: var GenericParser): Node =
+  ## C `(type)operand` cast vs parenthesized `(expr)` group, decided
+  ## up-front by `scanCParen` lookahead. Parses exactly once — the cast
+  ## path replays the scanned type shape forward (guaranteed to match),
+  ## the group path parses `(expr)` / `(a, b)` inline. Never nil.
+  ##
+  ## Casts yield `nkCast [typeNode, operand]`; a bare `(T)` (as in
+  ## `sizeof(int)`) yields the type node itself.
+  let openTk = p.curr
+  let scan = scanCParen(p) # pure lookahead; parser state untouched
+  if scan.isType and (scan.isOperand or (scan.isDelim and scan.typeKnown)):
+    walk p # consume '('
+    var typeNames = parseCSpecifiers(p)
+    if typeNames.len == 0:
+      typeNames.add(p.curr.value)
+      walk p
+    var ptrs = 0
+    while true:
+      if p.curr.kind == tkPunct and p.curr.value == "*":
+        inc ptrs
+        walk p
+        while p.curr.kind == tkIdentifier and p.curr.value in
+              ["const", "volatile", "restrict", "_Atomic"]:
+          walk p
+      elif p.curr.kind == tkPunct and
+           (p.curr.value == "[" or p.curr.value == "("):
+        let open = p.curr.value
+        let close = if open == "[": "]" else: ")"
+        var depth = 0
+        while true:
+          if p.curr.kind == tkEOF:
+            error(p, "Unexpected EOF in cast type")
+          if p.curr.kind == tkPunct:
+            if p.curr.value == open:
+              inc depth
+            elif p.curr.value == close:
+              dec depth
+              if depth == 0:
+                walk p
+                break
+          walk p
+      else:
+        break
+    p.expectWalk(")")
+    let typeNode = cTypeNode(typeNames, ptrs, openTk.line, openTk.col)
+    if scan.isOperand:
+      let operand = parseExpression(p, 13)
+      return Node(kind: nkCast,
+        children: @[typeNode, operand]).stamp(openTk)
+    return typeNode
+  # Parenthesized group: `(expr)`, `(a, b)`, `(name: T)` tuple-ish forms.
+  walk p # consume '('
+  while p.curr.kind in {tkComment, tkDocComment}:
+    discard parseCommentGeneric(p)
+  if p.curr.kind == tkPunct and p.curr.value == ")":
+    walk p
+    return Node(kind: nkEmpty)
+  var items: seq[Node] = @[]
+  let savedInParenGroup = p.inParenGroup
+  p.inParenGroup = true
+  items.add(parseExpression(p, 0))
+  if p.curr.kind == tkPunct and p.curr.value == ":":
+    walk p
+    items[^1] = Node(kind: nkColonExpr,
+      children: @[items[^1], parseExpression(p, 0)]).stampFrom(items[^1])
+  while p.curr.kind == tkPunct and p.curr.value in [",", ";"]:
+    walk p
+    while p.curr.kind in {tkComment, tkDocComment}:
+      discard parseCommentGeneric(p)
+    items.add(parseExpression(p, 0))
+    if p.curr.kind == tkPunct and p.curr.value == ":":
+      walk p
+      items[^1] = Node(kind: nkColonExpr,
+        children: @[items[^1], parseExpression(p, 0)]).stampFrom(items[^1])
+  p.inParenGroup = savedInParenGroup
+  p.expectWalk(")")
+  if items.len == 1: items[0]
+  else: Node(kind: nkStatement,
+    children: @[Node(kind: nkIdent, name: "comma").stamp(openTk)] & items).stamp(openTk)
 
 proc cOperatorOperand(p: var GenericParser, minPrec: int = 0): Node =
   ## A bare operator where an operand is expected: comparison operators
@@ -457,10 +571,9 @@ proc parseCDeclOne(p: var GenericParser): Node =
   var init: Node
   if p.curr.kind == tkPunct and p.curr.value == "=":
     walk p
-    init = if p.curr.kind == tkPunct and p.curr.value == "{":
-             parseBlock(p)
-           else:
-             parseExpression(p, 0)
+    # `{...}` routes to parseCInitializer via the brace handler
+    # (nested lists and designators included).
+    init = parseExpression(p, 0)
   else:
     init = newEmptyNode()
 
@@ -536,13 +649,9 @@ proc cHandlers*(p: var GenericParser) =
       result = nil
 
   prefixHandler p, "(":
-    ## C cast `(type)expr` vs parenthesized `(expr)`: speculate, and
-    ## fall back to the generic group on rewind.
-    let castNode = tryParseCCast(p)
-    if castNode != nil:
-      result = castNode
-    else:
-      result = parseGroupExpr(p)
+    ## C cast `(type)expr` vs parenthesized `(expr)`, decided by
+    ## lookahead inside `parseCCast` (single pass, no fallback).
+    result = parseCCast(p)
 
   prefixHandler p, "#":
     ## Preprocessor directive: skip the whole logical line and keep the
@@ -595,6 +704,8 @@ proc cHandlers*(p: var GenericParser) =
 
     for s in specifiers:
       result.children.add(Node(kind: nkIdent, name: s).stampFrom(result))
+
+    parseCStructBodyOpt(p, result, specifiers)
 
     let fnNode = parseCDeclRest(p, result)
     if fnNode != nil:
@@ -784,6 +895,7 @@ proc cHandlers*(p: var GenericParser) =
     let specifiers = parseCSpecifiers(p)
     for s in specifiers:
       result.children.add(Node(kind: nkIdent, name: s).stampFrom(result))
+    parseCStructBodyOpt(p, result, specifiers)
     var first = true
     while true:
       if not first:
@@ -851,11 +963,7 @@ proc cHandlers*(p: var GenericParser) =
     result = Node(kind: nkPrefix,
       children: @[Node(kind: nkIdent, name: "sizeof").stamp(kwTk)]).stamp(kwTk)
     if p.curr.kind == tkPunct and p.curr.value == "(":
-      let castNode = tryParseCCast(p)
-      if castNode != nil:
-        result.children.add(castNode)
-      else:
-        result.children.add(parseGroupExpr(p))
+      result.children.add(parseCCast(p))
     else:
       result.children.add(parseExpression(p, 13))
 

@@ -12,6 +12,8 @@ block_comment:
   - '/*'
   - '*/'
 
+int_suffixes: true
+
 symbols:
   plus: '+'
   minus: '-'

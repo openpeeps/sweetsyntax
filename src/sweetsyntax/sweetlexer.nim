@@ -63,6 +63,9 @@ type
     extendedNumbers*: bool
       # Go-style number literals: imaginary suffix (`1i`, `0x1p-2i`),
       # hex floats (`0x1p-2`), trailing-dot floats (`1.`)
+    intSuffixes*: bool
+      # C-style integer/float suffixes folded into number tokens
+      # (`1U`, `100ULL`, `0xFFL`, `1.5f`)
     openTag*: Option[string]
     closeTag*: Option[string]
     features*: set[LanguageFeature]
@@ -243,8 +246,8 @@ proc getTokenValue*(l: SweetLexer, tok: Token): string {.inline.} =
 
 type
   LexerMark* = object
-    ## Opaque snapshot of the lexer's mutable scan state, for speculative
-    ## parsing with rewind (e.g. C `(type)expr` casts vs `(expr)` groups).
+    ## Opaque snapshot of the lexer's mutable scan state, for read-only
+    ## lookahead (e.g. the C cast-vs-group paren scan).
     pos*, line*, col*: int
     current*: char
     expectRegex*, tagTerminated*: bool
@@ -560,6 +563,44 @@ proc scanHeredoc(l: var SweetLexer, startPos, startLine, startCol: int): Token =
   result = l.makeRange(tkString, startPos, startLine, startCol)
   result.attr.addAttrOnce("heredoc")
 
+proc scanIntSuffixLen(l: SweetLexer): int =
+  ## Length of a C integer suffix at the current position, or 0.
+  ## Valid shapes (case-insensitive): `u`, `l`, `ul`, `lu`, `ll`,
+  ## `ull`, `llu` — and the suffix must not run into more identifier
+  ## characters (`1Length` stays `1` + `Length`, an error downstream
+  ## just like a real C frontend). Peek-only; advances nothing.
+  var uCount = 0
+  var lCount = 0
+  while true:
+    case l.charAt(l.pos + result)
+    of 'u', 'U':
+      if uCount > 0: break
+      inc uCount
+    of 'l', 'L':
+      if lCount >= 2: break
+      inc lCount
+    else: break
+    inc result
+  if result == 0: return 0
+  if l.charAt(l.pos + result).isIdentPart(): return 0
+
+proc consumeIntSuffix(l: var SweetLexer) {.inline.} =
+  ## Fold a C integer suffix into the current number token, if the
+  ## `int_suffixes` spec flag is on. No-op for other languages.
+  if l.intSuffixes:
+    for i in 0 ..< l.scanIntSuffixLen():
+      discard l.advance()
+
+proc consumeFloatSuffix(l: var SweetLexer) {.inline.} =
+  ## Fold a C float suffix (`f`/`F`, plus `l`/`L` long double via the
+  ## integer-suffix scan) into the current number token. No-op unless
+  ## the `int_suffixes` spec flag is on.
+  if l.intSuffixes:
+    if l.current in {'f', 'F'} and not l.peek().isIdentPart():
+      discard l.advance()
+    else:
+      l.consumeIntSuffix()
+
 proc getToken*(l: var SweetLexer): Token =
   ## Retrieve the next token from the input stream, advancing the lexer's position
   if l.enableFilters: l.prepareFilters() # Ensure filters are prepared if enabled
@@ -687,6 +728,7 @@ proc getToken*(l: var SweetLexer): Token =
           discard l.advance()
           while l.current.isIdentPart():
             discard l.advance()
+        l.consumeIntSuffix()
         if not isBigInt and l.extendedNumbers and l.current == 'i' and
            not l.peek().isIdentPart():
           # Imaginary `0xFFi`
@@ -706,6 +748,7 @@ proc getToken*(l: var SweetLexer): Token =
           discard l.advance()
           while l.current.isIdentPart():
             discard l.advance()
+        l.consumeIntSuffix()
         if not isBigInt and l.extendedNumbers and l.current == 'i' and
            not l.peek().isIdentPart():
           # Imaginary `0o17i`
@@ -725,6 +768,7 @@ proc getToken*(l: var SweetLexer): Token =
           discard l.advance()
           while l.current.isIdentPart():
             discard l.advance()
+        l.consumeIntSuffix()
         if not isBigInt and l.extendedNumbers and l.current == 'i' and
            not l.peek().isIdentPart():
           # Imaginary `0b101i`
@@ -804,6 +848,11 @@ proc getToken*(l: var SweetLexer): Token =
       discard l.advance()
       while l.current.isIdentPart():
         discard l.advance()
+
+    # C integer suffix (`1U`, `100ULL`) and float suffix (`1.5f`).
+    l.consumeIntSuffix()
+    if isFloat:
+      l.consumeFloatSuffix()
 
     return l.makeRange(
       if isFloat: tkFloat else: tkInt,
@@ -1051,6 +1100,7 @@ proc initLexerFromFile*(spec: SweetSpec, path: string, enableFilters: bool = fal
     trailingBangQuestion: spec.trailing_bang_question,
     rawStrings: spec.raw_strings,
     extendedNumbers: spec.extended_numbers,
+    intSuffixes: spec.int_suffixes,
     openTag: spec.open_tag,
     closeTag: spec.close_tag,
     filters: spec.filters,
@@ -1103,6 +1153,7 @@ proc initLexerFromFile*(pre: SweetLexerInit, path: string, enableFilters: bool =
     trailingBangQuestion: pre.trailingBangQuestion,
     rawStrings: pre.rawStrings,
     extendedNumbers: pre.extendedNumbers,
+    intSuffixes: pre.intSuffixes,
     openTag: pre.openTag,
     closeTag: pre.closeTag,
     features: pre.features,
@@ -1135,6 +1186,7 @@ proc initLexer*(spec: SweetSpec, input: sink string, enableFilters: bool = false
     trailingBangQuestion: spec.trailing_bang_question,
     rawStrings: spec.raw_strings,
     extendedNumbers: spec.extended_numbers,
+    intSuffixes: spec.int_suffixes,
     openTag: spec.open_tag,
     closeTag: spec.close_tag,
     filters: spec.filters,
@@ -1184,6 +1236,7 @@ proc initLexer*(pre: SweetLexerInit, input: sink string, enableFilters: bool = f
     trailingBangQuestion: pre.trailingBangQuestion,
     rawStrings: pre.rawStrings,
     extendedNumbers: pre.extendedNumbers,
+    intSuffixes: pre.intSuffixes,
     openTag: pre.openTag,
     closeTag: pre.closeTag,
     features: pre.features,
@@ -1217,6 +1270,7 @@ proc initLexerFromMemFile*(spec: SweetSpec, mf: MemFile, path: string = "", enab
     trailingBangQuestion: spec.trailing_bang_question,
     rawStrings: spec.raw_strings,
     extendedNumbers: spec.extended_numbers,
+    intSuffixes: spec.int_suffixes,
     openTag: spec.open_tag,
     closeTag: spec.close_tag,
     filters: spec.filters,

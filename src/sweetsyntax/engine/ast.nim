@@ -32,6 +32,8 @@ type
     nkBracketExpr
     nkColonExpr
     nkCall
+    nkCast
+      ## C-style cast: `[typeNode, operand]` (`(int)x`, `(T*)p`).
     nkRegex
     nkReturn
 
