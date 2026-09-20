@@ -16,10 +16,10 @@
 <link rel="icon" type="image/png" sizes="32x32" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAABmJLR0QA/wD/AP+gvaeTAAAACXBIWXMAAA3XAAAN1wFCKJt4AAAAB3RJTUUH4QQQEwksSS9ZWwAAAk1JREFUWMPtll2ITVEUx39nn/O7Y5qR8f05wtCUUr6ZIS++8pEnkZInPImneaCQ5METNdOkeFBKUhMPRIkHKfEuUZSUlGlKPN2TrgfncpvmnntnmlEyq1Z7t89/rf9a6+y99oZxGZf/XeIq61EdtgKXgdXA0xrYAvBjOIF1AI9zvjcC74BSpndrJPkBWDScTF8Aa4E3wDlgHbASaANmVqlcCnwHvgDvgVfAJ+AikAAvgfVZwLnSVZHZaOuKoQi3ZOMi4NkYkpe1p4J7A8BpYAD49hfIy/oqG0+hLomiKP2L5L+1ubn5115S+3OAn4EnwBlgMzCjyt6ZAnQCJ4A7wOs88iRJHvw50HoujuPBoCKwHWiosy8MdfZnAdcHk8dxXFJ3VQbQlCTJvRBCGdRbD4M6uc5glpY3eAihpN5S5w12diSEcCCEcKUO4ljdr15T76ur1FDDLIQQ3qv71EdDOe3Kxj3leRXyk+pxdWnFWod6Wt2bY3de3aSuUHcPBVimHs7mK9WrmeOF6lR1o9qnzskh2ar2qm1qizpfXaPeVGdlmGN5pb09qMxz1Xb1kLqgzn1RyH7JUXW52lr5e/Kqi9qpto7V1atuUzfnARrV7jEib1T76gG2qxdGmXyiekkt1GswPTtek0aBfJp6YySGBfWg2tPQ0FAYgf1stUfdmdcjarbYJEniKIq6gY/Aw+zWHAC+p2labGpqiorFYgGYCEzN7oQdQClN07O1/EfDyGgC0ALMBdYAi4FyK+4H3gLPsxfR1zRNi+NP7nH5J+QntnXe5B5mpfQAAAAASUVORK5CYII=">
 
 <!-- CSS -->
-<link rel="stylesheet" type="text/css" href="../../nimdoc.out.css?v=2.2.10">
+<link rel="stylesheet" type="text/css" href="../../nimdoc.out.css?v=2.2.12">
 
 <!-- JS -->
-<script type="text/javascript" src="../../dochack.js?v=2.2.10"></script>
+<script type="text/javascript" src="../../dochack.js?v=2.2.12"></script>
 </head>
 <body>
   <div class="document" id="documentId">
@@ -92,7 +92,23 @@
                              ## with `}`), so the strict `;` check can be skipped for them.
   noSymbolArgCall*: bool ## When set, language-specific bare-call handlers must not treat a
                          ## leading `:` symbol as a call argument (used for Ruby `if x: ...`,
-                         ## hash keys and keyword arguments, which conflict with `attr_accessor :x`).">GenericParser</a></li>
+                         ## hash keys and keyword arguments, which conflict with `attr_accessor :x`).
+  inControlClause*: bool ## When set, a `{` after a bare TypeName-form operand (`T`, `pkg.T`,
+                         ## `T[P]`) does NOT start a composite literal: it opens the block of
+                         ## an `if`/`for`/`switch` header (cf. go/parser's `exprLev &lt; 0`).
+                         ## Structural literal types (`[]T`, `map[K]V`, `struct{...}`) still do.
+  funcDepth*: int ## Function-body nesting depth, maintained by language handlers that
+                  ## need declaration-context checks (e.g. Go rejects nested named
+                  ## function declarations and imports inside function bodies, while
+                  ## allowing anonymous function literals there). The engine itself
+                  ## never touches this counter.
+  inTypeContext*: bool ## In a type expression: `(` never starts call arguments. Set by
+                       ## language handlers around type parsing (Go conversions like
+                       ## `[]byte(s)` apply OUTSIDE the type: the call binds after the
+                       ## full `[]byte`, not inside its element type).
+  inParenGroup*: bool ## Inside a `(...)` group (set by parseGroupExpr): a `;` separates
+                      ## group items, so item parsers must not consume it as their own
+                      ## statement terminator (Nim `if (let x = ...; x):`, Ruby `(a; b)`).">GenericParser</a></li>
 <li><a class="reference" href="#OpenAstParsingError" title="OpenAstParsingError = object of CatchableError">OpenAstParsingError</a></li>
 <li><a class="reference" href="#ParsingCallback" title="ParsingCallback = proc (p: var GenericParser)">ParsingCallback</a></li>
 <li><a class="reference" href="#PrefixHandler" title="PrefixHandler = proc (p: var GenericParser; minPrec: int = 0): Node {.closure.}">PrefixHandler</a></li>
@@ -149,6 +165,10 @@
   <li><a class="reference" href="#parseGroupExpr%2CGenericParser%2Cint" title="parseGroupExpr(p: var GenericParser; minPrec: int = 0): Node">parseGroupExpr(p: var GenericParser; minPrec: int = 0): Node</a></li>
 
 </ul>
+<ul class="simple nested-toc-section">parseHexFloat
+  <li><a class="reference" href="#parseHexFloat%2Cstring" title="parseHexFloat(s: string): float">parseHexFloat(s: string): float</a></li>
+
+</ul>
 <ul class="simple nested-toc-section">parseIndentBlock
   <li><a class="reference" href="#parseIndentBlock%2CGenericParser" title="parseIndentBlock(p: var GenericParser): Node">parseIndentBlock(p: var GenericParser): Node</a></li>
 
@@ -165,6 +185,10 @@
 </ul>
 <ul class="simple nested-toc-section">parseStatement
   <li><a class="reference" href="#parseStatement%2CGenericParser%2Cint" title="parseStatement(p: var GenericParser; parentCol: int = -1): Node">parseStatement(p: var GenericParser; parentCol: int = -1): Node</a></li>
+
+</ul>
+<ul class="simple nested-toc-section">stampMissing
+  <li><a class="reference" href="#stampMissing%2CNode%2CTokenTuple" title="stampMissing(n: Node; tk: TokenTuple): Node">stampMissing(n: Node; tk: TokenTuple): Node</a></li>
 
 </ul>
 <ul class="simple nested-toc-section">walk
@@ -264,7 +288,23 @@
                              <span class="Comment">## with `}`), so the strict `;` check can be skipped for them.</span>
   <span class="Identifier">noSymbolArgCall</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">bool</span> <span class="Comment">## When set, language-specific bare-call handlers must not treat a</span>
                          <span class="Comment">## leading `:` symbol as a call argument (used for Ruby `if x: ...`,</span>
-                         <span class="Comment">## hash keys and keyword arguments, which conflict with `attr_accessor :x`).</span></pre></dt>
+                         <span class="Comment">## hash keys and keyword arguments, which conflict with `attr_accessor :x`).</span>
+  <span class="Identifier">inControlClause</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">bool</span> <span class="Comment">## When set, a `{` after a bare TypeName-form operand (`T`, `pkg.T`,</span>
+                         <span class="Comment">## `T[P]`) does NOT start a composite literal: it opens the block of</span>
+                         <span class="Comment">## an `if`/`for`/`switch` header (cf. go/parser's `exprLev &lt; 0`).</span>
+                         <span class="Comment">## Structural literal types (`[]T`, `map[K]V`, `struct{...}`) still do.</span>
+  <span class="Identifier">funcDepth</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">int</span> <span class="Comment">## Function-body nesting depth, maintained by language handlers that</span>
+                  <span class="Comment">## need declaration-context checks (e.g. Go rejects nested named</span>
+                  <span class="Comment">## function declarations and imports inside function bodies, while</span>
+                  <span class="Comment">## allowing anonymous function literals there). The engine itself</span>
+                  <span class="Comment">## never touches this counter.</span>
+  <span class="Identifier">inTypeContext</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">bool</span> <span class="Comment">## In a type expression: `(` never starts call arguments. Set by</span>
+                       <span class="Comment">## language handlers around type parsing (Go conversions like</span>
+                       <span class="Comment">## `[]byte(s)` apply OUTSIDE the type: the call binds after the</span>
+                       <span class="Comment">## full `[]byte`, not inside its element type).</span>
+  <span class="Identifier">inParenGroup</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">bool</span> <span class="Comment">## Inside a `(...)` group (set by parseGroupExpr): a `;` separates</span>
+                      <span class="Comment">## group items, so item parsers must not consume it as their own</span>
+                      <span class="Comment">## statement terminator (Nim `if (let x = ...; x):`, Ruby `(a; b)`).</span></pre></dt>
   <dd>
     
     
@@ -362,7 +402,8 @@
 <div id="expectWalk-procs-all">
   <div id="expectWalk,GenericParser,string,string">
   <dt><pre><span class="Keyword">proc</span> <a href="#expectWalk%2CGenericParser%2Cstring%2Cstring"><span class="Identifier">expectWalk</span></a><span class="Other">(</span><span class="Identifier">p</span><span class="Other">:</span> <span class="Keyword">var</span> <a href="#GenericParser"><span class="Identifier">GenericParser</span></a><span class="Other">;</span> <span class="Identifier">val</span><span class="Other">:</span> <span class="Identifier">string</span><span class="Other">;</span> <span class="Identifier">msg</span><span class="Other">:</span> <span class="Identifier">string</span> <span class="Other">=</span> <span class="StringLit">&quot;&quot;</span><span class="Other">)</span> {.
-    <span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">KeyError</span><span class="Other">,</span> <span class="Identifier">OpenAstParsingError</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">RootEffect</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
+    <span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">KeyError</span><span class="Other">,</span> <span class="Identifier">Exception</span><span class="Other">,</span> <span class="Identifier">OpenAstParsingError</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">RootEffect</span><span class="Other">]</span><span class="Other">,</span>
+    <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
   <dd>
     
     
@@ -374,7 +415,7 @@
 <div id="parseArrayLiteral-procs-all">
   <div id="parseArrayLiteral,GenericParser,int">
   <dt><pre><span class="Keyword">proc</span> <a href="#parseArrayLiteral%2CGenericParser%2Cint"><span class="Identifier">parseArrayLiteral</span></a><span class="Other">(</span><span class="Identifier">p</span><span class="Other">:</span> <span class="Keyword">var</span> <a href="#GenericParser"><span class="Identifier">GenericParser</span></a><span class="Other">;</span> <span class="Identifier">minPrec</span><span class="Other">:</span> <span class="Identifier">int</span> <span class="Other">=</span> <span class="DecNumber">0</span><span class="Other">)</span><span class="Other">:</span> <a href="ast.html#Node"><span class="Identifier">Node</span></a> {.
-    <span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">KeyError</span><span class="Other">,</span> <span class="Identifier">OpenAstParsingError</span><span class="Other">,</span> <span class="Identifier">Exception</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">RootEffect</span><span class="Other">]</span><span class="Other">,</span>
+    <span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">KeyError</span><span class="Other">,</span> <span class="Identifier">Exception</span><span class="Other">,</span> <span class="Identifier">OpenAstParsingError</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">RootEffect</span><span class="Other">]</span><span class="Other">,</span>
     <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
   <dd>
     
@@ -412,7 +453,7 @@
 <div id="parseCommentGeneric-procs-all">
   <div id="parseCommentGeneric,GenericParser,int">
   <dt><pre><span class="Keyword">proc</span> <a href="#parseCommentGeneric%2CGenericParser%2Cint"><span class="Identifier">parseCommentGeneric</span></a><span class="Other">(</span><span class="Identifier">p</span><span class="Other">:</span> <span class="Keyword">var</span> <a href="#GenericParser"><span class="Identifier">GenericParser</span></a><span class="Other">;</span> <span class="Identifier">minPrec</span><span class="Other">:</span> <span class="Identifier">int</span> <span class="Other">=</span> <span class="DecNumber">0</span><span class="Other">)</span><span class="Other">:</span> <a href="ast.html#Node"><span class="Identifier">Node</span></a> {.
-    <span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">KeyError</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">RootEffect</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
+    <span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">KeyError</span><span class="Other">,</span> <span class="Identifier">Exception</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">RootEffect</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
   <dd>
     
     
@@ -447,6 +488,18 @@
 </div>
 
 </div>
+<div id="parseHexFloat-procs-all">
+  <div id="parseHexFloat,string">
+  <dt><pre><span class="Keyword">proc</span> <a href="#parseHexFloat%2Cstring"><span class="Identifier">parseHexFloat</span></a><span class="Other">(</span><span class="Identifier">s</span><span class="Other">:</span> <span class="Identifier">string</span><span class="Other">)</span><span class="Other">:</span> <span class="Identifier">float</span> {.<span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">ValueError</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span>
+                                       <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
+  <dd>
+    
+    Parse a hexadecimal floating-point literal (<tt class="docutils literal"><span class="pre"><span class="HexNumber">0x1</span><span class="Operator">.</span><span class="DecNumber">8</span><span class="Identifier">p3</span></span></tt>, <tt class="docutils literal"><span class="pre"><span class="HexNumber">0x</span><span class="Operator">.</span><span class="DecNumber">8</span><span class="Identifier">p</span><span class="Operator">-</span><span class="DecNumber">1</span></span></tt>, <tt class="docutils literal"><span class="pre"><span class="HexNumber">0x1</span><span class="Identifier">P</span><span class="Operator">+</span><span class="DecNumber">2</span></span></tt>; underscores allowed). The lexer's <tt class="docutils literal"><span class="pre"><span class="Identifier">extended_numbers</span></span></tt> mode produces these as <tt class="docutils literal"><span class="pre"><span class="Identifier">tkFloat</span></span></tt>, but Nim's <tt class="docutils literal"><span class="pre"><span class="Identifier">parseFloat</span></span></tt> only handles decimal — so this mirrors it for base 16.
+    
+  </dd>
+</div>
+
+</div>
 <div id="parseIndentBlock-procs-all">
   <div id="parseIndentBlock,GenericParser">
   <dt><pre><span class="Keyword">proc</span> <a href="#parseIndentBlock%2CGenericParser"><span class="Identifier">parseIndentBlock</span></a><span class="Other">(</span><span class="Identifier">p</span><span class="Other">:</span> <span class="Keyword">var</span> <a href="#GenericParser"><span class="Identifier">GenericParser</span></a><span class="Other">)</span><span class="Other">:</span> <a href="ast.html#Node"><span class="Identifier">Node</span></a> {.
@@ -462,7 +515,7 @@
 <div id="parseObjectLiteral-procs-all">
   <div id="parseObjectLiteral,GenericParser,int">
   <dt><pre><span class="Keyword">proc</span> <a href="#parseObjectLiteral%2CGenericParser%2Cint"><span class="Identifier">parseObjectLiteral</span></a><span class="Other">(</span><span class="Identifier">p</span><span class="Other">:</span> <span class="Keyword">var</span> <a href="#GenericParser"><span class="Identifier">GenericParser</span></a><span class="Other">;</span> <span class="Identifier">minPrec</span><span class="Other">:</span> <span class="Identifier">int</span> <span class="Other">=</span> <span class="DecNumber">0</span><span class="Other">)</span><span class="Other">:</span> <a href="ast.html#Node"><span class="Identifier">Node</span></a> {.
-    <span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">KeyError</span><span class="Other">,</span> <span class="Identifier">OpenAstParsingError</span><span class="Other">,</span> <span class="Identifier">Exception</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">RootEffect</span><span class="Other">]</span><span class="Other">,</span>
+    <span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">KeyError</span><span class="Other">,</span> <span class="Identifier">Exception</span><span class="Other">,</span> <span class="Identifier">OpenAstParsingError</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">RootEffect</span><span class="Other">]</span><span class="Other">,</span>
     <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
   <dd>
     
@@ -476,7 +529,7 @@
   <div id="parseScript,string,ParsingCallback,set[LanguageFeature]">
   <dt><pre><span class="Keyword">proc</span> <a href="#parseScript%2Cstring%2CParsingCallback%2Cset%5BLanguageFeature%5D"><span class="Identifier">parseScript</span></a><span class="Other">(</span><span class="Identifier">path</span><span class="Other">:</span> <span class="Identifier">string</span><span class="Other">;</span> <span class="Identifier">parsingCallback</span><span class="Other">:</span> <a href="#ParsingCallback"><span class="Identifier">ParsingCallback</span></a> <span class="Other">=</span> <span class="Keyword">nil</span><span class="Other">;</span>
                  <span class="Identifier">features</span><span class="Other">:</span> <span class="Identifier">set</span><span class="Other">[</span><a href="../config.html#LanguageFeature"><span class="Identifier">LanguageFeature</span></a><span class="Other">]</span> <span class="Other">=</span> <span class="Other">{</span><span class="Other">}</span><span class="Other">)</span><span class="Other">:</span> <a href="ast.html#OpenAstProgram"><span class="Identifier">OpenAstProgram</span></a> {.
-    <span class="Identifier">discardable</span><span class="Other">,</span> <span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">KeyError</span><span class="Other">,</span> <span class="Identifier">ValueError</span><span class="Other">,</span> <span class="Identifier">OpenParserYamlError</span><span class="Other">,</span> <span class="Identifier">Exception</span><span class="Other">,</span>
+    <span class="Identifier">discardable</span><span class="Other">,</span> <span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">OpenParserYamlError</span><span class="Other">,</span> <span class="Identifier">ValueError</span><span class="Other">,</span> <span class="Identifier">KeyError</span><span class="Other">,</span> <span class="Identifier">Exception</span><span class="Other">,</span>
                           <span class="Identifier">IOError</span><span class="Other">,</span> <span class="Identifier">OpenAstParsingError</span><span class="Other">]</span><span class="Other">,</span>
     <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">RootEffect</span><span class="Other">,</span> <span class="Identifier">ReadIOEffect</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
   <dd>
@@ -500,10 +553,22 @@
 </div>
 
 </div>
+<div id="stampMissing-procs-all">
+  <div id="stampMissing,Node,TokenTuple">
+  <dt><pre><span class="Keyword">proc</span> <a href="#stampMissing%2CNode%2CTokenTuple"><span class="Identifier">stampMissing</span></a><span class="Other">(</span><span class="Identifier">n</span><span class="Other">:</span> <a href="ast.html#Node"><span class="Identifier">Node</span></a><span class="Other">;</span> <span class="Identifier">tk</span><span class="Other">:</span> <a href="../tokenizer.html#TokenTuple"><span class="Identifier">TokenTuple</span></a><span class="Other">)</span><span class="Other">:</span> <a href="ast.html#Node"><span class="Identifier">Node</span></a> {.<span class="Identifier">discardable</span><span class="Other">,</span> <span class="Identifier">inline</span><span class="Other">,</span>
+    <span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
+  <dd>
+    
+    Generic fallback: if a language handler forgot to stamp its root node, anchor it at the token where the construct started instead of leaving <tt class="docutils literal"><span class="pre"><span class="Identifier">ln</span><span class="Punctuation">:</span> <span class="DecNumber">0</span><span class="Punctuation">,</span> <span class="Identifier">col</span><span class="Punctuation">:</span> <span class="DecNumber">0</span></span></tt>. Handlers that stamp precisely are untouched.
+    
+  </dd>
+</div>
+
+</div>
 <div id="walk-procs-all">
   <div id="walk,GenericParser,int">
-  <dt><pre><span class="Keyword">proc</span> <a href="#walk%2CGenericParser%2Cint"><span class="Identifier">walk</span></a><span class="Other">(</span><span class="Identifier">p</span><span class="Other">:</span> <span class="Keyword">var</span> <a href="#GenericParser"><span class="Identifier">GenericParser</span></a><span class="Other">;</span> <span class="Identifier">offset</span> <span class="Other">=</span> <span class="DecNumber">1</span><span class="Other">)</span> {.<span class="Identifier">inline</span><span class="Other">,</span> <span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">KeyError</span><span class="Other">]</span><span class="Other">,</span>
-    <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">RootEffect</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
+  <dt><pre><span class="Keyword">proc</span> <a href="#walk%2CGenericParser%2Cint"><span class="Identifier">walk</span></a><span class="Other">(</span><span class="Identifier">p</span><span class="Other">:</span> <span class="Keyword">var</span> <a href="#GenericParser"><span class="Identifier">GenericParser</span></a><span class="Other">;</span> <span class="Identifier">offset</span> <span class="Other">=</span> <span class="DecNumber">1</span><span class="Other">)</span> {.<span class="Identifier">inline</span><span class="Other">,</span>
+    <span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">KeyError</span><span class="Other">,</span> <span class="Identifier">Exception</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">RootEffect</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
   <dd>
     
     
@@ -514,8 +579,8 @@
 </div>
 <div id="walkOpt-procs-all">
   <div id="walkOpt,GenericParser,string">
-  <dt><pre><span class="Keyword">proc</span> <a href="#walkOpt%2CGenericParser%2Cstring"><span class="Identifier">walkOpt</span></a><span class="Other">(</span><span class="Identifier">p</span><span class="Other">:</span> <span class="Keyword">var</span> <a href="#GenericParser"><span class="Identifier">GenericParser</span></a><span class="Other">;</span> <span class="Identifier">val</span><span class="Other">:</span> <span class="Identifier">string</span><span class="Other">)</span> {.<span class="Identifier">inline</span><span class="Other">,</span> <span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">KeyError</span><span class="Other">]</span><span class="Other">,</span>
-    <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">RootEffect</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
+  <dt><pre><span class="Keyword">proc</span> <a href="#walkOpt%2CGenericParser%2Cstring"><span class="Identifier">walkOpt</span></a><span class="Other">(</span><span class="Identifier">p</span><span class="Other">:</span> <span class="Keyword">var</span> <a href="#GenericParser"><span class="Identifier">GenericParser</span></a><span class="Other">;</span> <span class="Identifier">val</span><span class="Other">:</span> <span class="Identifier">string</span><span class="Other">)</span> {.<span class="Identifier">inline</span><span class="Other">,</span>
+    <span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">KeyError</span><span class="Other">,</span> <span class="Identifier">Exception</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">RootEffect</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
   <dd>
     
     
@@ -573,7 +638,7 @@
       <div class="twelve-columns footer">
         <span class="nim-sprite"></span>
         <br>
-        <small style="color: var(--hint);">Made with Nim. Generated: 2026-08-26 16:30:31 UTC</small>
+        <small style="color: var(--hint);">Made with Nim. Generated: 2026-09-20 11:45:59 UTC</small>
       </div>
     </div>
   </div>

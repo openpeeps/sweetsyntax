@@ -16,10 +16,10 @@
 <link rel="icon" type="image/png" sizes="32x32" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAABmJLR0QA/wD/AP+gvaeTAAAACXBIWXMAAA3XAAAN1wFCKJt4AAAAB3RJTUUH4QQQEwksSS9ZWwAAAk1JREFUWMPtll2ITVEUx39nn/O7Y5qR8f05wtCUUr6ZIS++8pEnkZInPImneaCQ5METNdOkeFBKUhMPRIkHKfEuUZSUlGlKPN2TrgfncpvmnntnmlEyq1Z7t89/rf9a6+y99oZxGZf/XeIq61EdtgKXgdXA0xrYAvBjOIF1AI9zvjcC74BSpndrJPkBWDScTF8Aa4E3wDlgHbASaANmVqlcCnwHvgDvgVfAJ+AikAAvgfVZwLnSVZHZaOuKoQi3ZOMi4NkYkpe1p4J7A8BpYAD49hfIy/oqG0+hLomiKP2L5L+1ubn5115S+3OAn4EnwBlgMzCjyt6ZAnQCJ4A7wOs88iRJHvw50HoujuPBoCKwHWiosy8MdfZnAdcHk8dxXFJ3VQbQlCTJvRBCGdRbD4M6uc5glpY3eAihpN5S5w12diSEcCCEcKUO4ljdr15T76ur1FDDLIQQ3qv71EdDOe3Kxj3leRXyk+pxdWnFWod6Wt2bY3de3aSuUHcPBVimHs7mK9WrmeOF6lR1o9qnzskh2ar2qm1qizpfXaPeVGdlmGN5pb09qMxz1Xb1kLqgzn1RyH7JUXW52lr5e/Kqi9qpto7V1atuUzfnARrV7jEib1T76gG2qxdGmXyiekkt1GswPTtek0aBfJp6YySGBfWg2tPQ0FAYgf1stUfdmdcjarbYJEniKIq6gY/Aw+zWHAC+p2labGpqiorFYgGYCEzN7oQdQClN07O1/EfDyGgC0ALMBdYAi4FyK+4H3gLPsxfR1zRNi+NP7nH5J+QntnXe5B5mpfQAAAAASUVORK5CYII=">
 
 <!-- CSS -->
-<link rel="stylesheet" type="text/css" href="nimdoc.out.css?v=2.2.10">
+<link rel="stylesheet" type="text/css" href="nimdoc.out.css?v=2.2.12">
 
 <!-- JS -->
-<script type="text/javascript" src="dochack.js?v=2.2.10"></script>
+<script type="text/javascript" src="dochack.js?v=2.2.12"></script>
 </head>
 <body>
   <div class="document" id="documentId">
@@ -28,7 +28,7 @@
     <label for="nav-toggle" id="nav-overlay"></label>
     <div class="container">
       <h1 class="title">Index</h1>
-      Modules: <a href="index.html">sweetsyntax</a>, <a href="sweetsyntax/config.html">sweetsyntax/config</a>, <a href="sweetsyntax/engine/ast.html">sweetsyntax/engine/ast</a>, <a href="sweetsyntax/engine/parser.html">sweetsyntax/engine/parser</a>, <a href="sweetsyntax/languages/c.html">sweetsyntax/languages/c</a>, <a href="sweetsyntax/languages/js.html">sweetsyntax/languages/js</a>, <a href="sweetsyntax/languages/nim.html">sweetsyntax/languages/nim</a>, <a href="sweetsyntax/languages/php.html">sweetsyntax/languages/php</a>, <a href="sweetsyntax/languages/ruby.html">sweetsyntax/languages/ruby</a>, <a href="sweetsyntax/sweetlexer.html">sweetsyntax/sweetlexer</a>, <a href="sweetsyntax/tokenizer.html">sweetsyntax/tokenizer</a>.<br/><p /><h2>API symbols</h2>
+      Modules: <a href="index.html">sweetsyntax</a>, <a href="sweetsyntax/config.html">sweetsyntax/config</a>, <a href="sweetsyntax/engine/ast.html">sweetsyntax/engine/ast</a>, <a href="sweetsyntax/engine/parser.html">sweetsyntax/engine/parser</a>, <a href="sweetsyntax/languages/c.html">sweetsyntax/languages/c</a>, <a href="sweetsyntax/languages/go.html">sweetsyntax/languages/go</a>, <a href="sweetsyntax/languages/js.html">sweetsyntax/languages/js</a>, <a href="sweetsyntax/languages/nim.html">sweetsyntax/languages/nim</a>, <a href="sweetsyntax/languages/php.html">sweetsyntax/languages/php</a>, <a href="sweetsyntax/languages/ruby.html">sweetsyntax/languages/ruby</a>, <a href="sweetsyntax/sweetlexer.html">sweetsyntax/sweetlexer</a>, <a href="sweetsyntax/tokenizer.html">sweetsyntax/tokenizer</a>.<br/><p /><h2>API symbols</h2>
 <dl><dt><a name="%60%5B%5D%3D%60" href="#%60%5B%5D%3D%60"><span>`[]=`:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
           data-doc-search-tag="ast: proc `[]=`(node: Node; index: int | BackwardsIndex; child: Node)" href="sweetsyntax/engine/ast.html#%5B%5D%3D%2CNode%2C%2CNode">ast: proc `[]=`(node: Node; index: int | BackwardsIndex; child: Node)</a></li>
@@ -113,6 +113,12 @@
 <li><a class="reference external"
           data-doc-search-tag="config: type Definitions" href="sweetsyntax/config.html#Definitions">config: type Definitions</a></li>
           </ul></dd>
+<dt><a name="dumpTree" href="#dumpTree"><span>dumpTree:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="ast: proc dumpTree(n: Node; indent = 0): string" href="sweetsyntax/engine/ast.html#dumpTree%2CNode%2Cint">ast: proc dumpTree(n: Node; indent = 0): string</a></li>
+          <li><a class="reference external"
+          data-doc-search-tag="ast: proc dumpTree(program: OpenAstProgram): string" href="sweetsyntax/engine/ast.html#dumpTree%2COpenAstProgram">ast: proc dumpTree(program: OpenAstProgram): string</a></li>
+          </ul></dd>
 <dt><a name="error" href="#error"><span>error:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
           data-doc-search-tag="parser: proc error(p: var GenericParser; msg: string)" href="sweetsyntax/engine/parser.html#error%2CGenericParser%2Cstring">parser: proc error(p: var GenericParser; msg: string)</a></li>
@@ -132,6 +138,10 @@
 <dt><a name="exprHandler" href="#exprHandler"><span>exprHandler:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
           data-doc-search-tag="parser: template exprHandler(parser: untyped; name: string; body: untyped)" href="sweetsyntax/engine/parser.html#exprHandler.t%2Cuntyped%2Cstring%2Cuntyped">parser: template exprHandler(parser: untyped; name: string; body: untyped)</a></li>
+          </ul></dd>
+<dt><a name="featAdjacentConcat" href="#featAdjacentConcat"><span>featAdjacentConcat:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="config: LanguageFeature.featAdjacentConcat" href="sweetsyntax/config.html#featAdjacentConcat">config: LanguageFeature.featAdjacentConcat</a></li>
           </ul></dd>
 <dt><a name="featArrowFn" href="#featArrowFn"><span>featArrowFn:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
@@ -199,6 +209,10 @@
 <li><a class="reference external"
           data-doc-search-tag="config: KnownSyntax.go" href="sweetsyntax/config.html#go">config: KnownSyntax.go</a></li>
           </ul></dd>
+<dt><a name="goHandlers" href="#goHandlers"><span>goHandlers:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="go: proc goHandlers(p: var GenericParser)" href="sweetsyntax/languages/go.html#goHandlers%2CGenericParser">go: proc goHandlers(p: var GenericParser)</a></li>
+          </ul></dd>
 <dt><a name="IdentsTable" href="#IdentsTable"><span>IdentsTable:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
           data-doc-search-tag="config: type IdentsTable" href="sweetsyntax/config.html#IdentsTable">config: type IdentsTable</a></li>
@@ -222,6 +236,12 @@
           data-doc-search-tag="sweetlexer: proc initLexerFromFile(pre: SweetLexerInit; path: string; enableFilters: bool = false): SweetLexer" href="sweetsyntax/sweetlexer.html#initLexerFromFile%2CSweetLexerInit%2Cstring%2Cbool">sweetlexer: proc initLexerFromFile(pre: SweetLexerInit; path: string; enableFilters: bool = false): SweetLexer</a></li>
           <li><a class="reference external"
           data-doc-search-tag="sweetlexer: proc initLexerFromFile(spec: SweetSpec; path: string; enableFilters: bool = false): SweetLexer" href="sweetsyntax/sweetlexer.html#initLexerFromFile%2CSweetSpec%2Cstring%2Cbool">sweetlexer: proc initLexerFromFile(spec: SweetSpec; path: string; enableFilters: bool = false): SweetLexer</a></li>
+          </ul></dd>
+<dt><a name="initLexerFromMemFile" href="#initLexerFromMemFile"><span>initLexerFromMemFile:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="sweetlexer: proc initLexerFromMemFile(spec: SweetSpec; mf: MemFile; path: string = &quot;&quot;;
+                     enableFilters: bool = false): SweetLexer" href="sweetsyntax/sweetlexer.html#initLexerFromMemFile%2CSweetSpec%2CMemFile%2Cstring%2Cbool">sweetlexer: proc initLexerFromMemFile(spec: SweetSpec; mf: MemFile; path: string = &quot;&quot;;
+                     enableFilters: bool = false): SweetLexer</a></li>
           </ul></dd>
 <dt><a name="items" href="#items"><span>items:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
@@ -258,6 +278,14 @@
 <dt><a name="len" href="#len"><span>len:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
           data-doc-search-tag="ast: proc len(node: Node): int" href="sweetsyntax/engine/ast.html#len%2CNode">ast: proc len(node: Node): int</a></li>
+          </ul></dd>
+<dt><a name="LexerMark" href="#LexerMark"><span>LexerMark:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="sweetlexer: object LexerMark" href="sweetsyntax/sweetlexer.html#LexerMark">sweetlexer: object LexerMark</a></li>
+          </ul></dd>
+<dt><a name="markLexer" href="#markLexer"><span>markLexer:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="sweetlexer: proc markLexer(l: SweetLexer): LexerMark" href="sweetsyntax/sweetlexer.html#markLexer%2CSweetLexer">sweetlexer: proc markLexer(l: SweetLexer): LexerMark</a></li>
           </ul></dd>
 <dt><a name="newBlockNode" href="#newBlockNode"><span>newBlockNode:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
@@ -361,6 +389,10 @@
 <li><a class="reference external"
           data-doc-search-tag="ast: NodeKind.nkIdentDefs" href="sweetsyntax/engine/ast.html#nkIdentDefs">ast: NodeKind.nkIdentDefs</a></li>
           </ul></dd>
+<dt><a name="nkImaginary" href="#nkImaginary"><span>nkImaginary:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="ast: NodeKind.nkImaginary" href="sweetsyntax/engine/ast.html#nkImaginary">ast: NodeKind.nkImaginary</a></li>
+          </ul></dd>
 <dt><a name="nkImport" href="#nkImport"><span>nkImport:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
           data-doc-search-tag="ast: NodeKind.nkImport" href="sweetsyntax/engine/ast.html#nkImport">ast: NodeKind.nkImport</a></li>
@@ -405,9 +437,17 @@
 <li><a class="reference external"
           data-doc-search-tag="ast: NodeKind.nkNil" href="sweetsyntax/engine/ast.html#nkNil">ast: NodeKind.nkNil</a></li>
           </ul></dd>
+<dt><a name="nkObjConstr" href="#nkObjConstr"><span>nkObjConstr:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="ast: NodeKind.nkObjConstr" href="sweetsyntax/engine/ast.html#nkObjConstr">ast: NodeKind.nkObjConstr</a></li>
+          </ul></dd>
 <dt><a name="nkPostfix" href="#nkPostfix"><span>nkPostfix:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
           data-doc-search-tag="ast: NodeKind.nkPostfix" href="sweetsyntax/engine/ast.html#nkPostfix">ast: NodeKind.nkPostfix</a></li>
+          </ul></dd>
+<dt><a name="nkPragmaBlock" href="#nkPragmaBlock"><span>nkPragmaBlock:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="ast: NodeKind.nkPragmaBlock" href="sweetsyntax/engine/ast.html#nkPragmaBlock">ast: NodeKind.nkPragmaBlock</a></li>
           </ul></dd>
 <dt><a name="nkPrefix" href="#nkPrefix"><span>nkPrefix:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
@@ -424,6 +464,10 @@
 <dt><a name="nkStatement" href="#nkStatement"><span>nkStatement:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
           data-doc-search-tag="ast: NodeKind.nkStatement" href="sweetsyntax/engine/ast.html#nkStatement">ast: NodeKind.nkStatement</a></li>
+          </ul></dd>
+<dt><a name="nkTypeAssert" href="#nkTypeAssert"><span>nkTypeAssert:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="ast: NodeKind.nkTypeAssert" href="sweetsyntax/engine/ast.html#nkTypeAssert">ast: NodeKind.nkTypeAssert</a></li>
           </ul></dd>
 <dt><a name="nkVar" href="#nkVar"><span>nkVar:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
@@ -481,9 +525,17 @@
 <li><a class="reference external"
           data-doc-search-tag="parser: proc parseExpression(p: var GenericParser; minPrec: int = 0): Node" href="sweetsyntax/engine/parser.html#parseExpression%2CGenericParser%2Cint">parser: proc parseExpression(p: var GenericParser; minPrec: int = 0): Node</a></li>
           </ul></dd>
+<dt><a name="parseGo" href="#parseGo"><span>parseGo:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="go: proc parseGo(path: string): OpenAstProgram" href="sweetsyntax/languages/go.html#parseGo%2Cstring">go: proc parseGo(path: string): OpenAstProgram</a></li>
+          </ul></dd>
 <dt><a name="parseGroupExpr" href="#parseGroupExpr"><span>parseGroupExpr:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
           data-doc-search-tag="parser: proc parseGroupExpr(p: var GenericParser; minPrec: int = 0): Node" href="sweetsyntax/engine/parser.html#parseGroupExpr%2CGenericParser%2Cint">parser: proc parseGroupExpr(p: var GenericParser; minPrec: int = 0): Node</a></li>
+          </ul></dd>
+<dt><a name="parseHexFloat" href="#parseHexFloat"><span>parseHexFloat:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="parser: proc parseHexFloat(s: string): float" href="sweetsyntax/engine/parser.html#parseHexFloat%2Cstring">parser: proc parseHexFloat(s: string): float</a></li>
           </ul></dd>
 <dt><a name="parseHook" href="#parseHook"><span>parseHook:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
@@ -573,6 +625,10 @@
 <li><a class="reference external"
           data-doc-search-tag="sweetlexer: proc resetLexer(l: SweetLexer)" href="sweetsyntax/sweetlexer.html#resetLexer%2CSweetLexer">sweetlexer: proc resetLexer(l: SweetLexer)</a></li>
           </ul></dd>
+<dt><a name="restoreLexer" href="#restoreLexer"><span>restoreLexer:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="sweetlexer: proc restoreLexer(l: var SweetLexer; m: LexerMark)" href="sweetsyntax/sweetlexer.html#restoreLexer%2CSweetLexer%2CLexerMark">sweetlexer: proc restoreLexer(l: var SweetLexer; m: LexerMark)</a></li>
+          </ul></dd>
 <dt><a name="rightAssoc" href="#rightAssoc"><span>rightAssoc:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
           data-doc-search-tag="config: Assoc.rightAssoc" href="sweetsyntax/config.html#rightAssoc">config: Assoc.rightAssoc</a></li>
@@ -588,6 +644,20 @@
 <dt><a name="rust" href="#rust"><span>rust:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
           data-doc-search-tag="config: KnownSyntax.rust" href="sweetsyntax/config.html#rust">config: KnownSyntax.rust</a></li>
+          </ul></dd>
+<dt><a name="stamp" href="#stamp"><span>stamp:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="ast: proc stamp(n: Node; line, col: int): Node" href="sweetsyntax/engine/ast.html#stamp%2CNode%2Cint%2Cint">ast: proc stamp(n: Node; line, col: int): Node</a></li>
+          <li><a class="reference external"
+          data-doc-search-tag="ast: proc stamp(n: Node; tk: TokenTuple): Node" href="sweetsyntax/engine/ast.html#stamp%2CNode%2CTokenTuple">ast: proc stamp(n: Node; tk: TokenTuple): Node</a></li>
+          </ul></dd>
+<dt><a name="stampFrom" href="#stampFrom"><span>stampFrom:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="ast: proc stampFrom(n, src: Node): Node" href="sweetsyntax/engine/ast.html#stampFrom%2CNode%2CNode">ast: proc stampFrom(n, src: Node): Node</a></li>
+          </ul></dd>
+<dt><a name="stampMissing" href="#stampMissing"><span>stampMissing:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="parser: proc stampMissing(n: Node; tk: TokenTuple): Node" href="sweetsyntax/engine/parser.html#stampMissing%2CNode%2CTokenTuple">parser: proc stampMissing(n: Node; tk: TokenTuple): Node</a></li>
           </ul></dd>
 <dt><a name="StatementSpec" href="#StatementSpec"><span>StatementSpec:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
@@ -677,6 +747,10 @@
 <li><a class="reference external"
           data-doc-search-tag="sweetlexer: SweetTokenKind.tkIdentifier" href="sweetsyntax/sweetlexer.html#tkIdentifier">sweetlexer: SweetTokenKind.tkIdentifier</a></li>
           </ul></dd>
+<dt><a name="tkImag" href="#tkImag"><span>tkImag:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="sweetlexer: SweetTokenKind.tkImag" href="sweetsyntax/sweetlexer.html#tkImag">sweetlexer: SweetTokenKind.tkImag</a></li>
+          </ul></dd>
 <dt><a name="tkInt" href="#tkInt"><span>tkInt:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
           data-doc-search-tag="sweetlexer: SweetTokenKind.tkInt" href="sweetsyntax/sweetlexer.html#tkInt">sweetlexer: SweetTokenKind.tkInt</a></li>
@@ -705,6 +779,10 @@
 <li><a class="reference external"
           data-doc-search-tag="tokenizer: tuple TokenTuple" href="sweetsyntax/tokenizer.html#TokenTuple">tokenizer: tuple TokenTuple</a></li>
           </ul></dd>
+<dt><a name="treeRepr" href="#treeRepr"><span>treeRepr:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="ast: proc treeRepr(n: Node): string" href="sweetsyntax/engine/ast.html#treeRepr%2CNode">ast: proc treeRepr(n: Node): string</a></li>
+          </ul></dd>
 <dt><a name="walk" href="#walk"><span>walk:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
           data-doc-search-tag="parser: proc walk(p: var GenericParser; offset = 1)" href="sweetsyntax/engine/parser.html#walk%2CGenericParser%2Cint">parser: proc walk(p: var GenericParser; offset = 1)</a></li>
@@ -717,7 +795,7 @@
       <div class="twelve-columns footer">
         <span class="nim-sprite"></span>
         <br>
-        <small style="color: var(--hint);">Made with Nim. Generated: 2026-08-26 16:30:32 UTC</small>
+        <small style="color: var(--hint);">Made with Nim. Generated: 2026-09-20 11:46:00 UTC</small>
       </div>
     </div>
   </div>

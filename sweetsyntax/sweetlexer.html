@@ -16,10 +16,10 @@
 <link rel="icon" type="image/png" sizes="32x32" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAABmJLR0QA/wD/AP+gvaeTAAAACXBIWXMAAA3XAAAN1wFCKJt4AAAAB3RJTUUH4QQQEwksSS9ZWwAAAk1JREFUWMPtll2ITVEUx39nn/O7Y5qR8f05wtCUUr6ZIS++8pEnkZInPImneaCQ5METNdOkeFBKUhMPRIkHKfEuUZSUlGlKPN2TrgfncpvmnntnmlEyq1Z7t89/rf9a6+y99oZxGZf/XeIq61EdtgKXgdXA0xrYAvBjOIF1AI9zvjcC74BSpndrJPkBWDScTF8Aa4E3wDlgHbASaANmVqlcCnwHvgDvgVfAJ+AikAAvgfVZwLnSVZHZaOuKoQi3ZOMi4NkYkpe1p4J7A8BpYAD49hfIy/oqG0+hLomiKP2L5L+1ubn5115S+3OAn4EnwBlgMzCjyt6ZAnQCJ4A7wOs88iRJHvw50HoujuPBoCKwHWiosy8MdfZnAdcHk8dxXFJ3VQbQlCTJvRBCGdRbD4M6uc5glpY3eAihpN5S5w12diSEcCCEcKUO4ljdr15T76ur1FDDLIQQ3qv71EdDOe3Kxj3leRXyk+pxdWnFWod6Wt2bY3de3aSuUHcPBVimHs7mK9WrmeOF6lR1o9qnzskh2ar2qm1qizpfXaPeVGdlmGN5pb09qMxz1Xb1kLqgzn1RyH7JUXW52lr5e/Kqi9qpto7V1atuUzfnARrV7jEib1T76gG2qxdGmXyiekkt1GswPTtek0aBfJp6YySGBfWg2tPQ0FAYgf1stUfdmdcjarbYJEniKIq6gY/Aw+zWHAC+p2labGpqiorFYgGYCEzN7oQdQClN07O1/EfDyGgC0ALMBdYAi4FyK+4H3gLPsxfR1zRNi+NP7nH5J+QntnXe5B5mpfQAAAAASUVORK5CYII=">
 
 <!-- CSS -->
-<link rel="stylesheet" type="text/css" href="../nimdoc.out.css?v=2.2.10">
+<link rel="stylesheet" type="text/css" href="../nimdoc.out.css?v=2.2.12">
 
 <!-- JS -->
-<script type="text/javascript" src="../dochack.js?v=2.2.10"></script>
+<script type="text/javascript" src="../dochack.js?v=2.2.12"></script>
 </head>
 <body>
   <div class="document" id="documentId">
@@ -61,7 +61,12 @@
   <details open>
     <summary><a class="reference reference-toplevel" href="#7" id="57">Types</a></summary>
     <ul class="simple simple-toc-section">
-      <li><a class="reference" href="#SweetLexer" title="SweetLexer = ref object
+      <li><a class="reference" href="#LexerMark" title="LexerMark = object
+  pos*, line*, col*: int
+  current*: char
+  expectRegex*, tagTerminated*: bool
+  filterScanIdx*, filterHitsLen*: int">LexerMark</a></li>
+<li><a class="reference" href="#SweetLexer" title="SweetLexer = ref object
   len*: int
   line*, col*, pos*: int
   current*: char
@@ -71,6 +76,8 @@
   blockComment*: array[2, string]
   hashComments*: bool
   trailingBangQuestion*: bool
+  rawStrings*: bool
+  extendedNumbers*: bool
   openTag*: Option[string]
   closeTag*: Option[string]
   features*: set[LanguageFeature]
@@ -87,6 +94,8 @@
   tkOctal,                  ## octal literal: 0o777
   tkBinary,                 ## binary literal: 0b1010
   tkBigInt,                 ## bigint literal: 42n, 0xFFn
+  tkImag,                   ## imaginary literal: 1i, 1.5i, 0x1p-2i
+                             ## (only with `extended_numbers`, e.g. Go)
   tkChar = &quot;char&quot;, tkString = &quot;string&quot;, tkPunct = &quot;punct&quot;,
   tkComment = &quot;comment&quot;, tkDocComment = &quot;doc_comment&quot;, tkRegex = &quot;regex&quot;">SweetTokenKind</a></li>
 <li><a class="reference" href="#Token" title="Token = ref object
@@ -140,8 +149,22 @@
 <li><a class="reference" href="#initLexerFromFile%2CSweetSpec%2Cstring%2Cbool" title="initLexerFromFile(spec: SweetSpec; path: string; enableFilters: bool = false): SweetLexer">initLexerFromFile(spec: SweetSpec; path: string; enableFilters: bool = false): SweetLexer</a></li>
 
 </ul>
+<ul class="simple nested-toc-section">initLexerFromMemFile
+  <li><a class="reference" href="#initLexerFromMemFile%2CSweetSpec%2CMemFile%2Cstring%2Cbool" title="initLexerFromMemFile(spec: SweetSpec; mf: MemFile; path: string = &quot;&quot;;
+                     enableFilters: bool = false): SweetLexer">initLexerFromMemFile(spec: SweetSpec; mf: MemFile; path: string = &quot;&quot;;
+                     enableFilters: bool = false): SweetLexer</a></li>
+
+</ul>
+<ul class="simple nested-toc-section">markLexer
+  <li><a class="reference" href="#markLexer%2CSweetLexer" title="markLexer(l: SweetLexer): LexerMark">markLexer(l: SweetLexer): LexerMark</a></li>
+
+</ul>
 <ul class="simple nested-toc-section">resetLexer
   <li><a class="reference" href="#resetLexer%2CSweetLexer" title="resetLexer(l: SweetLexer)">resetLexer(l: SweetLexer)</a></li>
+
+</ul>
+<ul class="simple nested-toc-section">restoreLexer
+  <li><a class="reference" href="#restoreLexer%2CSweetLexer%2CLexerMark" title="restoreLexer(l: var SweetLexer; m: LexerMark)">restoreLexer(l: var SweetLexer; m: LexerMark)</a></li>
 
 </ul>
 
@@ -166,7 +189,19 @@
 <div class="section" id="7">
   <h1><a class="toc-backref" href="#7">Types</a></h1>
   <dl class="item">
-    <div id="SweetLexer">
+    <div id="LexerMark">
+  <dt><pre><a href="#LexerMark"><span class="Identifier">LexerMark</span></a> <span class="Other">=</span> <span class="Keyword">object</span>
+  <span class="Identifier">pos</span><span class="Operator">*</span><span class="Other">,</span> <span class="Identifier">line</span><span class="Operator">*</span><span class="Other">,</span> <span class="Identifier">col</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">int</span>
+  <span class="Identifier">current</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">char</span>
+  <span class="Identifier">expectRegex</span><span class="Operator">*</span><span class="Other">,</span> <span class="Identifier">tagTerminated</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">bool</span>
+  <span class="Identifier">filterScanIdx</span><span class="Operator">*</span><span class="Other">,</span> <span class="Identifier">filterHitsLen</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">int</span></pre></dt>
+  <dd>
+    
+    Opaque snapshot of the lexer's mutable scan state, for speculative parsing with rewind (e.g. C <tt class="docutils literal"><span class="pre"><span class="Punctuation">(</span><span class="Keyword">type</span><span class="Punctuation">)</span><span class="Identifier">expr</span></span></tt> casts vs <tt class="docutils literal"><span class="pre"><span class="Punctuation">(</span><span class="Identifier">expr</span><span class="Punctuation">)</span></span></tt> groups).
+    
+  </dd>
+</div>
+<div id="SweetLexer">
   <dt><pre><a href="#SweetLexer"><span class="Identifier">SweetLexer</span></a> <span class="Other">=</span> <span class="Keyword">ref</span> <span class="Keyword">object</span>
   <span class="Identifier">len</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">int</span>
   <span class="Identifier">line</span><span class="Operator">*</span><span class="Other">,</span> <span class="Identifier">col</span><span class="Operator">*</span><span class="Other">,</span> <span class="Identifier">pos</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">int</span>
@@ -177,6 +212,8 @@
   <span class="Identifier">blockComment</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">array</span><span class="Other">[</span><span class="DecNumber">2</span><span class="Other">,</span> <span class="Identifier">string</span><span class="Other">]</span>
   <span class="Identifier">hashComments</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">bool</span>
   <span class="Identifier">trailingBangQuestion</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">bool</span>
+  <span class="Identifier">rawStrings</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">bool</span>
+  <span class="Identifier">extendedNumbers</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">bool</span>
   <span class="Identifier">openTag</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">Option</span><span class="Other">[</span><span class="Identifier">string</span><span class="Other">]</span>
   <span class="Identifier">closeTag</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">Option</span><span class="Other">[</span><span class="Identifier">string</span><span class="Other">]</span>
   <span class="Identifier">features</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">set</span><span class="Other">[</span><a href="config.html#LanguageFeature"><span class="Identifier">LanguageFeature</span></a><span class="Other">]</span>
@@ -207,6 +244,8 @@
   <span class="Identifier">tkOctal</span><span class="Other">,</span>                  <span class="Comment">## octal literal: 0o777</span>
   <span class="Identifier">tkBinary</span><span class="Other">,</span>                 <span class="Comment">## binary literal: 0b1010</span>
   <span class="Identifier">tkBigInt</span><span class="Other">,</span>                 <span class="Comment">## bigint literal: 42n, 0xFFn</span>
+  <span class="Identifier">tkImag</span><span class="Other">,</span>                   <span class="Comment">## imaginary literal: 1i, 1.5i, 0x1p-2i</span>
+                             <span class="Comment">## (only with `extended_numbers`, e.g. Go)</span>
   <span class="Identifier">tkChar</span> <span class="Other">=</span> <span class="StringLit">&quot;char&quot;</span><span class="Other">,</span> <span class="Identifier">tkString</span> <span class="Other">=</span> <span class="StringLit">&quot;string&quot;</span><span class="Other">,</span> <span class="Identifier">tkPunct</span> <span class="Other">=</span> <span class="StringLit">&quot;punct&quot;</span><span class="Other">,</span>
   <span class="Identifier">tkComment</span> <span class="Other">=</span> <span class="StringLit">&quot;comment&quot;</span><span class="Other">,</span> <span class="Identifier">tkDocComment</span> <span class="Other">=</span> <span class="StringLit">&quot;doc_comment&quot;</span><span class="Other">,</span> <span class="Identifier">tkRegex</span> <span class="Other">=</span> <span class="StringLit">&quot;regex&quot;</span></pre></dt>
   <dd>
@@ -293,7 +332,7 @@
 </div>
 <div id="getToken-procs-all">
   <div id="getToken,SweetLexer">
-  <dt><pre><span class="Keyword">proc</span> <a href="#getToken%2CSweetLexer"><span class="Identifier">getToken</span></a><span class="Other">(</span><span class="Identifier">l</span><span class="Other">:</span> <span class="Keyword">var</span> <a href="#SweetLexer"><span class="Identifier">SweetLexer</span></a><span class="Other">)</span><span class="Other">:</span> <a href="#Token"><span class="Identifier">Token</span></a> {.<span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">KeyError</span><span class="Other">]</span><span class="Other">,</span>
+  <dt><pre><span class="Keyword">proc</span> <a href="#getToken%2CSweetLexer"><span class="Identifier">getToken</span></a><span class="Other">(</span><span class="Identifier">l</span><span class="Other">:</span> <span class="Keyword">var</span> <a href="#SweetLexer"><span class="Identifier">SweetLexer</span></a><span class="Other">)</span><span class="Other">:</span> <a href="#Token"><span class="Identifier">Token</span></a> {.<span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">KeyError</span><span class="Other">,</span> <span class="Identifier">Exception</span><span class="Other">]</span><span class="Other">,</span>
     <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">RootEffect</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
   <dd>
     
@@ -360,12 +399,49 @@
 </div>
 
 </div>
+<div id="initLexerFromMemFile-procs-all">
+  <div id="initLexerFromMemFile,SweetSpec,MemFile,string,bool">
+  <dt><pre><span class="Keyword">proc</span> <a href="#initLexerFromMemFile%2CSweetSpec%2CMemFile%2Cstring%2Cbool"><span class="Identifier">initLexerFromMemFile</span></a><span class="Other">(</span><span class="Identifier">spec</span><span class="Other">:</span> <a href="config.html#SweetSpec"><span class="Identifier">SweetSpec</span></a><span class="Other">;</span> <span class="Identifier">mf</span><span class="Other">:</span> <span class="Identifier">MemFile</span><span class="Other">;</span> <span class="Identifier">path</span><span class="Other">:</span> <span class="Identifier">string</span> <span class="Other">=</span> <span class="StringLit">&quot;&quot;</span><span class="Other">;</span>
+                          <span class="Identifier">enableFilters</span><span class="Other">:</span> <span class="Identifier">bool</span> <span class="Other">=</span> <span class="Identifier">false</span><span class="Other">)</span><span class="Other">:</span> <a href="#SweetLexer"><span class="Identifier">SweetLexer</span></a> {.<span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span>
+    <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
+  <dd>
+    
+    Initialize lexer from an already-opened MemFile (e.g. from Flysystem's <tt class="docutils literal"><span class="pre"><span class="Identifier">readStream</span></span></tt>). Zero-copy: the returned lexer borrows <tt class="docutils literal"><span class="pre"><span class="Identifier">mf</span><span class="Operator">.</span><span class="Identifier">mem</span></span></tt>.
+    
+  </dd>
+</div>
+
+</div>
+<div id="markLexer-procs-all">
+  <div id="markLexer,SweetLexer">
+  <dt><pre><span class="Keyword">proc</span> <a href="#markLexer%2CSweetLexer"><span class="Identifier">markLexer</span></a><span class="Other">(</span><span class="Identifier">l</span><span class="Other">:</span> <a href="#SweetLexer"><span class="Identifier">SweetLexer</span></a><span class="Other">)</span><span class="Other">:</span> <a href="#LexerMark"><span class="Identifier">LexerMark</span></a> {.<span class="Identifier">inline</span><span class="Other">,</span> <span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span>
+    <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
+  <dd>
+    
+    Snapshot the current scan state. Only valid while no filter configuration changes (filter hits are append-only during <tt class="docutils literal"><span class="pre"><span class="Identifier">getToken</span></span></tt>).
+    
+  </dd>
+</div>
+
+</div>
 <div id="resetLexer-procs-all">
   <div id="resetLexer,SweetLexer">
   <dt><pre><span class="Keyword">proc</span> <a href="#resetLexer%2CSweetLexer"><span class="Identifier">resetLexer</span></a><span class="Other">(</span><span class="Identifier">l</span><span class="Other">:</span> <a href="#SweetLexer"><span class="Identifier">SweetLexer</span></a><span class="Other">)</span> {.<span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
   <dd>
     
     Rewind the lexer to offset 0 so its token stream can be consumed again. Used by streaming consumers that need a second pass over the input (e.g. fold computation that detects its mode only at EOF).
+    
+  </dd>
+</div>
+
+</div>
+<div id="restoreLexer-procs-all">
+  <div id="restoreLexer,SweetLexer,LexerMark">
+  <dt><pre><span class="Keyword">proc</span> <a href="#restoreLexer%2CSweetLexer%2CLexerMark"><span class="Identifier">restoreLexer</span></a><span class="Other">(</span><span class="Identifier">l</span><span class="Other">:</span> <span class="Keyword">var</span> <a href="#SweetLexer"><span class="Identifier">SweetLexer</span></a><span class="Other">;</span> <span class="Identifier">m</span><span class="Other">:</span> <a href="#LexerMark"><span class="Identifier">LexerMark</span></a><span class="Other">)</span> {.<span class="Identifier">inline</span><span class="Other">,</span> <span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span>
+    <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
+  <dd>
+    
+    Rewind the lexer to a snapshot from <tt class="docutils literal"><span class="pre"><span class="Identifier">markLexer</span></span></tt>, discarding any tokens scanned since (parser <tt class="docutils literal"><span class="pre"><span class="Identifier">prev</span></span></tt>/<tt class="docutils literal"><span class="pre"><span class="Identifier">curr</span></span></tt>/<tt class="docutils literal"><span class="pre"><span class="Identifier">next</span></span></tt> must be restored by the caller as well).
     
   </dd>
 </div>
@@ -381,7 +457,7 @@
       <div class="twelve-columns footer">
         <span class="nim-sprite"></span>
         <br>
-        <small style="color: var(--hint);">Made with Nim. Generated: 2026-08-26 16:30:31 UTC</small>
+        <small style="color: var(--hint);">Made with Nim. Generated: 2026-09-20 11:45:59 UTC</small>
       </div>
     </div>
   </div>

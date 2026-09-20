@@ -1,0 +1,3 @@
+nimTitle	go	sweetsyntax/languages/go.html	module sweetsyntax/languages/go		0
+nim	goHandlers	sweetsyntax/languages/go.html#goHandlers,GenericParser	proc goHandlers(p: var GenericParser)		1283
+nim	parseGo	sweetsyntax/languages/go.html#parseGo,string	proc parseGo(path: string): OpenAstProgram		1965
