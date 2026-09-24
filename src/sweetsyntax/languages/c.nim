@@ -299,6 +299,12 @@ proc parseStructUnionDecl(p: var GenericParser, kind: string): Node =
         fnNode.children.add(fnDecl.children[0])
         fnNode.children.add(fnDecl.children[1])
         fnNode.children.add(parseBlock(p))
+        let specs = Node(kind: nkStatement).stampFrom(fnNode)
+        specs.children.add(Node(kind: nkIdent, name: "specs").stampFrom(fnNode))
+        if tag != nil:
+          specs.children.add(Node(kind: nkIdent,
+            name: kind & " " & tag.name).stampFrom(tag))
+        fnNode.children.add(specs)
         return fnNode
       var init: Node
       if p.curr.kind == tkPunct and p.curr.value == "=":
@@ -559,6 +565,21 @@ proc cOperatorOperand(p: var GenericParser, minPrec: int = 0): Node =
   result = Node(kind: nkIdent, name: p.curr.value).stamp(p.curr)
   walk p
 
+proc attachCSpecs(fnNode, stmtNode: Node) =
+  ## Preserve declaration specifiers on a function definition node.
+  ## Shape: `nkFunction[name, params, body, specs]` where `specs` is
+  ## `nkStatement["specs", spec...]` (possibly empty). Consumers must
+  ## read the definition from children 0..2 and treat child 3 as
+  ## metadata. Without this, storage specifiers (`static`, `extern`)
+  ## are lost on definitions while surviving on declarations.
+  let specs = Node(kind: nkStatement).stampFrom(fnNode)
+  specs.children.add(Node(kind: nkIdent, name: "specs").stampFrom(fnNode))
+  for i in 1 ..< stmtNode.children.len:
+    let s = stmtNode.children[i]
+    if s != nil and s.kind == nkIdent:
+      specs.children.add(Node(kind: nkIdent, name: s.name).stampFrom(s))
+  fnNode.children.add(specs)
+
 proc parseCDeclOne(p: var GenericParser): Node =
   ## One declarator with optional initializer, bitfield width, or
   ## function body (shared by the `declarator` handler and the
@@ -606,6 +627,7 @@ proc parseCDeclRest(p: var GenericParser, stmtNode: Node): Node =
   let first = parseCDeclOne(p)
   if first.kind == nkFunction:
     p.walkOpt(";")
+    attachCSpecs(first, stmtNode)
     return first
   stmtNode.children.add(first)
   while p.curr.kind == tkPunct and p.curr.value == ",":
