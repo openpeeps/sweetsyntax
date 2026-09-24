@@ -25,22 +25,29 @@ when isMainModule:
 
   proc getLanguageHandlers(ext: string): (ParsingCallback, set[LanguageFeature]) =
     ## Resolve language handlers and features by file extension.
+    ## NOTE: `result` is assigned explicitly in every branch. Returning a
+    ## bare `(nil, {})` literal in the `else` branch would be fully
+    ## compile-time-known, so the C backend would lift it into a
+    ## `static const` aggregate initialized from another static, which
+    ## Apple Clang on ARM64 rejects
+    ## (`error: initializer element is not a compile-time constant`).
     case ext
     of "js", "jsx", "ts", "tsx":
-      (js.jsHandlers, {featAsync, featArrowFn, featGenerators,
-                        featLabeledStmt, featTemplateLit})
+      result = (js.jsHandlers, {featAsync, featArrowFn, featGenerators,
+                                featLabeledStmt, featTemplateLit})
     of "nim", "nims":
-      (nim.nimHandlers, {})
+      result = (nim.nimHandlers, {})
     of "c", "h":
-      (c.cHandlers, {featLabeledStmt, featAdjacentConcat})
+      result = (c.cHandlers, {featLabeledStmt, featAdjacentConcat})
     of "php", "phtml", "php3", "php4", "php5", "phps":
-      (php.phpHandlers, {featLabeledStmt, featGenerators})
+      result = (php.phpHandlers, {featLabeledStmt, featGenerators})
     of "rb", "ruby", "rake", "gemspec":
-      (ruby.rubyHandlers, {})
+      result = (ruby.rubyHandlers, {})
     of "go":
-      (go.goHandlers, {featLabeledStmt})
+      result = (go.goHandlers, {featLabeledStmt})
     else:
-      (nil, {})
+      result[0] = nil
+      result[1] = {}
 
   proc parseCommand(v: Values) =
     let srcPath = $(v.get("script").getPath)
