@@ -201,8 +201,7 @@ operators:
       handler: bracket
 
   assignment:
-    tokens: ["=", "+=", "-=", "*=", "/=", "%=", "**=",
-             "&=", "|=", "^=", "<<=", ">>=", "&&=", "||="]
+    tokens: ["=", "+=", "-=", "*=", "/=", "%=", "**=", "&=", "|=", "^=", "<<=", ">>=", "&&=", "||="]
 
   ternary:
     token: "?"
@@ -299,9 +298,5 @@ statements:
     handler: declarator
 
   expect_regex_after:
-    tokens: ["=", "+=", "-=", "*=", "/=", "%=", "**=",
-             "(", "[", "{", ",", ";", ":",
-             "!=", "==", "return"]
-    keywords: ["return", "typeof", "sizeof",
-               "instanceof", "is_a?",
-               "require"]
+    tokens: ["=", "+=", "-=", "*=", "/=", "%=", "**=", "(", "[", "{", ",", ";", ":", "!=", "==", "return"]
+    keywords: ["return", "typeof", "sizeof", "instanceof", "is_a?", "require"]

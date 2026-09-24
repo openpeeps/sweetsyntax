@@ -164,9 +164,7 @@ operators:
       handler: call
 
   assignment:
-    tokens: ["=", "+=", "-=", "*=", "/=", "%=", "**=",
-             "&=", "|=", "^=", "<<=", ">>=", ">>>=",
-             "&&=", "||=", "??="]
+    tokens: ["=", "+=", "-=", "*=", "/=", "%=", "**=", "&=", "|=", "^=", "<<=", ">>=", ">>>=", "&&=", "||=", "??="]
 
   ternary:
     token: "?"
@@ -227,10 +225,5 @@ statements:
     handler: async_function
 
   expect_regex_after:
-    tokens: ["=", "+=", "-=", "*=", "/=", "%=",
-             "(", "[", "{", ",", ";", ":",
-             "!", "~", "&&", "||", "??", "?", "=>"]
-    keywords: ["return", "typeof", "instanceof",
-               "delete", "void", "throw", "new",
-               "case", "in", "of", "yield", "await",
-               "var", "let", "const"]
+    tokens: ["=", "+=", "-=", "*=", "/=", "%=", "(", "[", "{", ",", ";", ":", "!", "~", "&&", "||", "??", "?", "=>"]
+    keywords: ["return", "typeof", "instanceof", "delete", "void", "throw", "new", "case", "in", "of", "yield", "await", "var", "let", "const"]

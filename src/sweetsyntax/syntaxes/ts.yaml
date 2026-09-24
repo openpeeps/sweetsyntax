@@ -225,9 +225,7 @@ operators:
       handler: call
 
   assignment:
-    tokens: ["=", "+=", "-=", "*=", "/=", "%=", "**=",
-             "&=", "|=", "^=", "<<=", ">>=", ">>>=",
-             "&&=", "||=", "??="]
+    tokens: ["=", "+=", "-=", "*=", "/=", "%=", "**=", "&=", "|=", "^=", "<<=", ">>=", ">>>=", "&&=", "||=", "??="]
 
   ternary:
     token: "?"
@@ -307,10 +305,5 @@ statements:
     handler: using
 
   expect_regex_after:
-    tokens: ["=", "+=", "-=", "*=", "/=", "%=",
-             "(", "[", "{", ",", ";", ":",
-             "!", "~", "&&", "||", "??", "?", "=>"]
-    keywords: ["return", "typeof", "instanceof",
-               "delete", "void", "throw", "new",
-               "case", "in", "of", "yield", "await",
-               "var", "let", "const", "as", "satisfies"]
+    tokens: ["=", "+=", "-=", "*=", "/=", "%=", "(", "[", "{", ",", ";", ":", "!", "~", "&&", "||", "??", "?", "=>"]
+    keywords: ["return", "typeof", "instanceof", "delete", "void", "throw", "new", "case", "in", "of", "yield", "await", "var", "let", "const", "as", "satisfies"]
