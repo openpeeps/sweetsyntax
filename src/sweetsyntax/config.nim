@@ -236,16 +236,34 @@ type
       ## the syntax specification containing tokens, identifiers, and other rules
 
 const
+  # Embedded YAML sources. These stay `const` (compile-time strings) so
+  # `staticRead` keeps working; the lookup table below is a `let`.
+  jsSyntaxSource = staticRead(currentSourcePath().parentDir / "syntaxes" / "js.yaml")
+  pySyntaxSource = staticRead(currentSourcePath().parentDir / "syntaxes" / "python.yaml")
+  nimSyntaxSource = staticRead(currentSourcePath().parentDir / "syntaxes" / "nim.yaml")
+  cSyntaxSource = staticRead(currentSourcePath().parentDir / "syntaxes" / "c.yaml")
+  rsSyntaxSource = staticRead(currentSourcePath().parentDir / "syntaxes" / "rust.yaml")
+  rbSyntaxSource = staticRead(currentSourcePath().parentDir / "syntaxes" / "ruby.yaml")
+  phpSyntaxSource = staticRead(currentSourcePath().parentDir / "syntaxes" / "php.yaml")
+  goSyntaxSource = staticRead(currentSourcePath().parentDir / "syntaxes" / "go.yaml")
+  dSyntaxSource = staticRead(currentSourcePath().parentDir / "syntaxes" / "d.yaml")
+
+let
+  # NOTE: this must stay a `let` (runtime init), not a `const`.
+  # A `const` Table of the embedded YAML sources makes the C backend emit a
+  # `static const` aggregate whose initializer references other statics,
+  # which Apple Clang on ARM64 rejects
+  # (`error: initializer element is not a compile-time constant`).
   knownSyntaxTable* = {
-    "js": staticRead(currentSourcePath().parentDir / "syntaxes" / "js.yaml"),
-    "py": staticRead(currentSourcePath().parentDir / "syntaxes" / "python.yaml"),
-    "nim": staticRead(currentSourcePath().parentDir / "syntaxes" / "nim.yaml"),
-    "c": staticRead(currentSourcePath().parentDir / "syntaxes" / "c.yaml"),
-    "rs": staticRead(currentSourcePath().parentDir / "syntaxes" / "rust.yaml"),
-    "rb": staticRead(currentSourcePath().parentDir / "syntaxes" / "ruby.yaml"),
-    "php": staticRead(currentSourcePath().parentDir / "syntaxes" / "php.yaml"),
-    "go": staticRead(currentSourcePath().parentDir / "syntaxes" / "go.yaml"),
-    "d": staticRead(currentSourcePath().parentDir / "syntaxes" / "d.yaml")
+    "js": jsSyntaxSource,
+    "py": pySyntaxSource,
+    "nim": nimSyntaxSource,
+    "c": cSyntaxSource,
+    "rs": rsSyntaxSource,
+    "rb": rbSyntaxSource,
+    "php": phpSyntaxSource,
+    "go": goSyntaxSource,
+    "d": dSyntaxSource
   }.toTable
 
 proc parseHook*(p: var YamlParser, v: var SymbolsTable) =
