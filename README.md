@@ -21,6 +21,7 @@
 - JSON-based AST generator / indent-based dump tree
 - ANSI, HTML and JSON-LD Renderers
 - Built-in syntax support for: C, Crystal, D lang, Go, JavaScript, Nim, PHP, Python, Ruby, and Rust
+- Highlight-only support (lexer + renderers, no AST) for: CSS and Markdown
 - **Context-aware error** reporting while parsing
 - Plugin System for creating custom syntaxes (soon 🔥)
 - Written in Nim language

@@ -21,6 +21,20 @@ proc colorForToken(lexer: SweetLexer, tok: Token): string =
   ## `scopeForToken`, which knows the language's keyword table.
   let scope = scopeForToken(lexer, tok)
   if scope.startsWith("comment"): return "\e[90m"                          # gray
+  if scope.startsWith("markup.heading"): return "\e[35;1m"                 # bold magenta
+  if scope.startsWith("markup.bold"): return "\e[37;1m"                    # bold white
+  if scope.startsWith("markup.italic"): return "\e[36m"                    # cyan
+  if scope.startsWith("markup.raw"): return "\e[32m"                      # green
+  if scope.startsWith("markup.link"): return "\e[34;4m"                   # underline blue
+  if scope.startsWith("markup.image"): return "\e[34;4m"                  # underline blue
+  if scope.startsWith("markup.quote"): return "\e[90m"                    # gray
+  if scope.startsWith("markup.list"): return "\e[33m"                     # yellow
+  if scope.startsWith("markup.hr"): return "\e[90m"                       # gray
+  if scope.startsWith("markup.strikethrough"): return "\e[90m"            # gray
+  if scope.startsWith("markup"): return "\e[97m"
+  if scope.startsWith("selector.id"): return "\e[33;1m"                   # bold yellow
+  if scope.startsWith("selector.class"): return "\e[33m"                  # yellow
+  if scope.startsWith("at.rule"): return "\e[35;1m"                       # bold magenta
   if scope.startsWith("keyword.control"): return "\e[35;1m"                # bold magenta
   if scope.startsWith("keyword.operator"): return "\e[37m"                 # white
   if scope.startsWith("storage.type"): return "\e[34;1m"                   # bold blue

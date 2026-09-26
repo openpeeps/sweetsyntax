@@ -230,6 +230,8 @@ type
     php = "php"
     go = "go"
     d = "d"
+    css = "css"
+    md = "md"
 
   SweetSyntax* = ref object
     spec*: SweetSpec
@@ -247,6 +249,8 @@ const
   phpSyntaxSource = staticRead(currentSourcePath().parentDir / "syntaxes" / "php.yaml")
   goSyntaxSource = staticRead(currentSourcePath().parentDir / "syntaxes" / "go.yaml")
   dSyntaxSource = staticRead(currentSourcePath().parentDir / "syntaxes" / "d.yaml")
+  cssSyntaxSource = staticRead(currentSourcePath().parentDir / "syntaxes" / "css.yaml")
+  mdSyntaxSource = staticRead(currentSourcePath().parentDir / "syntaxes" / "markdown.yaml")
 
 let
   # NOTE: this must stay a `let` (runtime init), not a `const`.
@@ -263,7 +267,9 @@ let
     "rb": rbSyntaxSource,
     "php": phpSyntaxSource,
     "go": goSyntaxSource,
-    "d": dSyntaxSource
+    "d": dSyntaxSource,
+    "css": cssSyntaxSource,
+    "md": mdSyntaxSource
   }.toTable
 
 proc parseHook*(p: var YamlParser, v: var SymbolsTable) =

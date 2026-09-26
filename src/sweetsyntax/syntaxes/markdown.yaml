@@ -1,0 +1,104 @@
+name: Markdown
+extension:
+  - md
+  - markdown
+  - mdown
+  - mkd
+
+block_comment:
+  - '<!--'
+  - '-->'
+
+filters:
+  - name: heading
+    pattern: "#{1,6} .+"
+    group: 0
+    attr: "markup.heading"
+  - name: fenced_block
+    pattern: "```.+"
+    group: 0
+    attr: "markup.raw.block"
+  - name: bold
+    pattern: "\\*\\*.+\\*\\*"
+    group: 0
+    attr: "markup.bold"
+  - name: bold_alt
+    pattern: "__.+__"
+    group: 0
+    attr: "markup.bold"
+  - name: italic
+    pattern: "\\*.+\\*"
+    group: 0
+    attr: "markup.italic"
+  - name: strikethrough
+    pattern: "~~.+~~"
+    group: 0
+    attr: "markup.strikethrough"
+  - name: inline_code
+    pattern: "`.+`"
+    group: 0
+    attr: "markup.raw.inline"
+  - name: image
+    pattern: "!.+\\(.+\\)"
+    group: 0
+    attr: "markup.image"
+  - name: link
+    pattern: "\\[.+\\]\\(.+\\)"
+    group: 0
+    attr: "markup.link"
+  - name: quote
+    pattern: "> .+"
+    group: 0
+    attr: "markup.quote"
+  - name: list_item
+    pattern: "[-*+] .+"
+    group: 0
+    attr: "markup.list"
+  - name: hr
+    pattern: "(---+|\\*\\*\\*+|___+)"
+    group: 0
+    attr: "markup.hr"
+
+symbols:
+  hash: '#'
+  plus: '+'
+  minus: '-'
+  multiply: '*'
+  divide: '/'
+  assign: '='
+  eq: '=='
+  lt: '<'
+  gt: '>'
+  tilde: '~'
+  pipe: '|'
+  and: '&'
+  or: '|'
+  not: '!'
+  parl: '('
+  parr: ')'
+  sqbl: '['
+  sqbr: ']'
+  curl: '{'
+  curr: '}'
+  squote: "'"
+  quote: '"'
+  backtick: '`'
+  colon: ':'
+  scolon: ';'
+  comma: ','
+  dot: '.'
+  ellipsis: '...'
+  question: '?'
+  colon_dash: ':-'
+
+blocks:
+  open: "{"
+  close: "}"
+
+features:
+  regex_literals: false
+  async_await: false
+  generators: false
+  arrow_functions: false
+  template_literals: false
+  labeled_statements: false

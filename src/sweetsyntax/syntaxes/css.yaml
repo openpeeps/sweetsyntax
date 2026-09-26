@@ -1,0 +1,95 @@
+name: CSS
+extension:
+  - css
+
+block_comment:
+  - '/*'
+  - '*/'
+
+filters:
+  - name: at_rule
+    pattern: "@[a-zA-Z-]+"
+    group: 0
+    attr: "at.rule"
+  - name: id_selector
+    pattern: "#[a-zA-Z_][a-zA-Z0-9_-]*"
+    group: 0
+    attr: "selector.id"
+  - name: class_selector
+    pattern: "\\.[a-zA-Z_][a-zA-Z0-9_-]*"
+    group: 0
+    attr: "selector.class"
+  - name: property_decl
+    pattern: "[a-zA-Z-]+\\s*:"
+    group: 0
+    attr: "property.name"
+
+symbols:
+  plus: '+'
+  minus: '-'
+  multiply: '*'
+  divide: '/'
+  modulo: '%'
+  assign: '='
+  eq: '=='
+  matchPrefix: '^='
+  matchSuffix: '$='
+  matchSubstring: '*='
+  matchDash: '|='
+  matchIncludes: '~='
+  lt: '<'
+  lte: '<='
+  gt: '>'
+  gte: '>='
+  not: '!'
+  tilde: '~'
+  pipe: '|'
+  caret: '^'
+  dollar: '$'
+  hash: '#'
+  dot: '.'
+  colon: ':'
+  doubleColon: '::'
+  scolon: ';'
+  comma: ','
+  parl: '('
+  parr: ')'
+  sqbl: '['
+  sqbr: ']'
+  curl: '{'
+  curr: '}'
+  squote: "'"
+  quote: '"'
+  at: '@'
+  slash: '/'
+  backslash: '\\'
+
+identifiers:
+  media: "media"
+  import: "import"
+  keyframes: "keyframes"
+  supports: "supports"
+  font-face: "font-face"
+  page: "page"
+  namespace: "namespace"
+  charset: "charset"
+  important: "important"
+  inherit: "inherit"
+  initial: "initial"
+  unset: "unset"
+  none: "none"
+  auto: "auto"
+  true: "true"
+  false: "false"
+
+blocks:
+  open: "{"
+  close: "}"
+
+features:
+  regex_literals: false
+  async_await: false
+  generators: false
+  arrow_functions: false
+  template_literals: false
+  labeled_statements: false

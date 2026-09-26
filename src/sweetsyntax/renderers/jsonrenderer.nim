@@ -36,7 +36,26 @@ const
     "return", "break", "continue", "goto", "try", "catch", "finally",
     "throw", "import", "export", "from", "yield", "await", "new", "delete",
     "typeof", "instanceof", "in", "of", "when", "elif", "except", "raise",
-    "block", "with", "without", "match", "as", "async", "loop"]
+    "block", "with", "without", "match", "as", "async", "loop",
+    "media", "keyframes", "supports", "font-face", "page", "namespace",
+    "charset"]
+
+proc scopeForFilterAttr(tok: Token): string =
+  ## Filter-driven scopes for non-programming languages (CSS, Markdown).
+  ## Returns "" when no filter attr applies so kind-based mapping below runs.
+  for a in tok.attr:
+    case a
+    of "markup.heading", "markup.bold", "markup.italic",
+       "markup.strikethrough", "markup.raw.block", "markup.raw.inline",
+       "markup.link", "markup.image", "markup.list", "markup.quote",
+       "markup.hr", "markup.table",
+       "selector.id", "selector.class", "at.rule":
+      return a
+    of "property.name":
+      return "variable.other.property"
+    else:
+      discard
+  ""
 
 proc scopeForToken*(lexer: SweetLexer, tok: Token): string =
   ## Derive a TextMate-style scope for the given token, based on the token
@@ -44,7 +63,11 @@ proc scopeForToken*(lexer: SweetLexer, tok: Token): string =
   ##
   ## Note: `tok.attr` holds keyword lexemes (e.g. "int", "if"), not semantic
   ## classes, so scopes are derived from the kind and the identifiers table
-  ## rather than from attributes.
+  ## rather than from attributes. YAML `filters` (CSS, Markdown) are the
+  ## exception: their dotted attrs (e.g. "markup.heading") map 1:1 to scopes.
+  let filterScope = scopeForFilterAttr(tok)
+  if filterScope.len > 0:
+    return filterScope
   case tok.kind
   of tkComment: result = "comment.line"
   of tkDocComment: result = "comment.block.documentation"
