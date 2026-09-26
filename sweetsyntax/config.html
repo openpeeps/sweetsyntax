@@ -96,7 +96,7 @@
   handler*: string">InfixGroup</a></li>
 <li><a class="reference" href="#KnownSyntax" title="KnownSyntax = enum
   js = &quot;js&quot;, py = &quot;py&quot;, nim = &quot;nim&quot;, c = &quot;c&quot;, rust = &quot;rs&quot;, ruby = &quot;rb&quot;,
-  php = &quot;php&quot;, go = &quot;go&quot;, d = &quot;d&quot;">KnownSyntax</a></li>
+  php = &quot;php&quot;, go = &quot;go&quot;, d = &quot;d&quot;, css = &quot;css&quot;, md = &quot;md&quot;">KnownSyntax</a></li>
 <li><a class="reference" href="#LanguageFeature" title="LanguageFeature = enum
   featRegex = &quot;regex_literals&quot;, featAsync = &quot;async_await&quot;,
   featGenerators = &quot;generators&quot;, featArrowFn = &quot;arrow_functions&quot;,
@@ -193,7 +193,8 @@
                             (&quot;nim&quot;, nimSyntaxSource), (&quot;c&quot;, cSyntaxSource),
                             (&quot;rs&quot;, rsSyntaxSource), (&quot;rb&quot;, rbSyntaxSource),
                             (&quot;php&quot;, phpSyntaxSource), (&quot;go&quot;, goSyntaxSource),
-                            (&quot;d&quot;, dSyntaxSource)])">knownSyntaxTable</a></li>
+                            (&quot;d&quot;, dSyntaxSource), (&quot;css&quot;, cssSyntaxSource),
+                            (&quot;md&quot;, mdSyntaxSource)])">knownSyntaxTable</a></li>
 
     </ul>
   </details>
@@ -351,7 +352,7 @@
 <div id="KnownSyntax">
   <dt><pre><a href="#KnownSyntax"><span class="Identifier">KnownSyntax</span></a> <span class="Other">=</span> <span class="Keyword">enum</span>
   <span class="Identifier">js</span> <span class="Other">=</span> <span class="StringLit">&quot;js&quot;</span><span class="Other">,</span> <span class="Identifier">py</span> <span class="Other">=</span> <span class="StringLit">&quot;py&quot;</span><span class="Other">,</span> <span class="Identifier">nim</span> <span class="Other">=</span> <span class="StringLit">&quot;nim&quot;</span><span class="Other">,</span> <span class="Identifier">c</span> <span class="Other">=</span> <span class="StringLit">&quot;c&quot;</span><span class="Other">,</span> <span class="Identifier">rust</span> <span class="Other">=</span> <span class="StringLit">&quot;rs&quot;</span><span class="Other">,</span> <span class="Identifier">ruby</span> <span class="Other">=</span> <span class="StringLit">&quot;rb&quot;</span><span class="Other">,</span>
-  <span class="Identifier">php</span> <span class="Other">=</span> <span class="StringLit">&quot;php&quot;</span><span class="Other">,</span> <span class="Identifier">go</span> <span class="Other">=</span> <span class="StringLit">&quot;go&quot;</span><span class="Other">,</span> <span class="Identifier">d</span> <span class="Other">=</span> <span class="StringLit">&quot;d&quot;</span></pre></dt>
+  <span class="Identifier">php</span> <span class="Other">=</span> <span class="StringLit">&quot;php&quot;</span><span class="Other">,</span> <span class="Identifier">go</span> <span class="Other">=</span> <span class="StringLit">&quot;go&quot;</span><span class="Other">,</span> <span class="Identifier">d</span> <span class="Other">=</span> <span class="StringLit">&quot;d&quot;</span><span class="Other">,</span> <span class="Identifier">css</span> <span class="Other">=</span> <span class="StringLit">&quot;css&quot;</span><span class="Other">,</span> <span class="Identifier">md</span> <span class="Other">=</span> <span class="StringLit">&quot;md&quot;</span></pre></dt>
   <dd>
     
     
@@ -544,7 +545,8 @@
                             <span class="Other">(</span><span class="StringLit">&quot;nim&quot;</span><span class="Other">,</span> <span class="Identifier">nimSyntaxSource</span><span class="Other">)</span><span class="Other">,</span> <span class="Other">(</span><span class="StringLit">&quot;c&quot;</span><span class="Other">,</span> <span class="Identifier">cSyntaxSource</span><span class="Other">)</span><span class="Other">,</span>
                             <span class="Other">(</span><span class="StringLit">&quot;rs&quot;</span><span class="Other">,</span> <span class="Identifier">rsSyntaxSource</span><span class="Other">)</span><span class="Other">,</span> <span class="Other">(</span><span class="StringLit">&quot;rb&quot;</span><span class="Other">,</span> <span class="Identifier">rbSyntaxSource</span><span class="Other">)</span><span class="Other">,</span>
                             <span class="Other">(</span><span class="StringLit">&quot;php&quot;</span><span class="Other">,</span> <span class="Identifier">phpSyntaxSource</span><span class="Other">)</span><span class="Other">,</span> <span class="Other">(</span><span class="StringLit">&quot;go&quot;</span><span class="Other">,</span> <span class="Identifier">goSyntaxSource</span><span class="Other">)</span><span class="Other">,</span>
-                            <span class="Other">(</span><span class="StringLit">&quot;d&quot;</span><span class="Other">,</span> <span class="Identifier">dSyntaxSource</span><span class="Other">)</span><span class="Other">]</span><span class="Other">)</span></pre></dt>
+                            <span class="Other">(</span><span class="StringLit">&quot;d&quot;</span><span class="Other">,</span> <span class="Identifier">dSyntaxSource</span><span class="Other">)</span><span class="Other">,</span> <span class="Other">(</span><span class="StringLit">&quot;css&quot;</span><span class="Other">,</span> <span class="Identifier">cssSyntaxSource</span><span class="Other">)</span><span class="Other">,</span>
+                            <span class="Other">(</span><span class="StringLit">&quot;md&quot;</span><span class="Other">,</span> <span class="Identifier">mdSyntaxSource</span><span class="Other">)</span><span class="Other">]</span><span class="Other">)</span></pre></dt>
   <dd>
     
     
@@ -653,7 +655,7 @@
       <div class="twelve-columns footer">
         <span class="nim-sprite"></span>
         <br>
-        <small style="color: var(--hint);">Made with Nim. Generated: 2026-09-25 08:05:07 UTC</small>
+        <small style="color: var(--hint);">Made with Nim. Generated: 2026-09-26 19:41:47 UTC</small>
       </div>
     </div>
   </div>
