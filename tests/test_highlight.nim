@@ -9,6 +9,7 @@ suite "highlight proc":
       (KnownSyntax.js, "const x = 42;"),
       (KnownSyntax.nim, "echo 42"),
       (KnownSyntax.c, "int x = 42;"),
+      (KnownSyntax.cpp, "int x = 42;"),
       (KnownSyntax.go, "package main"),
       (KnownSyntax.ruby, "puts 42"),
       (KnownSyntax.php, "echo 42;"),
@@ -31,6 +32,7 @@ suite "highlight proc":
     check highlight(KnownSyntax.js, "if (", hfHtml).len > 0
     check highlight(KnownSyntax.nim, "if (", hfAscii).len > 0
     check highlight(KnownSyntax.c, "int x = ;", hfJson).len > 0
+    check highlight(KnownSyntax.cpp, "template<", hfJson).len > 0
 
   test "html preserves whitespace between tokens":
     let html = highlight(KnownSyntax.c, "int x;", hfHtml)
@@ -64,6 +66,10 @@ suite "highlight proc":
     check syntaxForExt(".jsx") == KnownSyntax.js
     check syntaxForExt("TS") == KnownSyntax.ts
     check syntaxForExt("nim") == KnownSyntax.nim
+    check syntaxForExt("c") == KnownSyntax.c
+    check syntaxForExt("cpp") == KnownSyntax.cpp
+    check syntaxForExt(".hpp") == KnownSyntax.cpp
+    check syntaxForExt("cc") == KnownSyntax.cpp
     check syntaxForExt("rb") == KnownSyntax.ruby
     check syntaxForExt("php") == KnownSyntax.php
     check syntaxForExt("css") == KnownSyntax.css
@@ -85,6 +91,9 @@ suite "highlight proc":
     let jsPath = dir / "app.jsx"
     writeFile(jsPath, "const x = 42;")
     check "const" in highlightFile(jsPath, hfHtml)
+    let cppPath = dir / "main.cpp"
+    writeFile(cppPath, "int main() { return 0; }")
+    check "storage.type" in highlightFile(cppPath, hfJson)
 
   test "highlightFile raises on unknown extension or missing ext":
     let dir = getTempDir() / "sweetsyntax_highlight_test"
@@ -95,3 +104,14 @@ suite "highlight proc":
       discard highlightFile(badPath, hfHtml)
     expect SweetHighlightError:
       discard highlightFile(dir / "noext", hfHtml)
+
+  test "highlightFile names the offending extension":
+    let dir = getTempDir() / "sweetsyntax_highlight_test"
+    createDir(dir)
+    let badPath = dir / "file.xyz"
+    writeFile(badPath, "hello")
+    try:
+      discard highlightFile(badPath, hfHtml)
+      check false
+    except SweetHighlightError as e:
+      check ".xyz" in e.msg

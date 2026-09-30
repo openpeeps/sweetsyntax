@@ -91,6 +91,16 @@ identifiers:
   false: "false"
   nil: "nil"
 
+# Keyword scopes give a keyword its TextMate scope. These live here so that
+# each spec owns its own vocabulary and the renderer holds none of it; any
+# identifier left out below still highlights, as a plain `keyword`.
+keyword_scopes:
+  storage.modifier: ["const", "var"]
+  keyword.control: ["if", "else", "for", "range", "switch", "case", "default", "select", "break", "continue", "goto", "return", "fallthrough"]
+  keyword: ["chan", "defer", "func", "go", "map", "struct", "type", "interface", "package", "import"]
+  constant.language.boolean: ["true", "false"]
+  constant.language.null: ["nil"]
+
 blocks:
   open: "{"
   close: "}"

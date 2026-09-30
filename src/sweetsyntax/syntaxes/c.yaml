@@ -117,6 +117,18 @@ identifiers:
   false: "false"
   NULL: "NULL"
 
+# Keyword scopes give a keyword its TextMate scope. These live here so that
+# each spec owns its own vocabulary and the renderer holds none of it; any
+# identifier left out below still highlights, as a plain `keyword`.
+keyword_scopes:
+  storage.type: ["void", "char", "int", "float", "double", "_Bool", "_Complex", "_Imaginary"]
+  storage.modifier: ["const", "volatile", "static", "extern", "register", "restrict", "inline", "signed", "unsigned", "short", "long", "auto", "_Atomic", "_Noreturn", "_Thread_local", "_Alignas"]
+  keyword.control: ["if", "else", "for", "while", "do", "switch", "case", "default", "break", "continue", "goto", "return"]
+  keyword: ["enum", "typedef", "struct", "union", "sizeof", "_Alignof", "_Generic", "_Static_assert", "_Pragma"]
+  constant.language.boolean: ["true", "false"]
+  constant.language.null: ["NULL"]
+  constant.language: ["__func__", "__VA_ARGS__"]
+
 blocks:
   open: "{"
   close: "}"

@@ -8,6 +8,9 @@ extension:
 
 hash_comments: true
 
+# `<<EOF`, `<<-EOF`, `<<'EOF'`
+heredocs: true
+
 symbols:
   assign: '='
   eq: '=='

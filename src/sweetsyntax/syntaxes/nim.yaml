@@ -137,6 +137,17 @@ identifiers:
   spawn: "spawn"
   parallel: "parallel"
 
+# Keyword scopes give a keyword its TextMate scope. These live here so that
+# each spec owns its own vocabulary and the renderer holds none of it; any
+# identifier left out below still highlights, as a plain `keyword`.
+keyword_scopes:
+  storage.modifier: ["let", "var", "const", "static", "out"]
+  keyword.control: ["if", "elif", "else", "case", "of", "when", "while", "for", "return", "break", "continue", "yield", "raise", "try", "except", "finally", "block", "end", "defer", "discard", "do"]
+  keyword.operator: ["and", "or", "not", "xor", "div", "mod", "shl", "shr", "in", "is", "isnot", "notin"]
+  keyword: ["proc", "func", "method", "iterator", "converter", "template", "macro", "concept", "type", "object", "tuple", "ref", "ptr", "distinct", "cast", "addr", "mixin", "asm", "async", "await", "spawn", "parallel", "as", "from", "import", "include", "bind", "export", "enum", "interface", "with", "without"]
+  constant.language.boolean: ["true", "false"]
+  constant.language.null: ["nil"]
+
 blocks:
   open: "{"
   close: "}"

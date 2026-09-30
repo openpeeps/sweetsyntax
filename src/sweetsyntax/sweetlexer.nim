@@ -9,7 +9,7 @@
 ## The lexer supports various token kinds, including identifiers, literals, punctuation, comments, and regexes.
 ## It also allows for user-defined attributes and filters to enhance token classification.
 
-import std/[strutils, memfiles, tables, algorithm, options]
+import std/[strutils, memfiles, tables, algorithm, options, sets]
 import pkg/openparser/regex
 
 import ./config
@@ -49,6 +49,10 @@ type
     usingMemFile: bool
     symbols*: Table[string, string]
     identifiers*: Table[string, string]
+    keywordScopes*: Table[string, string]
+      # lexeme -> TextMate scope, inverted from the spec's `keyword_scopes`.
+      # Lets the renderers classify a keyword without carrying any vocabulary
+      # of their own. Empty when the spec declares no scopes.
     inlineComment*: Option[string]
     blockComment*: array[2, string]
     hashComments*: bool
@@ -66,6 +70,31 @@ type
     intSuffixes*: bool
       # C-style integer/float suffixes folded into number tokens
       # (`1U`, `100ULL`, `0xFFL`, `1.5f`)
+    heredocs*: bool
+      # whether `<<NAME` opens a here-document (Ruby, PHP, shell). Off for
+      # languages where `<<` is only a shift operator.
+    stringPrefixes*: seq[string]
+      # identifier prefixes glued to a quote to form one string token
+      # (C++ `u8"x"`, `L'c'`, `R"tag(...)tag"`; Rust `b"x"`)
+    rawStringDelims*: bool
+      # whether an `R`-style prefix introduces a delimited raw string
+      # (`R"tag(...)tag"`, C++17)
+    percentLiterals*: bool
+      # whether `%w[..]`, `%i(..)`, `%q{..}` and friends are percent string
+      # literals (Ruby) rather than the `%` operator
+    inferRegex*: bool
+      # when true, decide `/regex/` vs division from the previous significant
+      # token and the spec's `expect_regex_after` lists. Only for consumers
+      # with no parser to supply the hint (e.g. `highlight`); the parser sets
+      # `expectRegex` itself and must not enable this.
+    expectRegexTokens*: HashSet[string]
+      # `expect_regex_after` tokens after which a `/` may start a regex
+    expectRegexKeywords*: HashSet[string]
+      # `expect_regex_after` keywords after which a `/` may start a regex
+    lastTokKind*: SweetTokenKind
+      # kind of the last significant token returned by `getToken`
+    lastTokValue*: string
+      # lexeme of the last significant token returned by `getToken`
     openTag*: Option[string]
     closeTag*: Option[string]
     features*: set[LanguageFeature]
@@ -252,13 +281,16 @@ type
     current*: char
     expectRegex*, tagTerminated*: bool
     filterScanIdx*, filterHitsLen*: int
+    lastTokKind*: SweetTokenKind
+    lastTokValue*: string
 
 proc markLexer*(l: SweetLexer): LexerMark {.inline.} =
   ## Snapshot the current scan state. Only valid while no filter
   ## configuration changes (filter hits are append-only during `getToken`).
   LexerMark(pos: l.pos, line: l.line, col: l.col, current: l.current,
     expectRegex: l.expectRegex, tagTerminated: l.tagTerminated,
-    filterScanIdx: l.filterScanIdx, filterHitsLen: l.filterHits.len)
+    filterScanIdx: l.filterScanIdx, filterHitsLen: l.filterHits.len,
+    lastTokKind: l.lastTokKind, lastTokValue: l.lastTokValue)
 
 proc restoreLexer*(l: var SweetLexer, m: LexerMark) {.inline.} =
   ## Rewind the lexer to a snapshot from `markLexer`, discarding any
@@ -272,6 +304,8 @@ proc restoreLexer*(l: var SweetLexer, m: LexerMark) {.inline.} =
   l.tagTerminated = m.tagTerminated
   l.filterScanIdx = m.filterScanIdx
   l.filterHits.setLen(m.filterHitsLen)
+  l.lastTokKind = m.lastTokKind
+  l.lastTokValue = m.lastTokValue
 
 proc getFullInput*(l: SweetLexer): string =
   ## Returns full source text as string (needed for regex filters).
@@ -475,6 +509,8 @@ proc scanHeredoc(l: var SweetLexer, startPos, startLine, startCol: int): Token =
   ## inline uses such as `foo(<<A, x)` stay on the operator path.
   ## The token is a `tkString` spanning opener..terminator with a
   ## `heredoc` attr, so parsers and renderers work unchanged.
+  ## Only reached when the spec sets `heredocs: true` (Ruby, PHP, shell), so
+  ## languages that merely shift with `<<` cannot trigger a bogus heredoc.
   # Caller guarantees current == '<' and peek == '<'.
   if l.charAt(l.pos + 2) == '=':
     return nil # `<<=` assignment, not a heredoc
@@ -601,8 +637,165 @@ proc consumeFloatSuffix(l: var SweetLexer) {.inline.} =
     else:
       l.consumeIntSuffix()
 
-proc getToken*(l: var SweetLexer): Token =
-  ## Retrieve the next token from the input stream, advancing the lexer's position
+proc scanQuotedString(l: var SweetLexer, startPos, startLine, startCol: int): Token =
+  ## Scan a `"` or `'` delimited string literal. Assumes the opening quote is
+  ## current. `startPos` may point before the quote so that a literal prefix
+  ## (C++ `u8"x"`) is folded into the returned token span.
+  let quote = l.current
+  discard l.advance()
+  # Check for triple-quoted string """"""
+  var isTriple = false
+  if quote == '"' and l.current == '"' and l.peek() == '"':
+    isTriple = true
+    discard l.advance() # consume second "
+    discard l.advance() # consume third "
+  var escaped = false
+  while l.current != '\0':
+    if escaped:
+      escaped = false
+      discard l.advance()
+      continue
+    if l.current == '\\':
+      escaped = true
+      discard l.advance()
+      continue
+    if isTriple:
+      if l.current == '"' and l.peek() == '"' and l.charAt(l.pos + 2) == '"':
+        discard l.advance() # consume first "
+        discard l.advance() # consume second "
+        discard l.advance() # consume third "
+        return l.makeRange(tkString, startPos, startLine, startCol)
+    elif l.current == quote:
+      discard l.advance()
+      return l.makeRange(tkString, startPos, startLine, startCol)
+    discard l.advance()
+  return l.makeRange(tkString, startPos, startLine, startCol) # unterminated, but safe
+
+proc matchesAt(l: SweetLexer, at: int, s: string): bool {.inline.} =
+  ## True when `s` occurs at byte offset `at`. Peek-only; advances nothing.
+  if s.len == 0: return true
+  for i in 0 ..< s.len:
+    if l.charAt(at + i) != s[i]: return false
+  true
+
+proc scanDelimitedRawString(l: var SweetLexer, startPos, startLine, startCol, prefixLen: int): Token =
+  ## Scan a C++17 delimited raw string body: `R"tag( ... )tag"`. The prefix
+  ## (`R`, `u8R`, `LR`, ...) is already consumed and `l.current` is the
+  ## opening `"`; this proc consumes that quote, the optional `tag`
+  ## delimiter and the `(`. The body then runs to `)tag"`, so quotes and
+  ## backslashes inside are literal.
+  discard l.advance() # opening '"'
+  var delim = ""
+  while l.current != '\0' and l.current notin {'(', ')', '"', '\n', '\r'} and
+      delim.len < 16:
+    delim.add(l.current)
+    discard l.advance()
+  if l.current != '(':
+    # Not a well-formed raw string; fall back to an ordinary quoted scan so
+    # the text still highlights as a string. Rewind onto the opening quote.
+    l.pos = startPos + prefixLen
+    l.current = l.charAt(l.pos)
+    return l.scanQuotedString(startPos, startLine, startCol)
+  discard l.advance() # consume '('
+  while l.current != '\0':
+    if l.current == ')' and
+        l.matchesAt(l.pos + 1, delim) and l.charAt(l.pos + 1 + delim.len) == '"':
+      for _ in 0 ..< delim.len + 2:
+        discard l.advance() # consume `)tag"`
+      return l.makeRange(tkString, startPos, startLine, startCol)
+    discard l.advance()
+  return l.makeRange(tkString, startPos, startLine, startCol) # unterminated
+
+proc scanStringPrefix(l: var SweetLexer, startPos, startLine, startCol: int): Token =
+  ## Try to lex a string literal carrying an identifier prefix, e.g. C++
+  ## `u8"x"`, `L'c'`, `R"tag(...)tag"` or Rust `b"x"`. Returns nil when the
+  ## input does not start with one of the spec's `string_prefixes` followed
+  ## immediately by a quote, so the caller falls back to a plain identifier.
+  var prefixLen = 0
+  for pfx in l.stringPrefixes:
+    if pfx.len > prefixLen and l.matchesAt(l.pos, pfx) and
+        l.charAt(l.pos + pfx.len) in {'"', '\''}:
+      prefixLen = pfx.len
+  if prefixLen == 0:
+    return nil
+
+  # A prefix ending in `R` (`R`, `u8R`, `LR`) may open a delimited raw string.
+  let isRaw = l.rawStringDelims and
+    l.charAt(l.pos + prefixLen - 1) in {'R', 'r'} and
+    l.charAt(l.pos + prefixLen) == '"'
+  for i in 0 ..< prefixLen:
+    discard l.advance()
+  if isRaw:
+    return l.scanDelimitedRawString(startPos, startLine, startCol, prefixLen)
+  l.scanQuotedString(startPos, startLine, startCol)
+
+proc scanPercentLiteral(l: var SweetLexer, startPos, startLine, startCol: int): Token =
+  ## Scan a Ruby percent literal: `%w[..]`, `%W{..}`, `%i[..]`, `%I{..}`,
+  ## `%q(..)`, `%Q[..]` or a bare `%(..)`. The `W`, `Q` and `I` variants
+  ## interpolate. Returns nil when the text is the `%` operator instead
+  ## (e.g. `a % b`), so the caller falls back to operator scanning.
+  # Caller guarantees current == '%'. Everything is peeked first so a
+  # rejected candidate leaves the lexer untouched.
+  let kind = l.charAt(l.pos + 1)
+  if kind notin {'w', 'W', 'i', 'I', 'q', 'Q'}:
+    return nil # bare %(..) has no kind character
+  let open = l.charAt(l.pos + 2)
+  # The delimiter must be punctuation, which is what separates it from an
+  # identifier: `a % i` is modulo by `i`, not a `%i` literal.
+  if open == '\0' or open.isAlphaNumeric or open == '_' or
+      open in {' ', '\t', '\r', '\n'}:
+    return nil
+  let closer =
+    case open
+    of '(': ')'
+    of '[': ']'
+    of '{': '}'
+    of '<': '>'
+    else: open
+  discard l.advance() # consume '%'
+  discard l.advance() # consume the kind letter
+  discard l.advance() # consume the opening delimiter
+  # Paired delimiters nest; any other delimiter closes on itself.
+  let nesting = closer != open
+  var depth = 1
+  while l.current != '\0':
+    if l.current == '\\':
+      discard l.advance()
+      if l.current != '\0': discard l.advance()
+      continue
+    if nesting and l.current == open:
+      inc depth
+    elif l.current == closer:
+      dec depth
+      if depth == 0:
+        discard l.advance() # consume the closing delimiter
+        result = l.makeRange(tkString, startPos, startLine, startCol)
+        result.attr.addAttrOnce("percent_literal")
+        if kind in {'W', 'Q', 'I'}:
+          result.attr.addAttrOnce("interpolating")
+        return
+    discard l.advance()
+  result = l.makeRange(tkString, startPos, startLine, startCol) # unterminated
+  result.attr.addAttrOnce("percent_literal")
+
+proc regexAllowed(l: var SweetLexer): bool =
+  ## Whether a `/` at the current position may open a regex literal,
+  ## inferred from the previous significant token using the spec's
+  ## `expect_regex_after` lists. This mirrors what `GenericParser.walk`
+  ## decides with the same lists, so lexer-only consumers (e.g.
+  ## `highlight`) agree with the parser.
+  ## At the very start of input a `/` can only be a regex.
+  if l.lastTokValue.len == 0:
+    return true
+  if l.lastTokValue in l.expectRegexTokens:
+    return true
+  if l.lastTokKind == tkIdentifier and l.lastTokValue in l.expectRegexKeywords:
+    return true
+  false
+
+proc lexToken(l: var SweetLexer): Token =
+  ## Scan one token. See `getToken`, which wraps this to remember the last
+  ## significant token so the regex heuristic can look at it.
   if l.enableFilters: l.prepareFilters() # Ensure filters are prepared if enabled
   l.skipWhitespace()
 
@@ -620,7 +813,7 @@ proc getToken*(l: var SweetLexer): Token =
     if matches:
       for i in 0 ..< tag.len: discard l.advance()
       l.skipWhitespace()
-      return l.getToken() # recurse — parser only sees the real tokens
+      return l.lexToken() # recurse — parser only sees the real tokens
 
   # Close tags (e.g. `?>`) — skip any raw content until the next open tag
   # (or EOF) and resume lexing, enabling multi-block files such as
@@ -642,7 +835,7 @@ proc getToken*(l: var SweetLexer): Token =
             if openMatches:
               for i in 0 ..< open.len: discard l.advance()
               l.skipWhitespace()
-              result = l.getToken() # resume lexing after the open tag
+              result = l.lexToken() # resume lexing after the open tag
               l.tagTerminated = true
               return
           discard l.advance()
@@ -652,6 +845,14 @@ proc getToken*(l: var SweetLexer): Token =
 
   if l.current == '\0':
     return Token(kind: tkEOF, line: startLine, col: startCol, pos: startPos, start: startPos, stop: startPos)
+
+  # Prefixed string literals (C++ `u8"x"`, `L'c'`, `R"tag(...)tag"`) must be
+  # tested before the plain identifier scan, because the prefix is glued to
+  # the quote and would otherwise be read as an identifier.
+  if l.stringPrefixes.len > 0 and isIdentStart(l.current):
+    let prefixed = l.scanStringPrefix(startPos, startLine, startCol)
+    if prefixed != nil:
+      return prefixed
 
   if isIdentStart(l.current) or ord(l.current) >= 0x80:
     if ord(l.current) >= 0x80:
@@ -859,35 +1060,7 @@ proc getToken*(l: var SweetLexer): Token =
       startPos, startLine, startCol)
 
   if l.current == '"' or l.current == '\'':
-    let quote = l.current
-    discard l.advance()
-    # Check for triple-quoted string """"""
-    var isTriple = false
-    if quote == '"' and l.current == '"' and l.peek() == '"':
-      isTriple = true
-      discard l.advance() # consume second "
-      discard l.advance() # consume third "
-    var escaped = false
-    while l.current != '\0':
-      if escaped:
-        escaped = false
-        discard l.advance()
-        continue
-      if l.current == '\\':
-        escaped = true
-        discard l.advance()
-        continue
-      if isTriple:
-        if l.current == '"' and l.peek() == '"' and l.charAt(l.pos + 2) == '"':
-          discard l.advance() # consume first "
-          discard l.advance() # consume second "
-          discard l.advance() # consume third "
-          return l.makeRange(tkString, startPos, startLine, startCol)
-      elif l.current == quote:
-        discard l.advance()
-        return l.makeRange(tkString, startPos, startLine, startCol)
-      discard l.advance()
-    return l.makeRange(tkString, startPos, startLine, startCol) # unterminated, but safe
+    return l.scanQuotedString(startPos, startLine, startCol)
 
   # Check for block comments FIRST (before inline comments and operators)
   if l.blockComment[0].len > 0 and l.current == l.blockComment[0][0]:
@@ -1027,16 +1200,23 @@ proc getToken*(l: var SweetLexer): Token =
     return l.makeRange(tkPunct, startPos, startLine, startCol)
 
   if isOperatorPunct(l.current):
-    if l.current == '<' and l.peek() == '<':
+    if l.heredocs and l.current == '<' and l.peek() == '<':
       # Ruby/PHP heredoc (`<<EOS`, `<<~EOS`, `<<<EOT`, ...). Falls back
       # to normal operator scanning when it is not a heredoc.
       let hd = l.scanHeredoc(startPos, startLine, startCol)
       if hd != nil:
         return hd
+    if l.percentLiterals and l.current == '%':
+      # Ruby percent literals (`%w[a b]`, `%i[..]`, `%q(..)`, `%Q{..}`).
+      # Falls back to the `%` operator (modulo) when it is not one.
+      let pl = l.scanPercentLiteral(startPos, startLine, startCol)
+      if pl != nil:
+        return pl
     if l.current == '/':
-      # Only treat as regex when the parser explicitly signals it.
-      # Otherwise fall through to normal operator scanning (division).
-      if l.expectRegex:
+      # Treat as a regex when the parser explicitly signals it, or — with no
+      # parser running (`inferRegex`) — when the previous significant token
+      # says a regex may appear here. Otherwise this is division.
+      if l.expectRegex or (l.inferRegex and l.regexAllowed()):
         l.expectRegex = false  # consume the hint
         discard l.advance() # consume opening '/'
         var inCharClass = false
@@ -1081,6 +1261,57 @@ proc getToken*(l: var SweetLexer): Token =
       discard l.advance()
     return l.makeRange(tkPunct, startPos, startLine, startCol)
 
+proc getToken*(l: var SweetLexer): Token =
+  ## Retrieve the next token from the input stream, advancing the lexer's position.
+  ## Remembers the last significant token so `regexAllowed` can decide, without a
+  ## parser, whether a `/` opens a regex literal or is division.
+  result = l.lexToken()
+  if result.kind notin {tkEOF, tkComment, tkDocComment}:
+    l.lastTokKind = result.kind
+    l.lastTokValue = l.getLexeme(result.start, result.stop)
+
+proc buildAllOps(l: var SweetLexer, spec: SweetSpec) =
+  ## Collect the operator/delimiter lexemes the scanners may greedily match.
+  ## The spec's `symbols` table is always the base: it is the language's
+  ## punctuation vocabulary and is what the operator and delimiter scanners
+  ## need in order to emit multi-character operators (`==`, `->`, `::`).
+  ## `operators:` only *adds* the tokens a Pratt parser uses but which are not
+  ## symbols. Highlight-only specs have no `operators:` block, so gating the
+  ## symbol vocabulary on it would leave those languages unable to lex any
+  ## multi-character operator. Mirrors `buildPrepared`.
+  l.allOps = @[]
+  for k in spec.symbols.keys: l.allOps.add(k)
+  if spec.operators == nil: return
+  for g in spec.operators.prefix:
+    for tok in g.tokens: l.allOps.add(tok)
+  for g in spec.operators.infix:
+    for tok in g.tokens: l.allOps.add(tok)
+    for kw in g.keywords: l.allOps.add(kw)
+  if spec.operators.assignment != nil:
+    for tok in spec.operators.assignment.tokens: l.allOps.add(tok)
+  if spec.operators.ternary != nil:
+    l.allOps.add(spec.operators.ternary.token)
+
+proc buildRegexHints(l: var SweetLexer, spec: SweetSpec) =
+  ## Seed the parser-free `/regex/` heuristic from the spec's
+  ## `expect_regex_after` list. `GenericParser` decides the same thing from
+  ## the same lists while parsing, so lexer-only consumers that set
+  ## `inferRegex` (e.g. `highlight`) reach the same verdict.
+  if not spec.statements.hasKey("expect_regex_after"):
+    return
+  let era = spec.statements["expect_regex_after"]
+  l.expectRegexTokens = era.tokens.toHashSet()
+  l.expectRegexKeywords = era.keywords.toHashSet()
+
+proc buildKeywordScopes(l: var SweetLexer, spec: SweetSpec) =
+  ## Invert `spec.keyword_scopes` (scope -> lexemes) into the lexeme -> scope
+  ## table the renderers look up. A spec that declares no scopes leaves this
+  ## empty, and every identifier then renders as a plain `keyword`.
+  l.keywordScopes = initTable[string, string](spec.keywordScopes.len)
+  for scope, lexemes in spec.keyword_scopes.pairs:
+    for lexeme in lexemes:
+      l.keywordScopes[lexeme] = scope
+
 proc initLexerFromFile*(spec: SweetSpec, path: string, enableFilters: bool = false): SweetLexer =
   ## Initialize lexer from a file using memfiles for efficient access.
   ## This overload accepts a SweetSpec and extracts lexer data from it.
@@ -1094,6 +1325,7 @@ proc initLexerFromFile*(spec: SweetSpec, path: string, enableFilters: bool = fal
     pos: 0,
     symbols: spec.symbols,
     identifiers: spec.identifiers,
+    keywordScopes: initTable[string, string](),
     inlineComment: spec.inline_comment,
     blockComment: spec.block_comment,
     hashComments: spec.hash_comments,
@@ -1101,6 +1333,10 @@ proc initLexerFromFile*(spec: SweetSpec, path: string, enableFilters: bool = fal
     rawStrings: spec.raw_strings,
     extendedNumbers: spec.extended_numbers,
     intSuffixes: spec.int_suffixes,
+    heredocs: spec.heredocs,
+    stringPrefixes: spec.string_prefixes,
+    rawStringDelims: spec.raw_string_delims,
+    percentLiterals: spec.percent_literals,
     openTag: spec.open_tag,
     closeTag: spec.close_tag,
     filters: spec.filters,
@@ -1118,19 +1354,9 @@ proc initLexerFromFile*(spec: SweetSpec, path: string, enableFilters: bool = fal
     if spec.features.templateLiterals: result.features.incl(featTemplateLit)
     if spec.features.labeledStatements: result.features.incl(featLabeledStmt)
     if spec.features.commandSyntax: result.features.incl(featCommandSyntax)
-  # Build allOps from spec operators
-  if spec.operators != nil:
-    result.allOps = @[]
-    for k in spec.symbols.keys: result.allOps.add(k)
-    for g in spec.operators.prefix:
-      for tok in g.tokens: result.allOps.add(tok)
-    for g in spec.operators.infix:
-      for tok in g.tokens: result.allOps.add(tok)
-      for kw in g.keywords: result.allOps.add(kw)
-    if spec.operators.assignment != nil:
-      for tok in spec.operators.assignment.tokens: result.allOps.add(tok)
-    if spec.operators.ternary != nil:
-      result.allOps.add(spec.operators.ternary.token)
+  result.buildAllOps(spec)
+  result.buildRegexHints(spec)
+  result.buildKeywordScopes(spec)
   result.data = cast[ptr UncheckedArray[char]](result.mf.mem)
   result.len = result.mf.size
   result.current = result.charAt(0)
@@ -1147,6 +1373,7 @@ proc initLexerFromFile*(pre: SweetLexerInit, path: string, enableFilters: bool =
     pos: 0,
     symbols: pre.symbols,
     identifiers: pre.identifiers,
+    keywordScopes: pre.keywordScopes,
     inlineComment: pre.inlineComment,
     blockComment: pre.blockComment,
     hashComments: pre.hashComments,
@@ -1154,6 +1381,11 @@ proc initLexerFromFile*(pre: SweetLexerInit, path: string, enableFilters: bool =
     rawStrings: pre.rawStrings,
     extendedNumbers: pre.extendedNumbers,
     intSuffixes: pre.intSuffixes,
+    heredocs: pre.heredocs,
+    stringPrefixes: pre.stringPrefixes,
+    rawStringDelims: pre.rawStringDelims,
+    percentLiterals: pre.percentLiterals,
+    inferRegex: pre.inferRegex,
     openTag: pre.openTag,
     closeTag: pre.closeTag,
     features: pre.features,
@@ -1180,6 +1412,7 @@ proc initLexer*(spec: SweetSpec, input: sink string, enableFilters: bool = false
     current: '\0',
     symbols: spec.symbols,
     identifiers: spec.identifiers,
+    keywordScopes: initTable[string, string](),
     inlineComment: spec.inline_comment,
     blockComment: spec.block_comment,
     hashComments: spec.hash_comments,
@@ -1187,6 +1420,10 @@ proc initLexer*(spec: SweetSpec, input: sink string, enableFilters: bool = false
     rawStrings: spec.raw_strings,
     extendedNumbers: spec.extended_numbers,
     intSuffixes: spec.int_suffixes,
+    heredocs: spec.heredocs,
+    stringPrefixes: spec.string_prefixes,
+    rawStringDelims: spec.raw_string_delims,
+    percentLiterals: spec.percent_literals,
     openTag: spec.open_tag,
     closeTag: spec.close_tag,
     filters: spec.filters,
@@ -1203,18 +1440,9 @@ proc initLexer*(spec: SweetSpec, input: sink string, enableFilters: bool = false
     if spec.features.templateLiterals: result.features.incl(featTemplateLit)
     if spec.features.labeledStatements: result.features.incl(featLabeledStmt)
     if spec.features.commandSyntax: result.features.incl(featCommandSyntax)
-  if spec.operators != nil:
-    result.allOps = @[]
-    for k in spec.symbols.keys: result.allOps.add(k)
-    for g in spec.operators.prefix:
-      for tok in g.tokens: result.allOps.add(tok)
-    for g in spec.operators.infix:
-      for tok in g.tokens: result.allOps.add(tok)
-      for kw in g.keywords: result.allOps.add(kw)
-    if spec.operators.assignment != nil:
-      for tok in spec.operators.assignment.tokens: result.allOps.add(tok)
-    if spec.operators.ternary != nil:
-      result.allOps.add(spec.operators.ternary.token)
+  result.buildAllOps(spec)
+  result.buildRegexHints(spec)
+  result.buildKeywordScopes(spec)
   if result.len > 0:
     result.current = result.charAt(0)
 
@@ -1230,6 +1458,7 @@ proc initLexer*(pre: SweetLexerInit, input: sink string, enableFilters: bool = f
     current: '\0',
     symbols: pre.symbols,
     identifiers: pre.identifiers,
+    keywordScopes: pre.keywordScopes,
     inlineComment: pre.inlineComment,
     blockComment: pre.blockComment,
     hashComments: pre.hashComments,
@@ -1237,6 +1466,11 @@ proc initLexer*(pre: SweetLexerInit, input: sink string, enableFilters: bool = f
     rawStrings: pre.rawStrings,
     extendedNumbers: pre.extendedNumbers,
     intSuffixes: pre.intSuffixes,
+    heredocs: pre.heredocs,
+    stringPrefixes: pre.stringPrefixes,
+    rawStringDelims: pre.rawStringDelims,
+    percentLiterals: pre.percentLiterals,
+    inferRegex: pre.inferRegex,
     openTag: pre.openTag,
     closeTag: pre.closeTag,
     features: pre.features,
@@ -1264,6 +1498,7 @@ proc initLexerFromMemFile*(spec: SweetSpec, mf: MemFile, path: string = "", enab
     line: 1, col: 1, pos: 0,
     symbols: spec.symbols,
     identifiers: spec.identifiers,
+    keywordScopes: initTable[string, string](),
     inlineComment: spec.inline_comment,
     blockComment: spec.block_comment,
     hashComments: spec.hash_comments,
@@ -1271,6 +1506,10 @@ proc initLexerFromMemFile*(spec: SweetSpec, mf: MemFile, path: string = "", enab
     rawStrings: spec.raw_strings,
     extendedNumbers: spec.extended_numbers,
     intSuffixes: spec.int_suffixes,
+    heredocs: spec.heredocs,
+    stringPrefixes: spec.string_prefixes,
+    rawStringDelims: spec.raw_string_delims,
+    percentLiterals: spec.percent_literals,
     openTag: spec.open_tag,
     closeTag: spec.close_tag,
     filters: spec.filters,
@@ -1288,18 +1527,9 @@ proc initLexerFromMemFile*(spec: SweetSpec, mf: MemFile, path: string = "", enab
     if spec.features.templateLiterals: result.features.incl(featTemplateLit)
     if spec.features.labeledStatements: result.features.incl(featLabeledStmt)
     if spec.features.commandSyntax: result.features.incl(featCommandSyntax)
-  if spec.operators != nil:
-    result.allOps = @[]
-    for k in spec.symbols.keys: result.allOps.add(k)
-    for g in spec.operators.prefix:
-      for tok in g.tokens: result.allOps.add(tok)
-    for g in spec.operators.infix:
-      for tok in g.tokens: result.allOps.add(tok)
-      for kw in g.keywords: result.allOps.add(kw)
-    if spec.operators.assignment != nil:
-      for tok in spec.operators.assignment.tokens: result.allOps.add(tok)
-    if spec.operators.ternary != nil:
-      result.allOps.add(spec.operators.ternary.token)
+  result.buildAllOps(spec)
+  result.buildRegexHints(spec)
+  result.buildKeywordScopes(spec)
   result.current = result.charAt(0)
 
 proc resetLexer*(l: SweetLexer) =
@@ -1313,6 +1543,8 @@ proc resetLexer*(l: SweetLexer) =
   l.filterScanIdx = 0
   l.expectRegex = false
   l.tagTerminated = false
+  l.lastTokKind = tkEOF
+  l.lastTokValue = ""
   l.current = if l.len > 0: l.charAt(0) else: '\0'
 
 proc closeLexer*(l: var SweetLexer) =

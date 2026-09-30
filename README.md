@@ -20,8 +20,9 @@
 - Tree-sitter code folding
 - JSON-based AST generator / indent-based dump tree
 - ANSI, HTML and JSON-LD Renderers
-- Built-in syntax support for: C, Crystal, D lang, Go, JavaScript, Nim, PHP, Python, Ruby, Rust and TypeScript
-- Highlight-only support (lexer + renderers, no AST) for: CMake, CSV, CSS, Dockerfile, EJS, Handlebars, HTML, INI, Jinja2, JSON, Liquid, Makefile, Markdown, Nginx, Shell, systemd, TOML, XML and YAML
+- **Parsers** (lexer + Pratt parser + AST + validation) for: C, Go, JavaScript, Nim, PHP, Ruby — plus TypeScript, which reuses the JavaScript handlers
+- **Highlight-only** (lexer + renderers, no parser, no AST) for: C++, Crystal, D lang, Python, Rust, CMake, CSV, CSS, Dockerfile, EJS, Handlebars, HTML, INI, Jinja2, JSON, Liquid, Makefile, Markdown, Nginx, Shell, systemd, TOML, XML and YAML
+- Every one of those also highlights through the lexer alone, so broken or half-written code still renders — see [Unified highlight](#unified-highlight)
 - Resolves language by extension or by well-known filename (`Dockerfile`, `Makefile`, `CMakeLists.txt`, `.env`)
 - **Context-aware error** reporting while parsing
 - Plugin System for creating custom syntaxes (soon 🔥)
@@ -62,6 +63,43 @@ echo highlightFile("Dockerfile", hfJson)
 ```
 
 Highlights derived scopes for configuration, markup and template formats come from YAML `filters`: YAML/TOML/JSON keys, Makefile targets and systemd keys become `variable.other.property`, YAML tags/anchors, TOML tables and systemd sections become `entity.name.tag`, HTML/XML tag names become `markup.tag` with attributes as `entity.other.attribute-name`, Markdown/CSS get `markup.*` / `selector.*` scopes, and template engines add their own delimiter scopes.
+
+A highlight-only spec needs just `name`, `extension`, `symbols`, `identifiers` and the lexer flags — no `operators:` or `statements:`, since those only drive the Pratt parser. The lexer-only flags are:
+
+| Key | Effect |
+|-----|--------|
+| `inline_comment` / `block_comment` / `hash_comments` | Comment syntax |
+| `raw_strings` | Backquoted multi-line raw strings (Go) |
+| `extended_numbers` | Imaginary literals, hex floats, trailing-dot floats (Go) |
+| `int_suffixes` | C-style number suffixes folded in (`1ULL`, `1.5f`) |
+| `heredocs` | `<<NAME` runs to a terminator line (Ruby, PHP, shell) |
+| `percent_literals` | `%w[..]`, `%i(..)`, `%q{..}` are string literals (Ruby) |
+| `string_prefixes` | Identifier prefixes glued to a quote (`u8"x"`, `L'c'`, `b"x"`) |
+| `raw_string_delims` | An `R` prefix opens `R"tag(...)tag"` (C++17) |
+| `open_tag` / `close_tag` | Embedded-language tags (`<?php`, `?>`) |
+| `filters` | Regex overlays assigning scopes to markup/config constructs |
+| `keyword_scopes` | Scope → lexemes map, giving keywords a TextMate scope |
+
+#### Keyword scopes
+Every renderer classifies a token from the spec, never from a built-in word list, so each language owns its own vocabulary. `keyword_scopes` is the optional map from a TextMate scope to the lexemes that carry it:
+
+```yaml
+keyword_scopes:
+  storage.type: ["void", "char", "int", "float", "double"]
+  storage.modifier: ["const", "volatile", "static", "extern", "inline"]
+  keyword.control: ["if", "else", "for", "while", "switch", "return"]
+  constant.language.null: ["NULL"]
+  constant.language.boolean: ["true", "false"]
+```
+
+A word in `identifiers` that this map does not mention is reported as a plain `keyword`, so the map is purely additive and a spec may ship without it — that is why the remaining specs, which declare no `keyword_scopes` yet, still highlight every keyword correctly but uniformly. Two rules keep it honest: `identifiers` is consulted first, so a stale entry here cannot promote a plain variable to a keyword, and a spec that wants a different null or boolean word (`NULL`, `nil`, `None`, `undefined`, `nullptr`) simply lists its own. Quote the lexemes: YAML reads a bare `null`, `true` or `false` as a scalar rather than a string.
+
+This is also why no renderer keeps a keyword list of its own. It used to, and the list was a union of every language's vocabulary that mislabelled other languages' words — CSS's at-rules were reported as `keyword.control`, and C's `NULL` and Go's `nil` as plain keywords while JavaScript's `null` was a null literal.
+
+Because no parser runs, the lexer decides `/regex/` versus division itself: it reuses the spec's `statements.expect_regex_after` token and keyword lists to reach the same verdict `GenericParser` would. Languages that declare no such list never see a regex token. Because `/` after a *value* is genuinely ambiguous (`f(a) / 2`), a regex directly after an identifier, `)`, `]` or a literal still reads as division — bind it to a name (`r = /re/`) if you want it recognised.
+
+#### Known gaps
+The D, Python and Rust specs are still keyword-and-symbol only: none of them declares comment syntax yet, so `#` in Python and `//` in D and Rust highlight as punctuation. Python additionally has no f-string/b-prefix support and Rust lifetimes (`'a`) still lex as character literals. These are the only languages whose highlighting is materially incomplete.
 
 #### JSON renderer
 The JSON renderer emits each token as its own NDJSON line, designed to be streamed to higher-level applications over websocket/udp so editors and IDEs can build syntax highlighting:
@@ -114,7 +152,13 @@ The `sweetsyntax` binary explores source files by extension:
 sweetsyntax parse hello.nim   # validate: parse and report errors
 sweetsyntax ast hello.nim     # print the full AST as JSON
 sweetsyntax tree hello.nim    # print the AST as an indent-based tree
+sweetsyntax highlight main.cpp  # highlight any language, lexer only, no AST
 ```
+
+`highlight` works for **every** known syntax, including the highlight-only ones
+that have no parser handlers. Use `--format ascii|html|json`, `--no-color` to
+drop ANSI codes, and `-o` to write `<file>.txt` / `.html` / `.json` next to the
+input.
 
 `tree` prints the AST Nim `dumpTree`-style (2 spaces per level, `=value` on leaf nodes). For `echo "hi", 42`:
 

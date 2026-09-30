@@ -103,6 +103,18 @@ identifiers:
   true: "true"
   false: "false"
 
+# Keyword scopes give a keyword its TextMate scope. These live here so that
+# each spec owns its own vocabulary and the renderer holds none of it; any
+# identifier left out below still highlights, as a plain `keyword`.
+keyword_scopes:
+  storage.type: ["void"]
+  storage.modifier: ["const", "let", "var", "public", "protected", "private"]
+  keyword.control: ["if", "else", "for", "while", "do", "switch", "case", "default", "break", "continue", "return", "try", "catch", "finally", "throw", "yield", "await"]
+  keyword.operator: ["typeof", "delete", "new", "instanceof", "in"]
+  keyword: ["async", "class", "extends", "function", "import", "export", "from", "super", "debugger", "echo", "implements", "with"]
+  constant.language.boolean: ["true", "false"]
+  variable.language: ["this"]
+
 blocks:
   open: "{"
   close: "}"

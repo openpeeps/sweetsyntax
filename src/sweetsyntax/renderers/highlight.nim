@@ -35,6 +35,10 @@ const extToSyntax = {
   "c": KnownSyntax.c, "h": KnownSyntax.c,
   "c99": KnownSyntax.c, "c11": KnownSyntax.c,
   "c17": KnownSyntax.c, "c23": KnownSyntax.c,
+  "cpp": KnownSyntax.cpp, "cc": KnownSyntax.cpp, "cxx": KnownSyntax.cpp,
+  "c++": KnownSyntax.cpp, "hpp": KnownSyntax.cpp, "hh": KnownSyntax.cpp,
+  "hxx": KnownSyntax.cpp, "h++": KnownSyntax.cpp, "inl": KnownSyntax.cpp,
+  "ipp": KnownSyntax.cpp, "tcc": KnownSyntax.cpp,
   "rs": KnownSyntax.rust,
   "rb": KnownSyntax.ruby, "ruby": KnownSyntax.ruby,
   "rake": KnownSyntax.ruby, "gemspec": KnownSyntax.ruby,
@@ -115,6 +119,11 @@ proc highlight*(lang: KnownSyntax, code: string,
   ## Lexer-only: no parsing or validation is performed.
   let syntax = getKnownSyntax(lang)
   var lx = initLexer(syntax.spec, code, enableFilters)
+  # No parser runs here to supply the "a regex may start now" hint, so let
+  # the lexer infer it from each spec's `expect_regex_after` list. Without
+  # this, `/re/` in JavaScript, TypeScript, Ruby or PHP would highlight as
+  # punctuation around a run of identifiers.
+  lx.inferRegex = true
   case format
   of hfAscii:
     result = highlightAscii(lx, useColor)
@@ -136,8 +145,13 @@ proc highlightFile*(path: string,
   var lang: KnownSyntax
   if ext.len > 1 and extToSyntax.hasKey(ext.strip(chars = {'.'}).toLowerAscii):
     lang = syntaxForExt(ext)
+  elif filenameToSyntax.hasKey(name.toLowerAscii):
+    lang = syntaxForFilename(name)
   else:
-    lang = syntaxForFilename(name)   # raises when unknown
+    raise newException(SweetHighlightError,
+      if ext.len > 1: "Unsupported file extension: ." &
+          ext.strip(chars = {'.'}).toLowerAscii & " (" & name & ")"
+      else: "No syntax for filename: " & name)
   let code =
     try:
       readFile(path)

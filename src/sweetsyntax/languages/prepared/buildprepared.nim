@@ -35,6 +35,14 @@ macro buildPrepared*(yamlPath: static string): untyped =
   if identPairs.len > 0:
     body.add parseStmt("t.identifiers = [" & identPairs.join(", ") & "].toTable()")
 
+  # keyword scopes: spec is scope -> [lexemes], the lexer wants the inverse
+  var keywordScopePairs: seq[string]
+  for scope, lexemes in spec.keyword_scopes:
+    for lexeme in lexemes:
+      keywordScopePairs.add "(" & q(lexeme) & ", " & q(scope) & ")"
+  if keywordScopePairs.len > 0:
+    body.add parseStmt("t.keywordScopes = [" & keywordScopePairs.join(", ") & "].toTable()")
+
   # inline comment
   if spec.inline_comment.isSome:
     body.add parseStmt("t.inlineComment = some(" & q(spec.inline_comment.get) & ")")
@@ -61,6 +69,24 @@ macro buildPrepared*(yamlPath: static string): untyped =
   # C-style integer/float suffixes (`1U`, `100ULL`, `1.5f`)
   if spec.int_suffixes:
     body.add parseStmt("t.intSuffixes = true")
+
+  # heredocs (`<<EOS`, `<<<EOT`)
+  if spec.heredocs:
+    body.add parseStmt("t.heredocs = true")
+
+  # string prefixes (`u8"x"`, `L'c'`, `R"tag(...)tag"`, `b"x"`)
+  var prefixList: seq[string]
+  for pfx in spec.string_prefixes: prefixList.add q(pfx)
+  if prefixList.len > 0:
+    body.add parseStmt("t.stringPrefixes = @[" & prefixList.join(", ") & "]")
+
+  # C++17 delimited raw strings (`R"tag(...)tag"`)
+  if spec.raw_string_delims:
+    body.add parseStmt("t.rawStringDelims = true")
+
+  # Ruby percent literals (`%w[..]`, `%i(..)`)
+  if spec.percent_literals:
+    body.add parseStmt("t.percentLiterals = true")
 
   # open/close tags
   if spec.open_tag.isSome:

@@ -24,21 +24,18 @@ import ../sweetlexer
 
 const
   operatorChars = {'+', '-', '*', '/', '%', '=', '<', '>', '!', '&', '|', '^', '~', '?'}
-  storageTypeKeywords = [
-    "auto", "char", "const", "double", "enum", "extern", "float", "int",
-    "long", "register", "restrict", "short", "signed", "static", "struct",
-    "typedef", "union", "unsigned", "void", "volatile",
-    "_Bool", "_Complex", "_Imaginary", "class", "interface", "type", "def",
-    "fn", "func", "proc", "let", "var", "bool", "byte", "string", "object",
-    "array", "public", "private", "protected", "abstract", "final", "impl"]
-  controlKeywords = [
-    "if", "else", "for", "while", "do", "switch", "case", "default",
-    "return", "break", "continue", "goto", "try", "catch", "finally",
-    "throw", "import", "export", "from", "yield", "await", "new", "delete",
-    "typeof", "instanceof", "in", "of", "when", "elif", "except", "raise",
-    "block", "with", "without", "match", "as", "async", "loop",
-    "media", "keyframes", "supports", "font-face", "page", "namespace",
-    "charset"]
+    # A punctuation token is reported as `keyword.operator` when it opens with
+    # one of these. This is deliberately kept here rather than read from the
+    # spec: it describes the orthography shared by every language (operators
+    # are spelled with operator characters) and not any one language's
+    # vocabulary. It also has to stay usable for specs that declare no
+    # `operators:` block at all -- highlight-only specs like `cpp.yaml` have
+    # none, since that table exists for the Pratt parser, so the operator
+    # vocabulary cannot come from there without making lexer-only rendering
+    # depend on a parser table. Per-language refinement belongs in the spec's
+    # own `symbols` names and, where finer control is needed, in
+    # `keyword_scopes`.
+
 
 proc scopeForFilterAttr(tok: Token): string =
   ## Filter-driven scopes for non-programming languages (CSS, Markdown).
@@ -62,12 +59,15 @@ proc scopeForFilterAttr(tok: Token): string =
 
 proc scopeForToken*(lexer: SweetLexer, tok: Token): string =
   ## Derive a TextMate-style scope for the given token, based on the token
-  ## kind and the keyword table declared in the syntax YAML spec.
+  ## kind and the tables declared in the syntax YAML spec.
   ##
-  ## Note: `tok.attr` holds keyword lexemes (e.g. "int", "if"), not semantic
-  ## classes, so scopes are derived from the kind and the identifiers table
-  ## rather than from attributes. YAML `filters` (CSS, Markdown) are the
-  ## exception: their dotted attrs (e.g. "markup.heading") map 1:1 to scopes.
+  ## Keyword classification is entirely the spec's business: a spec lists the
+  ## lexemes it wants scoped in `keyword_scopes` and the renderer just looks
+  ## the lexeme up, so no vocabulary is baked in here. A spec that declares no
+  ## scopes gets a flat `keyword` for every identifier it lists. `tok.attr`
+  ## holds keyword lexemes (e.g. "int", "if"), not semantic classes, so it is
+  ## never used to classify. YAML `filters` (CSS, Markdown) are the exception:
+  ## their dotted attrs (e.g. "markup.heading") map 1:1 to scopes.
   let filterScope = scopeForFilterAttr(tok)
   if filterScope.len > 0:
     return filterScope
@@ -90,15 +90,12 @@ proc scopeForToken*(lexer: SweetLexer, tok: Token): string =
     let value = lexer.getTokenValue(tok)
     if "field.name" in tok.attr:
       result = "variable.other.property"
-    elif value in ["true", "false"]:
-      result = "constant.language.boolean"
-    elif value in ["null", "undefined"]:
-      result = "constant.language.null"
     elif value in lexer.identifiers:
-      if value in storageTypeKeywords:
-        result = "storage.type"
-      elif value in controlKeywords:
-        result = "keyword.control"
+      # The spec declared this word a keyword; it may refine that with a
+      # scope. Testing `identifiers` first means a stale or misspelled entry
+      # in `keyword_scopes` cannot promote a plain variable to a keyword.
+      if lexer.keywordScopes.hasKey(value):
+        result = lexer.keywordScopes[value]
       else:
         result = "keyword"
     else:

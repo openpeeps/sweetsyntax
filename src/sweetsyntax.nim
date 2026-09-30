@@ -103,6 +103,38 @@ when isMainModule:
       echo e.msg
       quit 1
 
+  proc highlightCommand(v: Values) =
+    # Lexer-only highlighting: tokenize with the language's YAML spec and
+    # render, without parsing or validating. Works for every known syntax,
+    # including the highlight-only ones that have no parser handlers.
+    let srcPath = $(v.get("script").getPath)
+    var format = hfAscii
+    if v.has("format"):
+      case v.get("format").getStr
+      of "ascii", "ansi", "terminal": discard
+      of "html": format = hfHtml
+      of "json", "ndjson": format = hfJson
+      else:
+        echo "Unknown format: use ascii, html or json"
+        quit 1
+    let useColor = not v.has("--no-color")
+    var output: string
+    try:
+      output = highlightFile(srcPath, format, useColor)
+    except SweetHighlightError as e:
+      echo e.msg
+      quit 1
+    if v.has("-o"):
+      let outExt =
+        if format == hfHtml: ".html"
+        elif format == hfJson: ".json"
+        else: ".txt"
+      let outPath = srcPath.changeFileExt(outExt)
+      writeFile(outPath, output)
+      echo "Wrote " & outPath
+    else:
+      stdout.write output
+
   initKapsis do:
     commands:
       parse path(script):
@@ -111,3 +143,5 @@ when isMainModule:
         ## Generate AST of a script by extension
       tree path(script):
         ## Print the AST of a script as an indent-based tree
+      highlight path(script), ?string(format), ?bool("-o"), ?bool("--no-color"):
+        ## Highlight a file with the lexer only, no parsing or AST

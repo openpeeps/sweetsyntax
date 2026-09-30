@@ -17,6 +17,13 @@ type
     ## A table mapping symbol names to their literal representations, e.g. "plus" -> "+"
   IdentsTable* = Table[string, string]
     ## A table mapping identifier names to their literal representations
+
+  KeywordScopes* = Table[string, seq[string]]
+    ## Maps a TextMate-style scope to the lexemes that should carry it, e.g.
+    ## "storage.type" -> @["int", "char"]. Presentational only: the renderers
+    ## read it to classify keywords, the parser ignores it. Note the keys are
+    ## scopes and the values are lexemes, so this is *not* stored in
+    ## `IdentsTable` form (that one is inverted, lexeme -> attr).
   
   AstNode* = object
     kind: string
@@ -149,6 +156,9 @@ type
     ## Populated by buildParser macro.
     symbols*: Table[string, string]
     identifiers*: Table[string, string]
+    keywordScopes*: Table[string, string]
+      # flattened lexeme -> scope, inverted from `spec.keyword_scopes` so the
+      # renderer does one lookup per keyword token
     inlineComment*: Option[string]
     blockComment*: array[2, string]
     hashComments*: bool
@@ -163,6 +173,24 @@ type
     intSuffixes*: bool
       # C-style integer/float suffixes folded into number tokens
       # (`1U`, `100ULL`, `0xFFL`, `1.5f`)
+    heredocs*: bool
+      # whether `<<NAME` opens a here-document that runs to a terminator
+      # line (Ruby, PHP, shell). Off for languages where `<<` is only a
+      # shift operator, so `cout << "x"` never scans as a heredoc.
+    stringPrefixes*: seq[string]
+      # identifier prefixes that may be glued to a quote to form one string
+      # token (C++ `u8"x"`, `L'c'`, `R"tag(...)tag"`; Rust `b"x"`)
+    rawStringDelims*: bool
+      # whether an `R`-style prefix introduces a delimited raw string
+      # (`R"tag(...)tag"`, C++17)
+    percentLiterals*: bool
+      # whether `%w[..]`, `%i(..)`, `%q{..}` and friends are percent string
+      # literals (Ruby) rather than the `%` operator
+    inferRegex*: bool
+      # when true, decide `/regex/` vs division from the previous significant
+      # token and the spec's `expect_regex_after` lists. Only for consumers
+      # with no parser to supply the hint (e.g. `highlight`); the parser sets
+      # `expectRegex` itself and must not enable this.
     openTag*: Option[string]
     closeTag*: Option[string]
     features*: set[LanguageFeature]
@@ -201,10 +229,29 @@ type
     int_suffixes*: bool
       ## C-style integer/float suffixes folded into number tokens
       ## (`1U`, `100ULL`, `0xFFL`, `1.5f`)
+    heredocs*: bool
+      ## whether `<<NAME` opens a here-document that runs to a terminator
+      ## line (Ruby, PHP, shell). Off for languages where `<<` is only a
+      ## shift operator, so `cout << "x"` never scans as a heredoc.
+    string_prefixes*: seq[string]
+      ## identifier prefixes that may be glued to a quote to form one string
+      ## token (C++ `u8"x"`, `L'c'`, `R"tag(...)tag"`; Rust `b"x"`)
+    raw_string_delims*: bool
+      ## whether an `R`-style prefix introduces a delimited raw string
+      ## (`R"tag(...)tag"`, C++17)
+    percent_literals*: bool
+      ## whether `%w[..]`, `%i(..)`, `%q{..}` and friends are percent string
+      ## literals (Ruby) rather than the `%` operator
     symbols*: SymbolsTable
       ## mapping of symbol names to their literal representations, e.g. "plus" -> "+"
     identifiers*: IdentsTable
       ## mapping of identifier names to their literal representations, e.g. "let" -> "let"
+    keyword_scopes*: KeywordScopes
+      ## optional scope -> lexemes map used by the renderers to classify
+      ## keywords, e.g. "storage.type" -> ["int", "char"]. Every lexeme listed
+      ## here is reported with that scope whatever language the renderer is
+      ## driving, so a spec owns its own vocabulary. Omit it and every declared
+      ## identifier renders as a plain `keyword`.
     filters*: seq[SweetFilter]
       ## list of filters that define regex patterns for token matching
     definitions*: Definitions
@@ -226,6 +273,7 @@ type
     py = "py"
     nim = "nim"
     c = "c"
+    cpp = "cpp"
     rust = "rs"
     ruby = "rb"
     php = "php"
@@ -264,6 +312,7 @@ const
   pySyntaxSource = staticRead(currentSourcePath().parentDir / "syntaxes" / "python.yaml")
   nimSyntaxSource = staticRead(currentSourcePath().parentDir / "syntaxes" / "nim.yaml")
   cSyntaxSource = staticRead(currentSourcePath().parentDir / "syntaxes" / "c.yaml")
+  cppSyntaxSource = staticRead(currentSourcePath().parentDir / "syntaxes" / "cpp.yaml")
   rsSyntaxSource = staticRead(currentSourcePath().parentDir / "syntaxes" / "rust.yaml")
   rbSyntaxSource = staticRead(currentSourcePath().parentDir / "syntaxes" / "ruby.yaml")
   phpSyntaxSource = staticRead(currentSourcePath().parentDir / "syntaxes" / "php.yaml")
@@ -302,6 +351,7 @@ let
     "py": pySyntaxSource,
     "nim": nimSyntaxSource,
     "c": cSyntaxSource,
+    "cpp": cppSyntaxSource,
     "rs": rsSyntaxSource,
     "rb": rbSyntaxSource,
     "php": phpSyntaxSource,

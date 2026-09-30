@@ -13,6 +13,9 @@ block_comment:
   - '*/'
 hash_comments: true
 
+# `<<<EOT`, `<<<'EOT'`, `<<<"EOT"`
+heredocs: true
+
 open_tag: "<?php"
 close_tag: "?>"
 
@@ -155,6 +158,19 @@ identifiers:
   null: "null"
   self: "self"
   parent: "parent"
+
+# Keyword scopes give a keyword its TextMate scope. These live here so that
+# each spec owns its own vocabulary and the renderer holds none of it; any
+# identifier left out below still highlights, as a plain `keyword`.
+keyword_scopes:
+  storage.type: ["array", "callable"]
+  storage.modifier: ["abstract", "const", "final", "private", "protected", "public", "readonly", "static", "var"]
+  keyword.control: ["if", "elseif", "else", "endif", "foreach", "as", "for", "endfor", "while", "endwhile", "do", "switch", "endswitch", "case", "default", "break", "continue", "return", "try", "catch", "finally", "throw", "goto", "match", "yield", "exit", "declare", "enddeclare", "endforeach"]
+  keyword.operator: ["and", "or", "xor"]
+  keyword: ["class", "clone", "echo", "empty", "enum", "eval", "extends", "fn", "function", "global", "implements", "include", "include_once", "instanceof", "insteadof", "interface", "isset", "list", "namespace", "new", "print", "require", "require_once", "trait", "unset", "use"]
+  constant.language.boolean: ["true", "false"]
+  constant.language.null: ["null"]
+  variable.language: ["self", "parent"]
 
 blocks:
   open: "{"

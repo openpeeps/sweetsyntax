@@ -132,6 +132,19 @@ identifiers:
   symbol: "symbol"
   voidType: "void"
 
+# Keyword scopes give a keyword its TextMate scope. These live here so that
+# each spec owns its own vocabulary and the renderer holds none of it; any
+# identifier left out below still highlights, as a plain `keyword`.
+keyword_scopes:
+  storage.type: ["void", "any", "never", "unknown", "bigint", "object", "string", "number", "symbol"]
+  storage.modifier: ["const", "let", "var", "public", "protected", "private", "readonly", "abstract", "declare", "override", "static", "accessor", "using"]
+  keyword.control: ["if", "else", "for", "while", "do", "switch", "case", "default", "break", "continue", "return", "try", "catch", "finally", "throw", "yield", "await"]
+  keyword.operator: ["typeof", "delete", "new", "instanceof", "in"]
+  keyword: ["class", "extends", "function", "import", "export", "from", "super", "debugger", "echo", "enum", "interface", "namespace", "module", "type", "as", "is", "keyof", "infer", "asserts", "satisfies", "of", "implements", "with"]
+  constant.language.boolean: ["true", "false"]
+  constant.language.null: ["null", "undefined"]
+  variable.language: ["this"]
+
 blocks:
   open: "{"
   close: "}"

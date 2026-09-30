@@ -191,6 +191,69 @@ suite "Template engines":
                  KnownSyntax.liquid, KnownSyntax.ejs]:
       check "markup.tag" in scopes(lang, "<div class=\"a\">{{ x }}</div>")
 
+suite "Highlight-only languages lex multi-character operators":
+  # `allOps` is seeded from the spec's `symbols` table, so a spec with no
+  # `operators:` section (every highlight-only language) still lexes `==`,
+  # `->`, `:=` and friends as single tokens instead of splitting them.
+  test "python operators stay whole":
+    let toks = tokens(KnownSyntax.py, "a += 1\nb = a ** c // d\n")
+    for op in ["+=", "**", "//"]:
+      check hasKind(toks, op, "punct")
+
+  test "d operators stay whole":
+    let toks = tokens(KnownSyntax.d, "x = a >>> b >>>= c;\n")
+    check hasKind(toks, ">>>", "punct")
+    check hasKind(toks, ">>>=", "punct")
+
+  test "rust operators stay whole":
+    let toks = tokens(KnownSyntax.rust, "fn f() -> bool { a >= b }\n")
+    check hasKind(toks, "->", "punct")
+    check hasKind(toks, ">=", "punct")
+
+  test "markup and config operators stay whole":
+    let toks = tokens(KnownSyntax.make, "CC := gcc\n")
+    check hasKind(toks, ":=", "punct")
+    let sh = tokens(KnownSyntax.shell, "a; case x in y) ;; esac\n")
+    check hasKind(sh, ";;", "punct")
+    let yml = tokens(KnownSyntax.yaml, "a: 1\n<<: *base\n")
+    check hasKind(yml, "<<", "punct")
+
+suite "Lexer flags from the spec":
+  test "heredocs are opt-in":
+    # Only specs that declare here-documents scan for a terminator line, so
+    # `<<` stays a plain shift everywhere else.
+    for lang in [KnownSyntax.ruby, KnownSyntax.php, KnownSyntax.shell]:
+      check getKnownSyntax(lang).spec.heredocs
+    for lang in [KnownSyntax.cpp, KnownSyntax.c, KnownSyntax.js,
+                 KnownSyntax.nim, KnownSyntax.py]:
+      check not getKnownSyntax(lang).spec.heredocs
+
+  test "a shift is never a heredoc without the flag":
+    let cpp = tokens(KnownSyntax.cpp, "cout << \"x\";\nhi\n")
+    check hasKind(cpp, "<<", "punct")
+    check hasAttr(cpp, "<<", "shiftLeft")
+    check hasKind(cpp, "hi", "ident")
+
+  test "specs with heredocs still lex theirs":
+    let toks = tokens(KnownSyntax.ruby, "msg = <<EOS\nhello\nEOS\n")
+    var found = false
+    for t in toks:
+      if t.kind == "string" and t.value.startsWith("<<EOS"):
+        check "heredoc" in t.attrs
+        found = true
+    check found
+
+  test "string prefixes are opt-in":
+    check getKnownSyntax(KnownSyntax.cpp).spec.string_prefixes.len > 0
+    check getKnownSyntax(KnownSyntax.cpp).spec.raw_string_delims
+    check getKnownSyntax(KnownSyntax.c).spec.string_prefixes.len == 0
+    check not getKnownSyntax(KnownSyntax.c).spec.raw_string_delims
+
+  test "an unprefixed quote still starts a string without the flag":
+    let toks = tokens(KnownSyntax.c, "char *s = \"hi\"; char c = 'a';\n")
+    check hasKind(toks, "\"hi\"", "string")
+    check hasKind(toks, "'a'", "string")
+
 suite "Filename resolution":
   test "well-known bare filenames resolve":
     let dir = getTempDir() / "sweetsyntax_expansion_test"

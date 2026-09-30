@@ -1,0 +1,205 @@
+# C++ — highlight-only spec (lexer + renderers, no parser/AST).
+#
+# There is deliberately no `operators:` or `statements:` section: those exist
+# to drive the Pratt parser's precedence tables and statement handlers, and
+# this language is supported for syntax highlighting only. The lexer gets
+# everything it needs from `symbols`, `identifiers` and the flags below.
+
+name: C++
+extension:
+  - cpp
+  - cc
+  - cxx
+  - c++
+  - hpp
+  - hh
+  - hxx
+  - h++
+  - inl
+  - ipp
+  - tcc
+
+inline_comment: '//'
+block_comment:
+  - '/*'
+  - '*/'
+
+int_suffixes: true
+
+# `u8`, `L`, `R`, `u8R`, ... glued directly to the quote form one string token.
+# A trailing `R` (with `raw_string_delims`) opens `R"tag(...)tag"` instead.
+string_prefixes: ["u8", "u", "U", "L", "u8R", "uR", "UR", "LR", "R"]
+raw_string_delims: true
+
+symbols:
+  plus: '+'
+  minus: '-'
+  multiply: '*'
+  divide: '/'
+  modulo: '%'
+  assign: '='
+  eq: '=='
+  ne: '!='
+  lt: '<'
+  lte: '<='
+  gt: '>'
+  gte: '>='
+  spaceship: '<=>'
+  and: '&'
+  andand: '&&'
+  bitAndAssign: '&='
+  or: '|'
+  oror: '||'
+  bitOrAssign: '|='
+  xor: '^'
+  xorAssign: '^='
+  not: '!'
+  tilde: '~'
+  shiftLeft: '<<'
+  shiftRight: '>>'
+  shiftLeftAssign: '<<='
+  shiftRightAssign: '>>='
+  plusAssign: '+='
+  minusAssign: '-='
+  multiplyAssign: '*='
+  divideAssign: '/='
+  moduloAssign: '%='
+  increment: '++'
+  decrement: '--'
+  arrow: '->'
+  memberArrow: '->*'
+  memberDot: '.*'
+  scope: '::'
+  ellipsis: '...'
+  dot: '.'
+  question: '?'
+  colon: ':'
+  scolon: ';'
+  comma: ','
+  parl: '('
+  parr: ')'
+  sqbl: '['
+  sqbr: ']'
+  curl: '{'
+  curr: '}'
+  squote: "'"
+  quote: '"'
+  hash: '#'
+  doubleHash: '##'
+  dollar: '$'
+  at: '@'
+
+identifiers:
+  alignas: "alignas"
+  alignof: "alignof"
+  and_eq: "and_eq"
+  asm: "asm"
+  auto: "auto"
+  bitand: "bitand"
+  bitor: "bitor"
+  bool: "bool"
+  break: "break"
+  case: "case"
+  catch: "catch"
+  char: "char"
+  char8_t: "char8_t"
+  char16_t: "char16_t"
+  char32_t: "char32_t"
+  class: "class"
+  compl: "compl"
+  concept: "concept"
+  const: "const"
+  consteval: "consteval"
+  constexpr: "constexpr"
+  constinit: "constinit"
+  const_cast: "const_cast"
+  continue: "continue"
+  co_await: "co_await"
+  co_return: "co_return"
+  co_yield: "co_yield"
+  decltype: "decltype"
+  default: "default"
+  delete: "delete"
+  do: "do"
+  double: "double"
+  dynamic_cast: "dynamic_cast"
+  else: "else"
+  enum: "enum"
+  explicit: "explicit"
+  export: "export"
+  extern: "extern"
+  false: "false"
+  float: "float"
+  for: "for"
+  friend: "friend"
+  goto: "goto"
+  if: "if"
+  inline: "inline"
+  int: "int"
+  long: "long"
+  mutable: "mutable"
+  namespace: "namespace"
+  new: "new"
+  noexcept: "noexcept"
+  not_eq: "not_eq"
+  nullptr: "nullptr"
+  operator: "operator"
+  or_eq: "or_eq"
+  private: "private"
+  protected: "protected"
+  public: "public"
+  register: "register"
+  reinterpret_cast: "reinterpret_cast"
+  requires: "requires"
+  return: "return"
+  short: "short"
+  signed: "signed"
+  sizeof: "sizeof"
+  static: "static"
+  static_assert: "static_assert"
+  static_cast: "static_cast"
+  struct: "struct"
+  switch: "switch"
+  template: "template"
+  this: "this"
+  thread_local: "thread_local"
+  throw: "throw"
+  true: "true"
+  try: "try"
+  typedef: "typedef"
+  typeid: "typeid"
+  typename: "typename"
+  union: "union"
+  unsigned: "unsigned"
+  using: "using"
+  virtual: "virtual"
+  void: "void"
+  volatile: "volatile"
+  wchar_t: "wchar_t"
+  while: "while"
+  xor_eq: "xor_eq"
+
+# Keyword scopes give a keyword its TextMate scope. These live here so that
+# each spec owns its own vocabulary and the renderer holds none of it; any
+# identifier left out below still highlights, as a plain `keyword`.
+keyword_scopes:
+  storage.type: ["void", "bool", "char", "char8_t", "char16_t", "char32_t", "wchar_t", "int", "float", "double"]
+  storage.modifier: ["const", "volatile", "static", "extern", "register", "mutable", "inline", "explicit", "friend", "virtual", "constexpr", "consteval", "constinit", "thread_local", "noexcept", "signed", "unsigned", "short", "long", "private", "protected", "public"]
+  keyword.control: ["if", "else", "for", "while", "do", "switch", "case", "default", "break", "continue", "goto", "return", "try", "catch", "throw", "co_await", "co_return", "co_yield"]
+  keyword.operator: ["and_eq", "bitand", "bitor", "compl", "not_eq", "or_eq", "xor_eq"]
+  keyword: ["auto", "class", "struct", "union", "enum", "namespace", "template", "typename", "using", "operator", "new", "delete", "sizeof", "alignof", "alignas", "decltype", "typeid", "static_assert", "concept", "requires", "export", "asm", "typedef", "const_cast", "dynamic_cast", "reinterpret_cast", "static_cast"]
+  constant.language.boolean: ["true", "false"]
+  constant.language.null: ["nullptr"]
+  variable.language: ["this"]
+
+blocks:
+  open: "{"
+  close: "}"
+
+features:
+  regex_literals: false
+  async_await: false
+  generators: false
+  arrow_functions: false
+  template_literals: false
+  labeled_statements: false

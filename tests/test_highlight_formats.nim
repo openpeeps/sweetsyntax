@@ -61,6 +61,8 @@ const cases: seq[Case] = @[
     "const x = 1;\n/* one\n   two */\n", "const x = 1;", 1),
   (KnownSyntax.c, "C",
     "int x;\n/* one\n   two */\n", "int x;", 1),
+  (KnownSyntax.cpp, "C++",
+    "auto x = 1;\n/* one\n   two */\n", "auto x = 1;", 1),
   (KnownSyntax.nim, "Nim",
     "echo 1\n# one\n   two\n", "echo 1", 1),
 ]

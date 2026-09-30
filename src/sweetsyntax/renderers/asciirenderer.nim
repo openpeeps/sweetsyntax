@@ -43,6 +43,7 @@ proc colorForToken(lexer: SweetLexer, tok: Token): string =
   if scope.startsWith("keyword.control"): return "\e[35;1m"                # bold magenta
   if scope.startsWith("keyword.operator"): return "\e[37m"                 # white
   if scope.startsWith("storage.type"): return "\e[34;1m"                   # bold blue
+  if scope.startsWith("storage.modifier"): return "\e[34m"                # blue
   if scope.startsWith("constant.numeric"): return "\e[36m"                 # cyan
   if scope.startsWith("constant.language"): return "\e[36m"                # cyan
   if scope.startsWith("string"): return "\e[32m"                           # green
