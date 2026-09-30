@@ -1,0 +1,5 @@
+nimTitle	jsonrenderer	sweetsyntax/renderers/jsonrenderer.html	module sweetsyntax/renderers/jsonrenderer		0
+nim	scopeForToken	sweetsyntax/renderers/jsonrenderer.html#scopeForToken,SweetLexer,Token	proc scopeForToken(lexer: SweetLexer; tok: Token): string		63
+nim	tokenToJson	sweetsyntax/renderers/jsonrenderer.html#tokenToJson,SweetLexer,Token	proc tokenToJson(lexer: SweetLexer; tok: Token; includeValue = true): JsonNode		108
+nim	tokenToJsonLd	sweetsyntax/renderers/jsonrenderer.html#tokenToJsonLd,SweetLexer,Token	proc tokenToJsonLd(lexer: SweetLexer; tok: Token; includeValue = true): string		125
+nim	highlightJsonLd	sweetsyntax/renderers/jsonrenderer.html#highlightJsonLd,SweetLexer	proc highlightJsonLd(lexer: var SweetLexer; includeValue = true): string		129

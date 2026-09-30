@@ -1,0 +1,3 @@
+nimTitle	htmlrenderer	sweetsyntax/renderers/htmlrenderer.html	module sweetsyntax/renderers/htmlrenderer		0
+nim	tokenToHtml	sweetsyntax/renderers/htmlrenderer.html#tokenToHtml,SweetLexer,Token	proc tokenToHtml(lexer: var SweetLexer; tok: Token): string		18
+nim	highlightHtml	sweetsyntax/renderers/htmlrenderer.html#highlightHtml,SweetLexer	proc highlightHtml(lexer: var SweetLexer): string		25

@@ -28,7 +28,7 @@
     <label for="nav-toggle" id="nav-overlay"></label>
     <div class="container">
       <h1 class="title">Index</h1>
-      Modules: <a href="index.html">sweetsyntax</a>, <a href="sweetsyntax/config.html">sweetsyntax/config</a>, <a href="sweetsyntax/engine/ast.html">sweetsyntax/engine/ast</a>, <a href="sweetsyntax/engine/parser.html">sweetsyntax/engine/parser</a>, <a href="sweetsyntax/languages/c.html">sweetsyntax/languages/c</a>, <a href="sweetsyntax/languages/go.html">sweetsyntax/languages/go</a>, <a href="sweetsyntax/languages/js.html">sweetsyntax/languages/js</a>, <a href="sweetsyntax/languages/nim.html">sweetsyntax/languages/nim</a>, <a href="sweetsyntax/languages/php.html">sweetsyntax/languages/php</a>, <a href="sweetsyntax/languages/ruby.html">sweetsyntax/languages/ruby</a>, <a href="sweetsyntax/sweetlexer.html">sweetsyntax/sweetlexer</a>, <a href="sweetsyntax/tokenizer.html">sweetsyntax/tokenizer</a>.<br/><p /><h2>API symbols</h2>
+      Modules: <a href="index.html">sweetsyntax</a>, <a href="sweetsyntax/config.html">sweetsyntax/config</a>, <a href="sweetsyntax/engine/ast.html">sweetsyntax/engine/ast</a>, <a href="sweetsyntax/engine/parser.html">sweetsyntax/engine/parser</a>, <a href="sweetsyntax/languages/c.html">sweetsyntax/languages/c</a>, <a href="sweetsyntax/languages/go.html">sweetsyntax/languages/go</a>, <a href="sweetsyntax/languages/js.html">sweetsyntax/languages/js</a>, <a href="sweetsyntax/languages/nim.html">sweetsyntax/languages/nim</a>, <a href="sweetsyntax/languages/php.html">sweetsyntax/languages/php</a>, <a href="sweetsyntax/languages/ruby.html">sweetsyntax/languages/ruby</a>, <a href="sweetsyntax/renderers/asciirenderer.html">sweetsyntax/renderers/asciirenderer</a>, <a href="sweetsyntax/renderers/highlight.html">sweetsyntax/renderers/highlight</a>, <a href="sweetsyntax/renderers/htmlrenderer.html">sweetsyntax/renderers/htmlrenderer</a>, <a href="sweetsyntax/renderers/jsonrenderer.html">sweetsyntax/renderers/jsonrenderer</a>, <a href="sweetsyntax/sweetlexer.html">sweetsyntax/sweetlexer</a>, <a href="sweetsyntax/tokenizer.html">sweetsyntax/tokenizer</a>.<br/><p /><h2>API symbols</h2>
 <dl><dt><a name="%60%5B%5D%3D%60" href="#%60%5B%5D%3D%60"><span>`[]=`:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
           data-doc-search-tag="ast: proc `[]=`(node: Node; index: int | BackwardsIndex; child: Node)" href="sweetsyntax/engine/ast.html#%5B%5D%3D%2CNode%2C%2CNode">ast: proc `[]=`(node: Node; index: int | BackwardsIndex; child: Node)</a></li>
@@ -93,9 +93,17 @@
 <li><a class="reference external"
           data-doc-search-tag="sweetlexer: proc closeLexer(l: var SweetLexer)" href="sweetsyntax/sweetlexer.html#closeLexer%2CSweetLexer">sweetlexer: proc closeLexer(l: var SweetLexer)</a></li>
           </ul></dd>
+<dt><a name="cmake" href="#cmake"><span>cmake:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="config: KnownSyntax.cmake" href="sweetsyntax/config.html#cmake">config: KnownSyntax.cmake</a></li>
+          </ul></dd>
 <dt><a name="compile" href="#compile"><span>compile:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
           data-doc-search-tag="parser: proc compile(spec: SweetSpec): GenericParser" href="sweetsyntax/engine/parser.html#compile%2CSweetSpec">parser: proc compile(spec: SweetSpec): GenericParser</a></li>
+          </ul></dd>
+<dt><a name="crystal" href="#crystal"><span>crystal:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="config: KnownSyntax.crystal" href="sweetsyntax/config.html#crystal">config: KnownSyntax.crystal</a></li>
           </ul></dd>
 <dt><a name="cSpecifiers" href="#cSpecifiers"><span>cSpecifiers:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
@@ -104,6 +112,10 @@
 <dt><a name="css" href="#css"><span>css:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
           data-doc-search-tag="config: KnownSyntax.css" href="sweetsyntax/config.html#css">config: KnownSyntax.css</a></li>
+          </ul></dd>
+<dt><a name="csv" href="#csv"><span>csv:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="config: KnownSyntax.csv" href="sweetsyntax/config.html#csv">config: KnownSyntax.csv</a></li>
           </ul></dd>
 <dt><a name="d" href="#d"><span>d:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
@@ -117,11 +129,19 @@
 <li><a class="reference external"
           data-doc-search-tag="config: type Definitions" href="sweetsyntax/config.html#Definitions">config: type Definitions</a></li>
           </ul></dd>
+<dt><a name="docker" href="#docker"><span>docker:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="config: KnownSyntax.docker" href="sweetsyntax/config.html#docker">config: KnownSyntax.docker</a></li>
+          </ul></dd>
 <dt><a name="dumpTree" href="#dumpTree"><span>dumpTree:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
           data-doc-search-tag="ast: proc dumpTree(n: Node; indent = 0): string" href="sweetsyntax/engine/ast.html#dumpTree%2CNode%2Cint">ast: proc dumpTree(n: Node; indent = 0): string</a></li>
           <li><a class="reference external"
           data-doc-search-tag="ast: proc dumpTree(program: OpenAstProgram): string" href="sweetsyntax/engine/ast.html#dumpTree%2COpenAstProgram">ast: proc dumpTree(program: OpenAstProgram): string</a></li>
+          </ul></dd>
+<dt><a name="ejs" href="#ejs"><span>ejs:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="config: KnownSyntax.ejs" href="sweetsyntax/config.html#ejs">config: KnownSyntax.ejs</a></li>
           </ul></dd>
 <dt><a name="error" href="#error"><span>error:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
@@ -217,6 +237,54 @@
 <li><a class="reference external"
           data-doc-search-tag="go: proc goHandlers(p: var GenericParser)" href="sweetsyntax/languages/go.html#goHandlers%2CGenericParser">go: proc goHandlers(p: var GenericParser)</a></li>
           </ul></dd>
+<dt><a name="handlebars" href="#handlebars"><span>handlebars:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="config: KnownSyntax.handlebars" href="sweetsyntax/config.html#handlebars">config: KnownSyntax.handlebars</a></li>
+          </ul></dd>
+<dt><a name="hfAscii" href="#hfAscii"><span>hfAscii:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="highlight: HighlightFormat.hfAscii" href="sweetsyntax/renderers/highlight.html#hfAscii">highlight: HighlightFormat.hfAscii</a></li>
+          </ul></dd>
+<dt><a name="hfHtml" href="#hfHtml"><span>hfHtml:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="highlight: HighlightFormat.hfHtml" href="sweetsyntax/renderers/highlight.html#hfHtml">highlight: HighlightFormat.hfHtml</a></li>
+          </ul></dd>
+<dt><a name="hfJson" href="#hfJson"><span>hfJson:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="highlight: HighlightFormat.hfJson" href="sweetsyntax/renderers/highlight.html#hfJson">highlight: HighlightFormat.hfJson</a></li>
+          </ul></dd>
+<dt><a name="highlight" href="#highlight"><span>highlight:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="highlight: proc highlight(lang: KnownSyntax; code: string; format: HighlightFormat = hfHtml;
+          useColor = true; enableFilters = true; includeValue = true): string" href="sweetsyntax/renderers/highlight.html#highlight%2CKnownSyntax%2Cstring%2CHighlightFormat">highlight: proc highlight(lang: KnownSyntax; code: string; format: HighlightFormat = hfHtml;
+          useColor = true; enableFilters = true; includeValue = true): string</a></li>
+          </ul></dd>
+<dt><a name="highlightAscii" href="#highlightAscii"><span>highlightAscii:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="asciirenderer: proc highlightAscii(lexer: var SweetLexer; useColor = true): string" href="sweetsyntax/renderers/asciirenderer.html#highlightAscii%2CSweetLexer">asciirenderer: proc highlightAscii(lexer: var SweetLexer; useColor = true): string</a></li>
+          </ul></dd>
+<dt><a name="highlightFile" href="#highlightFile"><span>highlightFile:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="highlight: proc highlightFile(path: string; format: HighlightFormat = hfHtml; useColor = true;
+              enableFilters = true; includeValue = true): string" href="sweetsyntax/renderers/highlight.html#highlightFile%2Cstring%2CHighlightFormat">highlight: proc highlightFile(path: string; format: HighlightFormat = hfHtml; useColor = true;
+              enableFilters = true; includeValue = true): string</a></li>
+          </ul></dd>
+<dt><a name="HighlightFormat" href="#HighlightFormat"><span>HighlightFormat:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="highlight: enum HighlightFormat" href="sweetsyntax/renderers/highlight.html#HighlightFormat">highlight: enum HighlightFormat</a></li>
+          </ul></dd>
+<dt><a name="highlightHtml" href="#highlightHtml"><span>highlightHtml:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="htmlrenderer: proc highlightHtml(lexer: var SweetLexer): string" href="sweetsyntax/renderers/htmlrenderer.html#highlightHtml%2CSweetLexer">htmlrenderer: proc highlightHtml(lexer: var SweetLexer): string</a></li>
+          </ul></dd>
+<dt><a name="highlightJsonLd" href="#highlightJsonLd"><span>highlightJsonLd:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="jsonrenderer: proc highlightJsonLd(lexer: var SweetLexer; includeValue = true): string" href="sweetsyntax/renderers/jsonrenderer.html#highlightJsonLd%2CSweetLexer">jsonrenderer: proc highlightJsonLd(lexer: var SweetLexer; includeValue = true): string</a></li>
+          </ul></dd>
+<dt><a name="html" href="#html"><span>html:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="config: KnownSyntax.html" href="sweetsyntax/config.html#html">config: KnownSyntax.html</a></li>
+          </ul></dd>
 <dt><a name="IdentsTable" href="#IdentsTable"><span>IdentsTable:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
           data-doc-search-tag="config: type IdentsTable" href="sweetsyntax/config.html#IdentsTable">config: type IdentsTable</a></li>
@@ -228,6 +296,10 @@
 <dt><a name="InfixGroup" href="#InfixGroup"><span>InfixGroup:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
           data-doc-search-tag="config: type InfixGroup" href="sweetsyntax/config.html#InfixGroup">config: type InfixGroup</a></li>
+          </ul></dd>
+<dt><a name="ini" href="#ini"><span>ini:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="config: KnownSyntax.ini" href="sweetsyntax/config.html#ini">config: KnownSyntax.ini</a></li>
           </ul></dd>
 <dt><a name="initLexer" href="#initLexer"><span>initLexer:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
@@ -251,6 +323,10 @@
 <li><a class="reference external"
           data-doc-search-tag="ast: iterator items(node: Node): Node" href="sweetsyntax/engine/ast.html#items.i%2CNode">ast: iterator items(node: Node): Node</a></li>
           </ul></dd>
+<dt><a name="jinja2" href="#jinja2"><span>jinja2:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="config: KnownSyntax.jinja2" href="sweetsyntax/config.html#jinja2">config: KnownSyntax.jinja2</a></li>
+          </ul></dd>
 <dt><a name="js" href="#js"><span>js:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
           data-doc-search-tag="config: KnownSyntax.js" href="sweetsyntax/config.html#js">config: KnownSyntax.js</a></li>
@@ -258,6 +334,10 @@
 <dt><a name="jsHandlers" href="#jsHandlers"><span>jsHandlers:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
           data-doc-search-tag="js: proc jsHandlers(p: var GenericParser)" href="sweetsyntax/languages/js.html#jsHandlers%2CGenericParser">js: proc jsHandlers(p: var GenericParser)</a></li>
+          </ul></dd>
+<dt><a name="json" href="#json"><span>json:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="config: KnownSyntax.json" href="sweetsyntax/config.html#json">config: KnownSyntax.json</a></li>
           </ul></dd>
 <dt><a name="KnownSyntax" href="#KnownSyntax"><span>KnownSyntax:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
@@ -286,6 +366,14 @@
 <dt><a name="LexerMark" href="#LexerMark"><span>LexerMark:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
           data-doc-search-tag="sweetlexer: object LexerMark" href="sweetsyntax/sweetlexer.html#LexerMark">sweetlexer: object LexerMark</a></li>
+          </ul></dd>
+<dt><a name="liquid" href="#liquid"><span>liquid:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="config: KnownSyntax.liquid" href="sweetsyntax/config.html#liquid">config: KnownSyntax.liquid</a></li>
+          </ul></dd>
+<dt><a name="make" href="#make"><span>make:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="config: KnownSyntax.make" href="sweetsyntax/config.html#make">config: KnownSyntax.make</a></li>
           </ul></dd>
 <dt><a name="markLexer" href="#markLexer"><span>markLexer:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
@@ -336,6 +424,10 @@
 <dt><a name="newSyntax" href="#newSyntax"><span>newSyntax:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
           data-doc-search-tag="config: proc newSyntax(specPath: string): SweetSyntax" href="sweetsyntax/config.html#newSyntax%2Cstring">config: proc newSyntax(specPath: string): SweetSyntax</a></li>
+          </ul></dd>
+<dt><a name="nginx" href="#nginx"><span>nginx:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="config: KnownSyntax.nginx" href="sweetsyntax/config.html#nginx">config: KnownSyntax.nginx</a></li>
           </ul></dd>
 <dt><a name="nim" href="#nim"><span>nim:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
@@ -657,6 +749,14 @@
 <li><a class="reference external"
           data-doc-search-tag="config: KnownSyntax.rust" href="sweetsyntax/config.html#rust">config: KnownSyntax.rust</a></li>
           </ul></dd>
+<dt><a name="scopeForToken" href="#scopeForToken"><span>scopeForToken:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="jsonrenderer: proc scopeForToken(lexer: SweetLexer; tok: Token): string" href="sweetsyntax/renderers/jsonrenderer.html#scopeForToken%2CSweetLexer%2CToken">jsonrenderer: proc scopeForToken(lexer: SweetLexer; tok: Token): string</a></li>
+          </ul></dd>
+<dt><a name="shell" href="#shell"><span>shell:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="config: KnownSyntax.shell" href="sweetsyntax/config.html#shell">config: KnownSyntax.shell</a></li>
+          </ul></dd>
 <dt><a name="stamp" href="#stamp"><span>stamp:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
           data-doc-search-tag="ast: proc stamp(n: Node; line, col: int): Node" href="sweetsyntax/engine/ast.html#stamp%2CNode%2Cint%2Cint">ast: proc stamp(n: Node; line, col: int): Node</a></li>
@@ -691,6 +791,10 @@
 <li><a class="reference external"
           data-doc-search-tag="config: type SweetFilter" href="sweetsyntax/config.html#SweetFilter">config: type SweetFilter</a></li>
           </ul></dd>
+<dt><a name="SweetHighlightError" href="#SweetHighlightError"><span>SweetHighlightError:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="highlight: object SweetHighlightError" href="sweetsyntax/renderers/highlight.html#SweetHighlightError">highlight: object SweetHighlightError</a></li>
+          </ul></dd>
 <dt><a name="SweetLexer" href="#SweetLexer"><span>SweetLexer:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
           data-doc-search-tag="sweetlexer: type SweetLexer" href="sweetsyntax/sweetlexer.html#SweetLexer">sweetlexer: type SweetLexer</a></li>
@@ -718,6 +822,18 @@
 <dt><a name="SymbolsTable" href="#SymbolsTable"><span>SymbolsTable:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
           data-doc-search-tag="config: type SymbolsTable" href="sweetsyntax/config.html#SymbolsTable">config: type SymbolsTable</a></li>
+          </ul></dd>
+<dt><a name="syntaxForExt" href="#syntaxForExt"><span>syntaxForExt:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="highlight: proc syntaxForExt(ext: string): KnownSyntax" href="sweetsyntax/renderers/highlight.html#syntaxForExt%2Cstring">highlight: proc syntaxForExt(ext: string): KnownSyntax</a></li>
+          </ul></dd>
+<dt><a name="syntaxForFilename" href="#syntaxForFilename"><span>syntaxForFilename:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="highlight: proc syntaxForFilename(path: string): KnownSyntax" href="sweetsyntax/renderers/highlight.html#syntaxForFilename%2Cstring">highlight: proc syntaxForFilename(path: string): KnownSyntax</a></li>
+          </ul></dd>
+<dt><a name="systemd" href="#systemd"><span>systemd:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="config: KnownSyntax.systemd" href="sweetsyntax/config.html#systemd">config: KnownSyntax.systemd</a></li>
           </ul></dd>
 <dt><a name="TernaryDef" href="#TernaryDef"><span>TernaryDef:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
@@ -787,13 +903,37 @@
 <li><a class="reference external"
           data-doc-search-tag="sweetlexer: type Token" href="sweetsyntax/sweetlexer.html#Token">sweetlexer: type Token</a></li>
           </ul></dd>
+<dt><a name="tokenToAscii" href="#tokenToAscii"><span>tokenToAscii:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="asciirenderer: proc tokenToAscii(lexer: SweetLexer; tok: Token; useColor = true): string" href="sweetsyntax/renderers/asciirenderer.html#tokenToAscii%2CSweetLexer%2CToken">asciirenderer: proc tokenToAscii(lexer: SweetLexer; tok: Token; useColor = true): string</a></li>
+          </ul></dd>
+<dt><a name="tokenToHtml" href="#tokenToHtml"><span>tokenToHtml:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="htmlrenderer: proc tokenToHtml(lexer: var SweetLexer; tok: Token): string" href="sweetsyntax/renderers/htmlrenderer.html#tokenToHtml%2CSweetLexer%2CToken">htmlrenderer: proc tokenToHtml(lexer: var SweetLexer; tok: Token): string</a></li>
+          </ul></dd>
+<dt><a name="tokenToJson" href="#tokenToJson"><span>tokenToJson:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="jsonrenderer: proc tokenToJson(lexer: SweetLexer; tok: Token; includeValue = true): JsonNode" href="sweetsyntax/renderers/jsonrenderer.html#tokenToJson%2CSweetLexer%2CToken">jsonrenderer: proc tokenToJson(lexer: SweetLexer; tok: Token; includeValue = true): JsonNode</a></li>
+          </ul></dd>
+<dt><a name="tokenToJsonLd" href="#tokenToJsonLd"><span>tokenToJsonLd:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="jsonrenderer: proc tokenToJsonLd(lexer: SweetLexer; tok: Token; includeValue = true): string" href="sweetsyntax/renderers/jsonrenderer.html#tokenToJsonLd%2CSweetLexer%2CToken">jsonrenderer: proc tokenToJsonLd(lexer: SweetLexer; tok: Token; includeValue = true): string</a></li>
+          </ul></dd>
 <dt><a name="TokenTuple" href="#TokenTuple"><span>TokenTuple:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
           data-doc-search-tag="tokenizer: tuple TokenTuple" href="sweetsyntax/tokenizer.html#TokenTuple">tokenizer: tuple TokenTuple</a></li>
           </ul></dd>
+<dt><a name="toml" href="#toml"><span>toml:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="config: KnownSyntax.toml" href="sweetsyntax/config.html#toml">config: KnownSyntax.toml</a></li>
+          </ul></dd>
 <dt><a name="treeRepr" href="#treeRepr"><span>treeRepr:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
           data-doc-search-tag="ast: proc treeRepr(n: Node): string" href="sweetsyntax/engine/ast.html#treeRepr%2CNode">ast: proc treeRepr(n: Node): string</a></li>
+          </ul></dd>
+<dt><a name="ts" href="#ts"><span>ts:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="config: KnownSyntax.ts" href="sweetsyntax/config.html#ts">config: KnownSyntax.ts</a></li>
           </ul></dd>
 <dt><a name="walk" href="#walk"><span>walk:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
@@ -803,11 +943,19 @@
 <li><a class="reference external"
           data-doc-search-tag="parser: proc walkOpt(p: var GenericParser; val: string)" href="sweetsyntax/engine/parser.html#walkOpt%2CGenericParser%2Cstring">parser: proc walkOpt(p: var GenericParser; val: string)</a></li>
           </ul></dd>
+<dt><a name="xml" href="#xml"><span>xml:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="config: KnownSyntax.xml" href="sweetsyntax/config.html#xml">config: KnownSyntax.xml</a></li>
+          </ul></dd>
+<dt><a name="yaml" href="#yaml"><span>yaml:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="config: KnownSyntax.yaml" href="sweetsyntax/config.html#yaml">config: KnownSyntax.yaml</a></li>
+          </ul></dd>
 </dl>
       <div class="twelve-columns footer">
         <span class="nim-sprite"></span>
         <br>
-        <small style="color: var(--hint);">Made with Nim. Generated: 2026-09-29 14:39:53 UTC</small>
+        <small style="color: var(--hint);">Made with Nim. Generated: 2026-09-30 15:12:25 UTC</small>
       </div>
     </div>
   </div>
