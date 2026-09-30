@@ -1,0 +1,63 @@
+name: Dockerfile
+extension:
+  - dockerfile
+
+hash_comments: true
+
+symbols:
+  assign: '='
+  colon: ':'
+  dash: '--'
+  plus: '+'
+  minus: '-'
+  dot: '.'
+  comma: ','
+  slash: '/'
+  tilde: '~'
+  at: '@'
+  percent: '%'
+  amp: '&'
+  pipe: '|'
+  lt: '<'
+  gt: '>'
+  eq: '=='
+  ne: '!='
+  not: '!'
+  backslash: '\'
+  quote: '"'
+  squote: "'"
+  backtick: '`'
+  dollar: '$'
+  parenl: '('
+  parenr: ')'
+  curl: '{'
+  curr: '}'
+
+identifiers:
+  FROM: "FROM"
+  RUN: "RUN"
+  CMD: "CMD"
+  ENTRYPOINT: "ENTRYPOINT"
+  ENV: "ENV"
+  ARG: "ARG"
+  EXPOSE: "EXPOSE"
+  VOLUME: "VOLUME"
+  USER: "USER"
+  WORKDIR: "WORKDIR"
+  COPY: "COPY"
+  ADD: "ADD"
+  LABEL: "LABEL"
+  HEALTHCHECK: "HEALTHCHECK"
+  ONBUILD: "ONBUILD"
+  STOPSIGNAL: "STOPSIGNAL"
+  SHELL: "SHELL"
+  MAINTAINER: "MAINTAINER"
+  AS: "AS"
+
+features:
+  regex_literals: false
+  async_await: false
+  generators: false
+  arrow_functions: false
+  template_literals: false
+  labeled_statements: false

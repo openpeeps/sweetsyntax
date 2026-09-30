@@ -20,8 +20,9 @@
 - Tree-sitter code folding
 - JSON-based AST generator / indent-based dump tree
 - ANSI, HTML and JSON-LD Renderers
-- Built-in syntax support for: C, Crystal, D lang, Go, JavaScript, Nim, PHP, Python, Ruby, and Rust
-- Highlight-only support (lexer + renderers, no AST) for: CSS and Markdown
+- Built-in syntax support for: C, Crystal, D lang, Go, JavaScript, Nim, PHP, Python, Ruby, Rust and TypeScript
+- Highlight-only support (lexer + renderers, no AST) for: CMake, CSV, CSS, Dockerfile, EJS, Handlebars, HTML, INI, Jinja2, JSON, Liquid, Makefile, Markdown, Nginx, Shell, systemd, TOML, XML and YAML
+- Resolves language by extension or by well-known filename (`Dockerfile`, `Makefile`, `CMakeLists.txt`, `.env`)
 - **Context-aware error** reporting while parsing
 - Plugin System for creating custom syntaxes (soon 🔥)
 - Written in Nim language
@@ -47,6 +48,20 @@ SweetSyntax ships a family of token-level renderers that turn a lexer into a usa
 | **Web** | `renderers/htmlrenderer` | Source text wrapped in `<span class="...">` for CSS styling |
 | **JSON** | `renderers/jsonrenderer` | Line-delimited JSON (NDJSON) — one self-contained token object per line |
 | **Folds** | `renderers/foldrenderer` | Tree-sitter style fold regions as NDJSON |
+| **Highlight** | `renderers/highlight` | Unified lexer-only `highlight`/`highlightFile` for any language → ascii, html or json |
+
+#### Unified highlight
+`highlight` tokenizes any supported language and renders it without parsing or validation, so even broken or incomplete code highlights. `highlightFile` resolves the language from the file extension:
+
+```nim
+import sweetsyntax
+
+echo highlight(KnownSyntax.js, "const x = 42;", hfHtml)
+echo highlight(KnownSyntax.md, "# Hello", hfAscii)
+echo highlightFile("Dockerfile", hfJson)
+```
+
+Highlights derived scopes for configuration, markup and template formats come from YAML `filters`: YAML/TOML/JSON keys, Makefile targets and systemd keys become `variable.other.property`, YAML tags/anchors, TOML tables and systemd sections become `entity.name.tag`, HTML/XML tag names become `markup.tag` with attributes as `entity.other.attribute-name`, Markdown/CSS get `markup.*` / `selector.*` scopes, and template engines add their own delimiter scopes.
 
 #### JSON renderer
 The JSON renderer emits each token as its own NDJSON line, designed to be streamed to higher-level applications over websocket/udp so editors and IDEs can build syntax highlighting:

@@ -1,0 +1,101 @@
+name: Liquid
+extension:
+  - liquid
+
+filters:
+  - name: doctype
+    pattern: "<![A-Za-z]+[A-Za-z ]*"
+    group: 0
+    attr: "markup.tag"
+  - name: tag
+    pattern: "(</?)([a-zA-Z][a-zA-Z0-9-]*)"
+    group: 2
+    attr: "markup.tag"
+  - name: attribute
+    pattern: "([a-zA-Z-]+)[ ]*="
+    group: 1
+    attr: "entity.other.attribute-name"
+  - name: entity
+    pattern: "&[A-Za-z]+;|&#[0-9]+;"
+    group: 0
+    attr: "constant.character.escape"
+  - name: output
+    pattern: "\\{\\{[\\}\\}#\\-]*"
+    group: 0
+    attr: "markup.tag"
+  - name: statement
+    pattern: "\\{%[#\\-]*"
+    group: 0
+    attr: "markup.tag"
+
+symbols:
+  lt: '<'
+  gt: '>'
+  slash: '/'
+  assign: '='
+  not: '!'
+  colon: ':'
+  semicolon: ';'
+  comma: ','
+  amp: '&'
+  pipe: '|'
+  dot: '.'
+  minus: '-'
+  question: '?'
+  hash: '#'
+  at: '@'
+  tilde: '~'
+  quote: '"'
+  squote: "'"
+  backtick: '`'
+  dollar: '$'
+  percent: '%'
+  plus: '+'
+  compare: '=='
+  notEqual: '!='
+  greaterThan: '>'
+  lessThan: '<'
+
+identifiers:
+  assign: "assign"
+  capture: "capture"
+  case: "case"
+  when: "when"
+  else: "else"
+  endcase: "endcase"
+  comment: "comment"
+  endcomment: "endcomment"
+  cycle: "cycle"
+  for: "for"
+  endfor: "endfor"
+  break: "break"
+  continue: "continue"
+  if: "if"
+  elsif: "elsif"
+  endif: "endif"
+  include: "include"
+  layout: "layout"
+  liquid: "liquid"
+  raw: "raw"
+  endraw: "endraw"
+  render: "render"
+  section: "section"
+  tablerow: "tablerow"
+  unless: "unless"
+  true: "true"
+  false: "false"
+  nil: "nil"
+  null: "null"
+  empty: "empty"
+  blank: "blank"
+  and: "and"
+  or: "or"
+  contains: "contains"
+
+features:
+  regex_literals: false
+  async_await: false
+  generators: false
+  arrow_functions: false
+  template_literals: false
+  labeled_statements: false

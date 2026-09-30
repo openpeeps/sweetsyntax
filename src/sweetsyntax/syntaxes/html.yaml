@@ -1,0 +1,65 @@
+name: HTML
+extension:
+  - html
+  - htm
+  - xhtml
+
+block_comment:
+  - '<!--'
+  - '-->'
+
+filters:
+  - name: doctype
+    pattern: "<![A-Za-z]+[A-Za-z ]*"
+    group: 0
+    attr: "markup.tag"
+  - name: tag
+    pattern: "(</?)([a-zA-Z][a-zA-Z0-9-]*)"
+    group: 2
+    attr: "markup.tag"
+  - name: attribute
+    pattern: "([a-zA-Z-]+)[ ]*="
+    group: 1
+    attr: "entity.other.attribute-name"
+  - name: entity
+    pattern: "&[A-Za-z]+;|&#[0-9]+;"
+    group: 0
+    attr: "constant.character.escape"
+
+symbols:
+  lt: '<'
+  gt: '>'
+  slash: '/'
+  assign: '='
+  not: '!'
+  colon: ':'
+  semicolon: ';'
+  comma: ','
+  amp: '&'
+  pipe: '|'
+  dot: '.'
+  minus: '-'
+  question: '?'
+  hash: '#'
+  at: '@'
+  tilde: '~'
+  quote: '"'
+  squote: "'"
+  backtick: '`'
+  dollar: '$'
+  percent: '%'
+  plus: '+'
+  eq: '=='
+
+identifiers:
+  true: "true"
+  false: "false"
+  null: "null"
+
+features:
+  regex_literals: false
+  async_await: false
+  generators: false
+  arrow_functions: false
+  template_literals: false
+  labeled_statements: false

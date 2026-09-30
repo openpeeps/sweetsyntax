@@ -1,0 +1,103 @@
+name: EJS
+extension:
+  - ejs
+
+block_comment:
+  - '<%#'
+  - '%>'
+
+filters:
+  - name: doctype
+    pattern: "<![A-Za-z]+[A-Za-z ]*"
+    group: 0
+    attr: "markup.tag"
+  - name: tag
+    pattern: "(</?)([a-zA-Z][a-zA-Z0-9-]*)"
+    group: 2
+    attr: "markup.tag"
+  - name: attribute
+    pattern: "([a-zA-Z-]+)[ ]*="
+    group: 1
+    attr: "entity.other.attribute-name"
+  - name: entity
+    pattern: "&[A-Za-z]+;|&#[0-9]+;"
+    group: 0
+    attr: "constant.character.escape"
+  - name: scriptlet
+    pattern: "<%[=-]?"
+    group: 0
+    attr: "markup.tag"
+
+symbols:
+  lt: '<'
+  gt: '>'
+  slash: '/'
+  assign: '='
+  not: '!'
+  colon: ':'
+  semicolon: ';'
+  comma: ','
+  amp: '&'
+  pipe: '|'
+  dot: '.'
+  minus: '-'
+  question: '?'
+  hash: '#'
+  at: '@'
+  tilde: '~'
+  quote: '"'
+  squote: "'"
+  backtick: '`'
+  dollar: '$'
+  percent: '%'
+  plus: '+'
+  multiply: '*'
+  divide: '/'
+
+identifiers:
+  include: "include"
+  each: "each"
+  if: "if"
+  else: "else"
+  locals: "locals"
+  var: "var"
+  let: "let"
+  const: "const"
+  function: "function"
+  return: "return"
+  for: "for"
+  while: "while"
+  do: "do"
+  of: "of"
+  in: "in"
+  new: "new"
+  this: "this"
+  class: "class"
+  extends: "extends"
+  super: "super"
+  typeof: "typeof"
+  instanceof: "instanceof"
+  try: "try"
+  catch: "catch"
+  finally: "finally"
+  throw: "throw"
+  switch: "switch"
+  case: "case"
+  break: "break"
+  continue: "continue"
+  async: "async"
+  await: "await"
+  yield: "yield"
+  delete: "delete"
+  true: "true"
+  false: "false"
+  null: "null"
+  undefined: "undefined"
+
+features:
+  regex_literals: false
+  async_await: false
+  generators: false
+  arrow_functions: false
+  template_literals: false
+  labeled_statements: false

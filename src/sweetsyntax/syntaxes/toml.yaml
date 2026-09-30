@@ -1,0 +1,64 @@
+name: TOML
+extension:
+  - toml
+
+hash_comments: true
+
+filters:
+  - name: key
+    pattern: "([A-Za-z0-9_.-]+)[ ]*="
+    group: 1
+    attr: "property.name"
+  - name: table
+    pattern: "\\[[A-Za-z0-9_.-]+\\]"
+    group: 0
+    attr: "entity.name.tag"
+  - name: date
+    pattern: "[0-9]{4}-[0-9]{2}-[0-9]{2}"
+    group: 0
+    attr: "constant.numeric.date"
+  - name: time
+    pattern: "[0-9]{2}:[0-9]{2}:[0-9]{2}"
+    group: 0
+    attr: "constant.numeric.date"
+
+symbols:
+  assign: '='
+  sqbl: '['
+  sqbr: ']'
+  curl: '{'
+  curr: '}'
+  comma: ','
+  colon: ':'
+  dot: '.'
+  minus: '-'
+  plus: '+'
+  multiply: '*'
+  divide: '/'
+  percent: '%'
+  lt: '<'
+  gt: '>'
+  eq: '=='
+  ne: '!='
+  lte: '<='
+  gte: '>='
+  question: '?'
+  at: '@'
+  hash: '#'
+  tilde: '~'
+
+identifiers:
+  true: "true"
+  false: "false"
+
+blocks:
+  open: "{"
+  close: "}"
+
+features:
+  regex_literals: false
+  async_await: false
+  generators: false
+  arrow_functions: false
+  template_literals: false
+  labeled_statements: false

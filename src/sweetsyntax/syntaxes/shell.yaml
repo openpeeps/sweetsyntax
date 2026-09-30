@@ -1,0 +1,106 @@
+name: Shell
+extension:
+  - sh
+  - bash
+  - zsh
+  - ksh
+  - ash
+
+hash_comments: true
+
+symbols:
+  assign: '='
+  eq: '=='
+  ne: '!='
+  regexMatch: '=~'
+  lt: '<'
+  lte: '<='
+  gt: '>'
+  gte: '>='
+  andand: '&&'
+  oror: '||'
+  not: '!'
+  semicolon: ';'
+  semicolonSemicolon: ';;'
+  semicolonAnd: ';&'
+  amp: '&'
+  pipe: '|'
+  pipeAnd: '|&'
+  append: '>>'
+  shiftLeft: '<<'
+  redirect: '>&'
+  redirectBoth: '&>'
+  dblDcolon: '::'
+  plusAssign: '+='
+  tilde: '~'
+  dollar: '$'
+  multiply: '*'
+  question: '?'
+  backslash: '\'
+  glob: '**'
+  backtick: '`'
+  hash: '#'
+  dot: '.'
+  comma: ','
+  colon: ':'
+  parl: '('
+  parr: ')'
+  curl: '{'
+  curr: '}'
+  sqbl: '['
+  sqbr: ']'
+  ltGt: '<>'
+
+identifiers:
+  if: "if"
+  then: "then"
+  else: "else"
+  elif: "elif"
+  fi: "fi"
+  for: "for"
+  while: "while"
+  until: "until"
+  do: "do"
+  done: "done"
+  case: "case"
+  esac: "esac"
+  function: "function"
+  in: "in"
+  select: "select"
+  time: "time"
+  coproc: "coproc"
+  local: "local"
+  export: "export"
+  readonly: "readonly"
+  declare: "declare"
+  typeset: "typeset"
+  return: "return"
+  break: "break"
+  continue: "continue"
+  shift: "shift"
+  exit: "exit"
+  eval: "eval"
+  exec: "exec"
+  source: "source"
+  alias: "alias"
+  unalias: "unalias"
+  unset: "unset"
+  trap: "trap"
+  set: "set"
+  echo: "echo"
+  printf: "printf"
+  read: "read"
+  cd: "cd"
+  pwd: "pwd"
+  test: "test"
+  true: "true"
+  false: "false"
+  let: "let"
+
+features:
+  regex_literals: false
+  async_await: false
+  generators: false
+  arrow_functions: false
+  template_literals: false
+  labeled_statements: false

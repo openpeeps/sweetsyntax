@@ -1,0 +1,89 @@
+name: Nginx
+extension:
+  - nginx
+
+hash_comments: true
+
+filters:
+  - name: block_directive
+    pattern: "\\.[A-Za-z_][A-Za-z0-9_]*"
+    group: 0
+    attr: "entity.name.tag"
+  - name: key
+    pattern: "([A-Za-z_][A-Za-z0-9_.]*)[ ]*="
+    group: 1
+    attr: "property.name"
+
+symbols:
+  curl: '{'
+  curr: '}'
+  semicolon: ';'
+  assign: '='
+  colon: ':'
+  comma: ','
+  dot: '.'
+  plus: '+'
+  minus: '-'
+  multiply: '*'
+  divide: '/'
+  percent: '%'
+  lt: '<'
+  gt: '>'
+  amp: '&'
+  pipe: '|'
+  tilde: '~'
+  hash: '#'
+  dollar: '$'
+  quote: '"'
+  squote: "'"
+  backslash: '\'
+  slash: '/'
+  dcolon: '::'
+  regOr: '|~'
+  regAnd: '&~'
+
+identifiers:
+  events: "events"
+  http: "http"
+  server: "server"
+  location: "location"
+  upstream: "upstream"
+  if: "if"
+  include: "include"
+  listen: "listen"
+  server_name: "server_name"
+  root: "root"
+  index: "index"
+  return: "return"
+  rewrite: "rewrite"
+  access_log: "access_log"
+  error_log: "error_log"
+  proxy_pass: "proxy_pass"
+  proxy_set_header: "proxy_set_header"
+  add_header: "add_header"
+  ssl_certificate: "ssl_certificate"
+  ssl_certificate_key: "ssl_certificate_key"
+  worker_processes: "worker_processes"
+  worker_connections: "worker_connections"
+  sendfile: "sendfile"
+  keepalive_timeout: "keepalive_timeout"
+  gzip: "gzip"
+  gzip_types: "gzip_types"
+  default_type: "default_type"
+  charset: "charset"
+  client_max_body_size: "client_max_body_size"
+  try_files: "try_files"
+  internal: "internal"
+  default: "default"
+
+blocks:
+  open: "{"
+  close: "}"
+
+features:
+  regex_literals: false
+  async_await: false
+  generators: false
+  arrow_functions: false
+  template_literals: false
+  labeled_statements: false

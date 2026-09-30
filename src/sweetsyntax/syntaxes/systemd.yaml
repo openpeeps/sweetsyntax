@@ -1,0 +1,66 @@
+name: systemd
+extension:
+  - service
+  - socket
+  - timer
+  - target
+  - mount
+  - automount
+  - swap
+  - path
+  - slice
+  - scope
+  - device
+
+inline_comment: ';'
+hash_comments: true
+
+filters:
+  - name: section
+    pattern: "\\[[A-Za-z][A-Za-z ]*\\]"
+    group: 0
+    attr: "entity.name.tag"
+  - name: key
+    pattern: "([A-Za-z][A-Za-z0-9]*)[ ]*="
+    group: 1
+    attr: "property.name"
+
+symbols:
+  assign: '='
+  colon: ':'
+  semicolon: ';'
+  comma: ','
+  dot: '.'
+  plus: '+'
+  minus: '-'
+  multiply: '*'
+  divide: '/'
+  percent: '%'
+  lt: '<'
+  gt: '>'
+  amp: '&'
+  pipe: '|'
+  tilde: '~'
+  hash: '#'
+  at: '@'
+  dollar: '$'
+  quote: '"'
+  squote: "'"
+  backslash: '\'
+  slash: '/'
+  sqbl: '['
+  sqbr: ']'
+
+identifiers:
+  true: "true"
+  false: "false"
+  yes: "yes"
+  no: "no"
+
+features:
+  regex_literals: false
+  async_await: false
+  generators: false
+  arrow_functions: false
+  template_literals: false
+  labeled_statements: false

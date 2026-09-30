@@ -48,7 +48,10 @@ proc scopeForFilterAttr(tok: Token): string =
     of "markup.heading", "markup.bold", "markup.italic",
        "markup.strikethrough", "markup.raw.block", "markup.raw.inline",
        "markup.link", "markup.image", "markup.list", "markup.quote",
-       "markup.hr", "markup.table",
+       "markup.hr", "markup.table", "markup.frontmatter",
+       "markup.indicator", "markup.tag",
+       "entity.name.tag", "entity.other.attribute-name",
+       "constant.numeric.date", "constant.character.escape",
        "selector.id", "selector.class", "at.rule":
       return a
     of "property.name":

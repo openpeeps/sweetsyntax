@@ -1,0 +1,67 @@
+name: Makefile
+extension:
+  - mak
+  - mk
+  - make
+
+hash_comments: true
+
+filters:
+  - name: target
+    pattern: "([A-Za-z0-9_./$()%-]+)[ ]*::?="
+    group: 1
+    attr: "property.name"
+  - name: target_rule
+    pattern: "([A-Za-z0-9_./$()%-]+)[ ]*:[ ]*[^=]"
+    group: 1
+    attr: "property.name"
+
+symbols:
+  assign: '='
+  assignColon: ':='
+  assignQuestion: '?='
+  assignPlus: '+='
+  colon: ':'
+  dcolon: '::'
+  semicolon: ';'
+  comma: ','
+  dot: '.'
+  plus: '+'
+  minus: '-'
+  multiply: '*'
+  divide: '/'
+  percent: '%'
+  lt: '<'
+  gt: '>'
+  amp: '&'
+  pipe: '|'
+  tilde: '~'
+  backslash: '\'
+  hash: '#'
+  parenl: '('
+  parenr: ')'
+
+identifiers:
+  ifeq: "ifeq"
+  ifneq: "ifneq"
+  ifdef: "ifdef"
+  ifndef: "ifndef"
+  else: "else"
+  endif: "endif"
+  define: "define"
+  endef: "endef"
+  include: "include"
+  export: "export"
+  unexport: "unexport"
+  override: "override"
+  vpath: "vpath"
+  private: "private"
+  PHONY: ".PHONY"
+
+features:
+  regex_literals: false
+  async_await: false
+  generators: false
+  arrow_functions: false
+  template_literals: false
+  labeled_statements: false

@@ -143,29 +143,31 @@ features:
   arrow_functions: true
   template_literals: true
   labeled_statements: true
-  decorators: true
-  enums: true
-  generics: true
-  namespaces: true
-  modules: true
-  type_annotations: true
-  declaration_merging: true
-  conditional_types: true
-  mapped_types: true
-  tuples: true
-  rest_elements: true
-  non_null_assertion: true
-  optional_chaining: true
-  nullish_coalescing: true
-  as_assertions: true
-  satisfies_expression: true
-  type_imports: true
-  ambient_declarations: true
-  const_enum: true
-  parameter_decorators: true
-  index_signatures: true
-  call_signatures: true
-  constructor_signatures: true
+  # Informational only: these are not consumed by FeaturesSpec, and the
+  # parser rejects unconsumed unknown keys, so they stay commented out.
+  # decorators: true
+  # enums: true
+  # generics: true
+  # namespaces: true
+  # modules: true
+  # type_annotations: true
+  # declaration_merging: true
+  # conditional_types: true
+  # mapped_types: true
+  # tuples: true
+  # rest_elements: true
+  # non_null_assertion: true
+  # optional_chaining: true
+  # nullish_coalescing: true
+  # as_assertions: true
+  # satisfies_expression: true
+  # type_imports: true
+  # ambient_declarations: true
+  # const_enum: true
+  # parameter_decorators: true
+  # index_signatures: true
+  # call_signatures: true
+  # constructor_signatures: true
 
 operators:
   prefix:

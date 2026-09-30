@@ -1,0 +1,54 @@
+name: INI
+extension:
+  - ini
+  - cfg
+  - conf
+  - properties
+
+inline_comment: ';'
+hash_comments: true
+
+symbols:
+  assign: '='
+  colon: ':'
+  comma: ','
+  dot: '.'
+  plus: '+'
+  minus: '-'
+  multiply: '*'
+  divide: '/'
+  percent: '%'
+  lt: '<'
+  gt: '>'
+  amp: '&'
+  pipe: '|'
+  tilde: '~'
+  hash: '#'
+  at: '@'
+  dollar: '$'
+  backslash: '\'
+  quote: '"'
+  squote: "'"
+  backtick: '`'
+  eq: '=='
+  ne: '!='
+  lte: '<='
+  gte: '>='
+
+identifiers:
+  true: "true"
+  false: "false"
+  yes: "yes"
+  no: "no"
+  on: "on"
+  off: "off"
+  null: "null"
+  none: "none"
+
+features:
+  regex_literals: false
+  async_await: false
+  generators: false
+  arrow_functions: false
+  template_literals: false
+  labeled_statements: false

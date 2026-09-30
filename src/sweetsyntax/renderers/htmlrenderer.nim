@@ -23,9 +23,14 @@ proc tokenToHtml*(lexer: var SweetLexer, tok: Token): string =
   "<span class=\"" & classes & "\">" & htmlEscape(lexeme) & "</span>"
 
 proc highlightHtml*(lexer: var SweetLexer): string =
-  var html = ""
+  ## Render full source with HTML highlighting.
+  ## Preserves skipped whitespace/newlines between tokens (mirrors
+  ## `highlightAscii`), HTML-escaped so `int x` keeps its space.
+  var prevStop = 0
   var tok = lexer.getToken()
   while tok.kind != tkEOF:
-    html.add tokenToHtml(lexer, tok)
+    if tok.start > prevStop:
+      result.add htmlEscape(lexer.getLexeme(prevStop, tok.start)) # whitespace/gaps
+    result.add tokenToHtml(lexer, tok)
+    prevStop = tok.stop
     tok = lexer.getToken()
-  html

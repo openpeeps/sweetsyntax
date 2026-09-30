@@ -1,0 +1,49 @@
+name: CSV
+extension:
+  - csv
+  - tsv
+
+symbols:
+  comma: ','
+  semicolon: ';'
+  colon: ':'
+  dot: '.'
+  minus: '-'
+  plus: '+'
+  multiply: '*'
+  divide: '/'
+  percent: '%'
+  eq: '='
+  lt: '<'
+  gt: '>'
+  not: '!'
+  question: '?'
+  hash: '#'
+  amp: '&'
+  pipe: '|'
+  tilde: '~'
+  at: '@'
+  dollar: '$'
+  backslash: '\\'
+  sqbl: '['
+  sqbr: ']'
+  curl: '{'
+  curr: '}'
+  parl: '('
+  parr: ')'
+
+identifiers:
+  true: "true"
+  false: "false"
+  null: "null"
+  NA: "NA"
+  N/A: "N/A"
+  na: "na"
+
+features:
+  regex_literals: false
+  async_await: false
+  generators: false
+  arrow_functions: false
+  template_literals: false
+  labeled_statements: false

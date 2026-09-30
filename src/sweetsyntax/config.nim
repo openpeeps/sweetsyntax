@@ -222,6 +222,7 @@ type
 
   KnownSyntax* = enum
     js = "js"
+    ts = "ts"
     py = "py"
     nim = "nim"
     c = "c"
@@ -230,8 +231,26 @@ type
     php = "php"
     go = "go"
     d = "d"
+    crystal = "crystal"
     css = "css"
     md = "md"
+    yaml = "yaml"
+    json = "json"
+    toml = "toml"
+    csv = "csv"
+    html = "html"
+    xml = "xml"
+    shell = "shell"
+    ini = "ini"
+    make = "make"
+    cmake = "cmake"
+    docker = "docker"
+    nginx = "nginx"
+    systemd = "systemd"
+    jinja2 = "jinja2"
+    handlebars = "handlebars"
+    liquid = "liquid"
+    ejs = "ejs"
 
   SweetSyntax* = ref object
     spec*: SweetSpec
@@ -241,6 +260,7 @@ const
   # Embedded YAML sources. These stay `const` (compile-time strings) so
   # `staticRead` keeps working; the lookup table below is a `let`.
   jsSyntaxSource = staticRead(currentSourcePath().parentDir / "syntaxes" / "js.yaml")
+  tsSyntaxSource = staticRead(currentSourcePath().parentDir / "syntaxes" / "ts.yaml")
   pySyntaxSource = staticRead(currentSourcePath().parentDir / "syntaxes" / "python.yaml")
   nimSyntaxSource = staticRead(currentSourcePath().parentDir / "syntaxes" / "nim.yaml")
   cSyntaxSource = staticRead(currentSourcePath().parentDir / "syntaxes" / "c.yaml")
@@ -249,8 +269,26 @@ const
   phpSyntaxSource = staticRead(currentSourcePath().parentDir / "syntaxes" / "php.yaml")
   goSyntaxSource = staticRead(currentSourcePath().parentDir / "syntaxes" / "go.yaml")
   dSyntaxSource = staticRead(currentSourcePath().parentDir / "syntaxes" / "d.yaml")
+  crSyntaxSource = staticRead(currentSourcePath().parentDir / "syntaxes" / "crystal.yaml")
   cssSyntaxSource = staticRead(currentSourcePath().parentDir / "syntaxes" / "css.yaml")
   mdSyntaxSource = staticRead(currentSourcePath().parentDir / "syntaxes" / "markdown.yaml")
+  yamlSyntaxSource = staticRead(currentSourcePath().parentDir / "syntaxes" / "yaml.yaml")
+  jsonSyntaxSource = staticRead(currentSourcePath().parentDir / "syntaxes" / "json.yaml")
+  tomlSyntaxSource = staticRead(currentSourcePath().parentDir / "syntaxes" / "toml.yaml")
+  csvSyntaxSource = staticRead(currentSourcePath().parentDir / "syntaxes" / "csv.yaml")
+  htmlSyntaxSource = staticRead(currentSourcePath().parentDir / "syntaxes" / "html.yaml")
+  xmlSyntaxSource = staticRead(currentSourcePath().parentDir / "syntaxes" / "xml.yaml")
+  shellSyntaxSource = staticRead(currentSourcePath().parentDir / "syntaxes" / "shell.yaml")
+  iniSyntaxSource = staticRead(currentSourcePath().parentDir / "syntaxes" / "ini.yaml")
+  makeSyntaxSource = staticRead(currentSourcePath().parentDir / "syntaxes" / "make.yaml")
+  cmakeSyntaxSource = staticRead(currentSourcePath().parentDir / "syntaxes" / "cmake.yaml")
+  dockerSyntaxSource = staticRead(currentSourcePath().parentDir / "syntaxes" / "docker.yaml")
+  nginxSyntaxSource = staticRead(currentSourcePath().parentDir / "syntaxes" / "nginx.yaml")
+  systemdSyntaxSource = staticRead(currentSourcePath().parentDir / "syntaxes" / "systemd.yaml")
+  jinja2SyntaxSource = staticRead(currentSourcePath().parentDir / "syntaxes" / "jinja2.yaml")
+  handlebarsSyntaxSource = staticRead(currentSourcePath().parentDir / "syntaxes" / "handlebars.yaml")
+  liquidSyntaxSource = staticRead(currentSourcePath().parentDir / "syntaxes" / "liquid.yaml")
+  ejsSyntaxSource = staticRead(currentSourcePath().parentDir / "syntaxes" / "ejs.yaml")
 
 let
   # NOTE: this must stay a `let` (runtime init), not a `const`.
@@ -260,6 +298,7 @@ let
   # (`error: initializer element is not a compile-time constant`).
   knownSyntaxTable* = {
     "js": jsSyntaxSource,
+    "ts": tsSyntaxSource,
     "py": pySyntaxSource,
     "nim": nimSyntaxSource,
     "c": cSyntaxSource,
@@ -268,8 +307,26 @@ let
     "php": phpSyntaxSource,
     "go": goSyntaxSource,
     "d": dSyntaxSource,
+    "crystal": crSyntaxSource,
     "css": cssSyntaxSource,
-    "md": mdSyntaxSource
+    "md": mdSyntaxSource,
+    "yaml": yamlSyntaxSource,
+    "json": jsonSyntaxSource,
+    "toml": tomlSyntaxSource,
+    "csv": csvSyntaxSource,
+    "html": htmlSyntaxSource,
+    "xml": xmlSyntaxSource,
+    "shell": shellSyntaxSource,
+    "ini": iniSyntaxSource,
+    "make": makeSyntaxSource,
+    "cmake": cmakeSyntaxSource,
+    "docker": dockerSyntaxSource,
+    "nginx": nginxSyntaxSource,
+    "systemd": systemdSyntaxSource,
+    "jinja2": jinja2SyntaxSource,
+    "handlebars": handlebarsSyntaxSource,
+    "liquid": liquidSyntaxSource,
+    "ejs": ejsSyntaxSource
   }.toTable
 
 proc parseHook*(p: var YamlParser, v: var SymbolsTable) =

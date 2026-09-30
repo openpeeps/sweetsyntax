@@ -1,0 +1,77 @@
+name: YAML
+extension:
+  - yaml
+  - yml
+
+hash_comments: true
+
+filters:
+  - name: key
+    pattern: "([A-Za-z0-9_.-]+):([ ]|\\n)"
+    group: 1
+    attr: "property.name"
+  - name: document_marker
+    pattern: "^[-.]{3}"
+    group: 0
+    attr: "markup.frontmatter"
+  - name: tag
+    pattern: "!![A-Za-z]+"
+    group: 0
+    attr: "entity.name.tag"
+  - name: anchor
+    pattern: "[&*][A-Za-z0-9_.-]+"
+    group: 0
+    attr: "entity.name.tag"
+  - name: block_scalar
+    pattern: "(:[ ]*)([|>][-+0-9]*)"
+    group: 2
+    attr: "markup.indicator"
+
+symbols:
+  colon: ':'
+  hash: '#'
+  minus: '-'
+  plus: '+'
+  question: '?'
+  tilde: '~'
+  eq: '='
+  lt: '<'
+  gt: '>'
+  shiftLeft: '<<'
+  pipe: '|'
+  amp: '&'
+  multiply: '*'
+  not: '!'
+  divide: '/'
+  backslash: '\\'
+  at: '@'
+  backtick: '`'
+  percent: '%'
+  dollar: '$'
+  sqbl: '['
+  sqbr: ']'
+  curl: '{'
+  curr: '}'
+  comma: ','
+  dot: '.'
+
+identifiers:
+  true: "true"
+  false: "false"
+  null: "null"
+  yes: "yes"
+  no: "no"
+  on: "on"
+  off: "off"
+
+blocks:
+  open: "{"
+  close: "}"
+
+features:
+  regex_literals: false
+  async_await: false
+  generators: false
+  arrow_functions: false
+  template_literals: false
+  labeled_statements: false

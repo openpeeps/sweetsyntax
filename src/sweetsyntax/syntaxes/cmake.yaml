@@ -1,0 +1,84 @@
+name: CMake
+extension:
+  - cmake
+
+inline_comment: '#'
+
+symbols:
+  parenl: '('
+  parenr: ')'
+  assign: '='
+  colon: ':'
+  semicolon: ';'
+  comma: ','
+  dot: '.'
+  plus: '+'
+  minus: '-'
+  multiply: '*'
+  divide: '/'
+  percent: '%'
+  lt: '<'
+  gt: '>'
+  gtEq: '>='
+  ltEq: '<='
+  notEqual: '!='
+  not: '!'
+  amp: '&'
+  pipe: '|'
+  tilde: '~'
+  backslash: '\'
+  dollar: '$'
+  sqbl: '['
+  sqbr: ']'
+  curl: '{'
+  curr: '}'
+
+identifiers:
+  project: "project"
+  cmake_minimum_required: "cmake_minimum_required"
+  set: "set"
+  option: "option"
+  if: "if"
+  elseif: "elseif"
+  else: "else"
+  endif: "endif"
+  foreach: "foreach"
+  endforeach: "endforeach"
+  while: "while"
+  endwhile: "endwhile"
+  function: "function"
+  endfunction: "endfunction"
+  macro: "macro"
+  endmacro: "endmacro"
+  find_package: "find_package"
+  add_executable: "add_executable"
+  add_library: "add_library"
+  target_link_libraries: "target_link_libraries"
+  target_include_directories: "target_include_directories"
+  target_compile_options: "target_compile_options"
+  include: "include"
+  include_directories: "include_directories"
+  add_subdirectory: "add_subdirectory"
+  message: "message"
+  install: "install"
+  list: "list"
+  string: "string"
+  file: "file"
+  set_property: "set_property"
+  get_property: "get_property"
+  return: "return"
+  break: "break"
+  continue: "continue"
+  not: "NOT"
+  and: "AND"
+  or: "OR"
+  true: "true"
+  false: "false"
+
+features:
+  regex_literals: false
+  async_await: false
+  generators: false
+  arrow_functions: false
+  template_literals: false
+  labeled_statements: false

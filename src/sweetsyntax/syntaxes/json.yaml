@@ -1,0 +1,44 @@
+name: JSON
+extension:
+  - json
+
+filters:
+  - name: key
+    pattern: "\"([^\"]*)\"[ ]*:"
+    group: 1
+    attr: "property.name"
+
+symbols:
+  colon: ':'
+  comma: ','
+  curl: '{'
+  curr: '}'
+  sqbl: '['
+  sqbr: ']'
+  minus: '-'
+  plus: '+'
+  dot: '.'
+  multiply: '*'
+  divide: '/'
+  eq: '='
+  lt: '<'
+  gt: '>'
+  not: '!'
+  question: '?'
+
+identifiers:
+  true: "true"
+  false: "false"
+  null: "null"
+
+blocks:
+  open: "{"
+  close: "}"
+
+features:
+  regex_literals: false
+  async_await: false
+  generators: false
+  arrow_functions: false
+  template_literals: false
+  labeled_statements: false

@@ -3,7 +3,8 @@ extension:
   - cr
 
 inline_comment: '#'
-block_comment: []
+# No `block_comment` key: Crystal has no block comments, and the field is an
+# `array[2, string]`, so an empty sequence fails to parse.
 
 symbols:
   plus: '+'
@@ -88,7 +89,7 @@ identifiers:
   in: "in"
   include: "include"
   instance_sizeof: "instance_sizeof"
-  is_a?: "is_a?"
+  "is_a?": "is_a?"
   lib: "lib"
   macro: "macro"
   module: "module"
@@ -101,7 +102,7 @@ identifiers:
   protected: "protected"
   require: "require"
   rescue: "rescue"
-  respond_to?: "respond_to?"
+  "respond_to?": "respond_to?"
   return: "return"
   self: "self"
   sizeof: "sizeof"
@@ -130,21 +131,23 @@ blocks:
   close: "}"
 
 features:
-  regex_literals: true
+  regex_literals: false
   async_await: false
   generators: false
   arrow_functions: true
   template_literals: false
   labeled_statements: false
-  generics: true
-  macros: true
-  annotations: true
-  type_restrictions: true
-  union_types: true
-  nilable_types: true
-  pointers: true
-  unsafe: true
-  crystal_ffi: true
+  # Informational only: these are not consumed by FeaturesSpec, and the
+  # parser rejects unconsumed unknown keys, so they stay commented out.
+  # generics: true
+  # macros: true
+  # annotations: true
+  # type_restrictions: true
+  # union_types: true
+  # nilable_types: true
+  # pointers: true
+  # unsafe: true
+  # crystal_ffi: true
 
 operators:
   prefix:

@@ -22,6 +22,9 @@ proc colorForToken(lexer: SweetLexer, tok: Token): string =
   let scope = scopeForToken(lexer, tok)
   if scope.startsWith("comment"): return "\e[90m"                          # gray
   if scope.startsWith("markup.heading"): return "\e[35;1m"                 # bold magenta
+  if scope.startsWith("markup.frontmatter"): return "\e[35;1m"             # bold magenta
+  if scope.startsWith("markup.indicator"): return "\e[32;1m"               # bold green
+  if scope.startsWith("markup.tag"): return "\e[34;1m"                    # bold blue
   if scope.startsWith("markup.bold"): return "\e[37;1m"                    # bold white
   if scope.startsWith("markup.italic"): return "\e[36m"                    # cyan
   if scope.startsWith("markup.raw"): return "\e[32m"                      # green
@@ -35,6 +38,8 @@ proc colorForToken(lexer: SweetLexer, tok: Token): string =
   if scope.startsWith("selector.id"): return "\e[33;1m"                   # bold yellow
   if scope.startsWith("selector.class"): return "\e[33m"                  # yellow
   if scope.startsWith("at.rule"): return "\e[35;1m"                       # bold magenta
+  if scope.startsWith("entity.name.tag"): return "\e[36;1m"                # bold cyan
+  if scope.startsWith("entity.other.attribute-name"): return "\e[33m"      # yellow (attributes)
   if scope.startsWith("keyword.control"): return "\e[35;1m"                # bold magenta
   if scope.startsWith("keyword.operator"): return "\e[37m"                 # white
   if scope.startsWith("storage.type"): return "\e[34;1m"                   # bold blue
