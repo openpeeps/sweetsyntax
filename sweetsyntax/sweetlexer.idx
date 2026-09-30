@@ -16,23 +16,23 @@ nim	tkDocComment	sweetsyntax/sweetlexer.html#tkDocComment	SweetTokenKind.tkDocCo
 nim	tkRegex	sweetsyntax/sweetlexer.html#tkRegex	SweetTokenKind.tkRegex		18
 nim	SweetTokenKind	sweetsyntax/sweetlexer.html#SweetTokenKind	enum SweetTokenKind		18
 nim	SweetLexer	sweetsyntax/sweetlexer.html#SweetLexer	type SweetLexer		41
-nim	Token	sweetsyntax/sweetlexer.html#Token	type Token		88
-nim	SweetLexerError	sweetsyntax/sweetlexer.html#SweetLexerError	object SweetLexerError		97
-nim	charAt	sweetsyntax/sweetlexer.html#charAt,SweetLexer,int	proc charAt(l: SweetLexer; idx: int): char		101
-nim	getContext	sweetsyntax/sweetlexer.html#getContext,SweetLexer,int,int	proc getContext(l: SweetLexer; posOverride: int = -1; maxContext: int = 80): string		106
-nim	getLexeme	sweetsyntax/sweetlexer.html#getLexeme,SweetLexer,int,int	proc getLexeme(l: SweetLexer; startPos, stopPos: int): string		232
-nim	getTokenValue	sweetsyntax/sweetlexer.html#getTokenValue,SweetLexer,Token	proc getTokenValue(l: SweetLexer; tok: Token): string		243
-nim	LexerMark	sweetsyntax/sweetlexer.html#LexerMark	object LexerMark		248
-nim	markLexer	sweetsyntax/sweetlexer.html#markLexer,SweetLexer	proc markLexer(l: SweetLexer): LexerMark		256
-nim	restoreLexer	sweetsyntax/sweetlexer.html#restoreLexer,SweetLexer,LexerMark	proc restoreLexer(l: var SweetLexer; m: LexerMark)		263
-nim	getFullInput	sweetsyntax/sweetlexer.html#getFullInput,SweetLexer	proc getFullInput(l: SweetLexer): string		276
-nim	getToken	sweetsyntax/sweetlexer.html#getToken,SweetLexer	proc getToken(l: var SweetLexer): Token		604
-nim	initLexerFromFile	sweetsyntax/sweetlexer.html#initLexerFromFile,SweetSpec,string,bool	proc initLexerFromFile(spec: SweetSpec; path: string; enableFilters: bool = false): SweetLexer		1084
-nim	initLexerFromFile	sweetsyntax/sweetlexer.html#initLexerFromFile,SweetLexerInit,string,bool	proc initLexerFromFile(pre: SweetLexerInit; path: string; enableFilters: bool = false): SweetLexer		1138
-nim	initLexer	sweetsyntax/sweetlexer.html#initLexer,SweetSpec,sinkstring,bool	proc initLexer(spec: SweetSpec; input: sink string; enableFilters: bool = false): SweetLexer		1171
-nim	initLexer	sweetsyntax/sweetlexer.html#initLexer,SweetLexerInit,sinkstring,bool	proc initLexer(pre: SweetLexerInit; input: sink string; enableFilters: bool = false): SweetLexer		1221
-nim	initLexerFromMemFile	sweetsyntax/sweetlexer.html#initLexerFromMemFile,SweetSpec,MemFile,string,bool	proc initLexerFromMemFile(spec: SweetSpec; mf: MemFile; path: string = "";\n                     enableFilters: bool = false): SweetLexer		1252
-nim	resetLexer	sweetsyntax/sweetlexer.html#resetLexer,SweetLexer	proc resetLexer(l: SweetLexer)		1305
-nim	closeLexer	sweetsyntax/sweetlexer.html#closeLexer,SweetLexer	proc closeLexer(l: var SweetLexer)		1318
-nimgrp	initlexerfromfile	sweetsyntax/sweetlexer.html#initLexerFromFile-procs-all	proc		1084
-nimgrp	initlexer	sweetsyntax/sweetlexer.html#initLexer-procs-all	proc		1171
+nim	Token	sweetsyntax/sweetlexer.html#Token	type Token		117
+nim	SweetLexerError	sweetsyntax/sweetlexer.html#SweetLexerError	object SweetLexerError		126
+nim	charAt	sweetsyntax/sweetlexer.html#charAt,SweetLexer,int	proc charAt(l: SweetLexer; idx: int): char		130
+nim	getContext	sweetsyntax/sweetlexer.html#getContext,SweetLexer,int,int	proc getContext(l: SweetLexer; posOverride: int = -1; maxContext: int = 80): string		135
+nim	getLexeme	sweetsyntax/sweetlexer.html#getLexeme,SweetLexer,int,int	proc getLexeme(l: SweetLexer; startPos, stopPos: int): string		261
+nim	getTokenValue	sweetsyntax/sweetlexer.html#getTokenValue,SweetLexer,Token	proc getTokenValue(l: SweetLexer; tok: Token): string		272
+nim	LexerMark	sweetsyntax/sweetlexer.html#LexerMark	object LexerMark		277
+nim	markLexer	sweetsyntax/sweetlexer.html#markLexer,SweetLexer	proc markLexer(l: SweetLexer): LexerMark		287
+nim	restoreLexer	sweetsyntax/sweetlexer.html#restoreLexer,SweetLexer,LexerMark	proc restoreLexer(l: var SweetLexer; m: LexerMark)		295
+nim	getFullInput	sweetsyntax/sweetlexer.html#getFullInput,SweetLexer	proc getFullInput(l: SweetLexer): string		310
+nim	getToken	sweetsyntax/sweetlexer.html#getToken,SweetLexer	proc getToken(l: var SweetLexer): Token		1264
+nim	initLexerFromFile	sweetsyntax/sweetlexer.html#initLexerFromFile,SweetSpec,string,bool	proc initLexerFromFile(spec: SweetSpec; path: string; enableFilters: bool = false): SweetLexer		1315
+nim	initLexerFromFile	sweetsyntax/sweetlexer.html#initLexerFromFile,SweetLexerInit,string,bool	proc initLexerFromFile(pre: SweetLexerInit; path: string; enableFilters: bool = false): SweetLexer		1364
+nim	initLexer	sweetsyntax/sweetlexer.html#initLexer,SweetSpec,sinkstring,bool	proc initLexer(spec: SweetSpec; input: sink string; enableFilters: bool = false): SweetLexer		1403
+nim	initLexer	sweetsyntax/sweetlexer.html#initLexer,SweetLexerInit,sinkstring,bool	proc initLexer(pre: SweetLexerInit; input: sink string; enableFilters: bool = false): SweetLexer		1449
+nim	initLexerFromMemFile	sweetsyntax/sweetlexer.html#initLexerFromMemFile,SweetSpec,MemFile,string,bool	proc initLexerFromMemFile(spec: SweetSpec; mf: MemFile; path: string = "";\n                     enableFilters: bool = false): SweetLexer		1486
+nim	resetLexer	sweetsyntax/sweetlexer.html#resetLexer,SweetLexer	proc resetLexer(l: SweetLexer)		1535
+nim	closeLexer	sweetsyntax/sweetlexer.html#closeLexer,SweetLexer	proc closeLexer(l: var SweetLexer)		1550
+nimgrp	initlexerfromfile	sweetsyntax/sweetlexer.html#initLexerFromFile-procs-all	proc		1315
+nimgrp	initlexer	sweetsyntax/sweetlexer.html#initLexer-procs-all	proc		1403

@@ -122,12 +122,12 @@
 </div>
 <div id="scopeForToken-procs-all">
   <div id="scopeForToken,SweetLexer,Token">
-  <dt><pre><span class="Keyword">proc</span> <a href="#scopeForToken%2CSweetLexer%2CToken"><span class="Identifier">scopeForToken</span></a><span class="Other">(</span><span class="Identifier">lexer</span><span class="Other">:</span> <a href="../sweetlexer.html#SweetLexer"><span class="Identifier">SweetLexer</span></a><span class="Other">;</span> <span class="Identifier">tok</span><span class="Other">:</span> <a href="../sweetlexer.html#Token"><span class="Identifier">Token</span></a><span class="Other">)</span><span class="Other">:</span> <span class="Identifier">string</span> {.<span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span>
+  <dt><pre><span class="Keyword">proc</span> <a href="#scopeForToken%2CSweetLexer%2CToken"><span class="Identifier">scopeForToken</span></a><span class="Other">(</span><span class="Identifier">lexer</span><span class="Other">:</span> <a href="../sweetlexer.html#SweetLexer"><span class="Identifier">SweetLexer</span></a><span class="Other">;</span> <span class="Identifier">tok</span><span class="Other">:</span> <a href="../sweetlexer.html#Token"><span class="Identifier">Token</span></a><span class="Other">)</span><span class="Other">:</span> <span class="Identifier">string</span> {.<span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">KeyError</span><span class="Other">]</span><span class="Other">,</span>
     <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
   <dd>
     
-    <p>Derive a TextMate-style scope for the given token, based on the token kind and the keyword table declared in the syntax YAML spec.</p>
-<p>Note: <tt class="docutils literal"><span class="pre"><span class="Identifier">tok</span><span class="Operator">.</span><span class="Identifier">attr</span></span></tt> holds keyword lexemes (e.g. &quot;int&quot;, &quot;if&quot;), not semantic classes, so scopes are derived from the kind and the identifiers table rather than from attributes. YAML <tt class="docutils literal"><span class="pre"><span class="Identifier">filters</span></span></tt> (CSS, Markdown) are the exception: their dotted attrs (e.g. &quot;markup.heading&quot;) map 1:1 to scopes.</p>
+    <p>Derive a TextMate-style scope for the given token, based on the token kind and the tables declared in the syntax YAML spec.</p>
+<p>Keyword classification is entirely the spec's business: a spec lists the lexemes it wants scoped in <tt class="docutils literal"><span class="pre"><span class="Identifier">keyword_scopes</span></span></tt> and the renderer just looks the lexeme up, so no vocabulary is baked in here. A spec that declares no scopes gets a flat <tt class="docutils literal"><span class="pre"><span class="Identifier">keyword</span></span></tt> for every identifier it lists. <tt class="docutils literal"><span class="pre"><span class="Identifier">tok</span><span class="Operator">.</span><span class="Identifier">attr</span></span></tt> holds keyword lexemes (e.g. &quot;int&quot;, &quot;if&quot;), not semantic classes, so it is never used to classify. YAML <tt class="docutils literal"><span class="pre"><span class="Identifier">filters</span></span></tt> (CSS, Markdown) are the exception: their dotted attrs (e.g. &quot;markup.heading&quot;) map 1:1 to scopes.</p>
 
     
   </dd>
@@ -137,7 +137,7 @@
 <div id="tokenToJson-procs-all">
   <div id="tokenToJson,SweetLexer,Token">
   <dt><pre><span class="Keyword">proc</span> <a href="#tokenToJson%2CSweetLexer%2CToken"><span class="Identifier">tokenToJson</span></a><span class="Other">(</span><span class="Identifier">lexer</span><span class="Other">:</span> <a href="../sweetlexer.html#SweetLexer"><span class="Identifier">SweetLexer</span></a><span class="Other">;</span> <span class="Identifier">tok</span><span class="Other">:</span> <a href="../sweetlexer.html#Token"><span class="Identifier">Token</span></a><span class="Other">;</span> <span class="Identifier">includeValue</span> <span class="Other">=</span> <span class="Identifier">true</span><span class="Other">)</span><span class="Other">:</span> <span class="Identifier">JsonNode</span> {.
-    <span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
+    <span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">KeyError</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
   <dd>
     
     Build a JSON object for a single token.
@@ -149,7 +149,7 @@
 <div id="tokenToJsonLd-procs-all">
   <div id="tokenToJsonLd,SweetLexer,Token">
   <dt><pre><span class="Keyword">proc</span> <a href="#tokenToJsonLd%2CSweetLexer%2CToken"><span class="Identifier">tokenToJsonLd</span></a><span class="Other">(</span><span class="Identifier">lexer</span><span class="Other">:</span> <a href="../sweetlexer.html#SweetLexer"><span class="Identifier">SweetLexer</span></a><span class="Other">;</span> <span class="Identifier">tok</span><span class="Other">:</span> <a href="../sweetlexer.html#Token"><span class="Identifier">Token</span></a><span class="Other">;</span> <span class="Identifier">includeValue</span> <span class="Other">=</span> <span class="Identifier">true</span><span class="Other">)</span><span class="Other">:</span> <span class="Identifier">string</span> {.
-    <span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
+    <span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">KeyError</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
   <dd>
     
     Render a single token as one line of NDJSON, terminated by a newline.
@@ -168,7 +168,7 @@
       <div class="twelve-columns footer">
         <span class="nim-sprite"></span>
         <br>
-        <small style="color: var(--hint);">Made with Nim. Generated: 2026-09-30 15:12:24 UTC</small>
+        <small style="color: var(--hint);">Made with Nim. Generated: 2026-09-30 20:53:32 UTC</small>
       </div>
     </div>
   </div>

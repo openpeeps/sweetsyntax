@@ -1,3 +1,3 @@
 nimTitle	asciirenderer	sweetsyntax/renderers/asciirenderer.html	module sweetsyntax/renderers/asciirenderer		0
-nim	tokenToAscii	sweetsyntax/renderers/asciirenderer.html#tokenToAscii,SweetLexer,Token	proc tokenToAscii(lexer: SweetLexer; tok: Token; useColor = true): string		56
-nim	highlightAscii	sweetsyntax/renderers/asciirenderer.html#highlightAscii,SweetLexer	proc highlightAscii(lexer: var SweetLexer; useColor = true): string		64
+nim	tokenToAscii	sweetsyntax/renderers/asciirenderer.html#tokenToAscii,SweetLexer,Token	proc tokenToAscii(lexer: SweetLexer; tok: Token; useColor = true): string		57
+nim	highlightAscii	sweetsyntax/renderers/asciirenderer.html#highlightAscii,SweetLexer	proc highlightAscii(lexer: var SweetLexer; useColor = true): string		65
