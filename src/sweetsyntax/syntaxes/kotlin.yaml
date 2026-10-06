@@ -1,0 +1,206 @@
+# Kotlin — highlight-only spec (lexer + renderers, no parser/AST).
+#
+# There is deliberately no `operators:` or `statements:` section: those drive the
+# Pratt parser's precedence tables and statement handlers, and Kotlin is
+# supported for syntax highlighting only.
+#
+# Limitations, all from single-pass lexing rather than from this spec:
+#   - Block comments nest in Kotlin; the lexer stores a single pair and closes
+#     on the first `*/`.
+#   - String templates (`"$name"`, `"${expr}"`) are lexed as plain strings: the
+#     template and the expression inside it all highlight as one string token.
+#   - Raw strings (`"""..."""`) are recognised as one string token, with the
+#     same caveat as C#.
+#   - Annotations (`@JvmStatic`, `@Deprecated`) read as an `@` symbol followed
+#     by a plain identifier, since the `@`-prefixed form is not filtered here.
+
+name: Kotlin
+extension:
+  - kt
+  - kts
+
+inline_comment: '//'
+block_comment:
+  - '/*'
+  - '*/'
+
+int_suffixes: true
+
+symbols:
+  plus: '+'
+  minus: '-'
+  multiply: '*'
+  divide: '/'
+  modulo: '%'
+  increment: '++'
+  decrement: '--'
+  assign: '='
+  plusAssign: '+='
+  minusAssign: '-='
+  multiplyAssign: '*='
+  divideAssign: '/='
+  moduloAssign: '%='
+  range: '..'
+  rangeUntil: '..<'
+  andAssign: '&='
+  orAssign: '|='
+  xorAssign: '^='
+  shlAssign: '<<='
+  shrAssign: '>>='
+  ushrAssign: '>>>='
+  arrow: '->'
+  doubleArrow: '=>'
+  eq: '=='
+  ne: '!='
+  strictEq: '==='
+  strictNe: '!=='
+  lt: '<'
+  lte: '<='
+  gt: '>'
+  gte: '>='
+  not: '!'
+  andand: '&&'
+  oror: '||'
+  shl: '<<'
+  shr: '>>'
+  ushr: '>>>'
+  colon: ':'
+  semi: ';'
+  comma: ','
+  dot: '.'
+  parenL: '('
+  parenR: ')'
+  curlyL: '{'
+  curlyR: '}'
+  bracketL: '['
+  bracketR: ']'
+  question: '?'
+  at: '@'
+  dollar: '$'
+  hash: '#'
+
+identifiers:
+  # Declarations
+  class: "class"
+  companion: "companion"
+  constructor: "constructor"
+  enum: "enum"
+  fun: "fun"
+  init: "init"
+  interface: "interface"
+  object: "object"
+  package: "package"
+  property: "property"
+  typealias: "typealias"
+  val: "val"
+  var: "var"
+  data: "data"
+  sealed: "sealed"
+  annotation: "annotation"
+  inline: "inline"
+  value: "value"
+  infix: "infix"
+  operator: "operator"
+  external: "external"
+  suspend: "suspend"
+  tailrec: "tailrec"
+  expect: "expect"
+  actual: "actual"
+
+  # Statements
+  break: "break"
+  continue: "continue"
+  do: "do"
+  else: "else"
+  for: "for"
+  if: "if"
+  in: "in"
+  return: "return"
+  throw: "throw"
+  try: "try"
+  catch: "catch"
+  finally: "finally"
+  when: "when"
+  while: "while"
+  is: "is"
+  as: "as"
+  out: "out"
+  this: "this"
+  super: "super"
+  where: "where"
+  by: "by"
+  get: "get"
+  set: "set"
+  field: "field"
+  receiver: "receiver"
+  param: "param"
+  setparam: "setparam"
+  file: "file"
+  import: "import"
+
+  # Modifiers
+  abstract: "abstract"
+  final: "final"
+  open: "open"
+  override: "override"
+  private: "private"
+  protected: "protected"
+  public: "public"
+  internal: "internal"
+  lateinit: "lateinit"
+  const: "const"
+  crossinline: "crossinline"
+  noinline: "noinline"
+  vararg: "vararg"
+  reified: "reified"
+  inner: "inner"
+
+  # Types
+  Any: "Any"
+  Nothing: "Nothing"
+  Unit: "Unit"
+  Boolean: "Boolean"
+  Byte: "Byte"
+  Short: "Short"
+  Int: "Int"
+  Long: "Long"
+  Float: "Float"
+  Double: "Double"
+  Char: "Char"
+  String: "String"
+  Array: "Array"
+  List: "List"
+  MutableList: "MutableList"
+  Map: "Map"
+  Set: "Set"
+  Sequence: "Sequence"
+
+  # Literals
+  true: "true"
+  false: "false"
+  null: "null"
+
+# Keyword scopes give a keyword its TextMate scope. These live here so that
+# each spec owns its own vocabulary and the renderer holds none of it; any
+# identifier left out below still highlights, as a plain `keyword`.
+keyword_scopes:
+  storage.type: ["Any", "Nothing", "Unit", "Boolean", "Byte", "Short", "Int", "Long", "Float", "Double", "Char", "String", "Array", "List", "MutableList", "Map", "Set", "Sequence"]
+  storage.modifier: ["abstract", "annotation", "const", "crossinline", "data", "enum", "expect", "actual", "external", "final", "infix", "inline", "inner", "internal", "lateinit", "noinline", "open", "operator", "override", "private", "protected", "public", "reified", "sealed", "suspend", "tailrec", "value", "vararg"]
+  keyword.control: ["break", "continue", "do", "else", "for", "if", "in", "return", "throw", "try", "catch", "finally", "when", "while"]
+  keyword: ["class", "companion", "constructor", "fun", "init", "interface", "object", "package", "property", "typealias", "val", "var", "is", "as", "out", "where", "by", "import", "field", "param", "receiver", "setparam", "get", "set", "file"]
+  constant.language.boolean: ["true", "false"]
+  constant.language.null: ["null"]
+  variable.language: ["this", "super"]
+
+blocks:
+  open: "{"
+  close: "}"
+
+features:
+  regex_literals: false
+  async_await: false
+  generators: false
+  arrow_functions: false
+  template_literals: false
+  labeled_statements: false
+  adjacent_concat: false

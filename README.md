@@ -21,7 +21,7 @@
 - JSON-based AST generator / indent-based dump tree
 - ANSI, HTML and JSON-LD Renderers
 - **Parsers** (lexer + Pratt parser + AST + validation) for: C, Go, JavaScript, Nim, PHP, Ruby — plus TypeScript, which reuses the JavaScript handlers
-- **Highlight-only** (lexer + renderers, no parser, no AST) for: C++, Crystal, D lang, Python, Rust, CMake, CSV, CSS, Dockerfile, EJS, Handlebars, HTML, INI, Jinja2, JSON, Liquid, Makefile, Markdown, Nginx, Shell, systemd, TOML, XML and YAML
+- **Highlight-only** (lexer + renderers, no parser, no AST) for: C++, Crystal, C#, D lang, Haskell, Java, Kotlin, Lua, Objective-C, OCaml, Perl, Python, Rust, Swift, Zig, CMake, CSV, CSS, Dockerfile, EJS, Handlebars, HTML, INI, Jinja2, JSON, Liquid, Makefile, Markdown, Nginx, Shell, systemd, TOML, XML and YAML
 - Every one of those also highlights through the lexer alone, so broken or half-written code still renders — see [Unified highlight](#unified-highlight)
 - Resolves language by extension or by well-known filename (`Dockerfile`, `Makefile`, `CMakeLists.txt`, `.env`)
 - **Context-aware error** reporting while parsing
@@ -78,6 +78,9 @@ A highlight-only spec needs just `name`, `extension`, `symbols`, `identifiers` a
 | `raw_string_delims` | An `R` prefix opens `R"tag(...)tag"` (C++17) |
 | `open_tag` / `close_tag` | Embedded-language tags (`<?php`, `?>`) |
 | `filters` | Regex overlays assigning scopes to markup/config constructs |
+| `filters_skip_literals` | Filters never restyle string/char/regex/comment tokens, so a code-structure filter cannot match inside a literal |
+| `long_brackets` | `[[ ... ]]`, `[=[ ... ]=]` open a string literal (Lua) |
+| `heredoc_opener_punctuation` | `;`/`,` may follow a heredoc opener (Perl's `print <<"EOF";`) |
 | `keyword_scopes` | Scope → lexemes map, giving keywords a TextMate scope |
 
 #### Keyword scopes
@@ -99,7 +102,19 @@ This is also why no renderer keeps a keyword list of its own. It used to, and th
 Because no parser runs, the lexer decides `/regex/` versus division itself: it reuses the spec's `statements.expect_regex_after` token and keyword lists to reach the same verdict `GenericParser` would. Languages that declare no such list never see a regex token. Because `/` after a *value* is genuinely ambiguous (`f(a) / 2`), a regex directly after an identifier, `)`, `]` or a literal still reads as division — bind it to a name (`r = /re/`) if you want it recognised.
 
 #### Known gaps
-The D, Python and Rust specs are still keyword-and-symbol only: none of them declares comment syntax yet, so `#` in Python and `//` in D and Rust highlight as punctuation. Python additionally has no f-string/b-prefix support and Rust lifetimes (`'a`) still lex as character literals. These are the only languages whose highlighting is materially incomplete.
+The Python and Rust specs are still keyword-and-symbol only: neither declares comment syntax yet, so `#` in Python and `//` in Rust highlight as punctuation. Python additionally has no f-string/b-prefix support and Rust lifetimes (`'a`) still lex as character literals. These are the only languages whose highlighting is materially incomplete.
+
+Swift and D both nest block comments, but the lexer stores a single `block_comment` pair and closes on the first `*/`, so a nested comment ends early. D's `/+ +/` comments and `/+! +/` doc comments are not recognised either. Swift raw strings (`#"..."#`) and string interpolation (`"\(x)"`) are likewise not recognised: the interpolation stays inside the string span, and the raw-string `#` reads as a compiler directive. D's delimited forms (`q{...}`, `hex[...]`) are not recognised, though `c"..."`, `q"..."` and `` `backtick` `` are. Objective-C boxed literals (`@42`, `@YES`) read as an `@` symbol followed by an ordinary token.
+
+Comments also nest in Java, C#, Kotlin, OCaml, Zig and Haskell, with the same single-pair limitation.
+
+A few language-specific gaps worth knowing:
+
+- **Kotlin, C# and Swift** string templates and interpolation (`"$name"`, `"{expr}"`) stay inside the string span, so the embedded expression is not highlighted as code. Java text blocks and C# raw strings (triple quotes) do work as single tokens.
+- **Perl** bareword quotes are not recognised. `qw(a b c)` — very common — reads as a call to a variable named `qw`, and `qq{...}`, `m//` and `s///` read as operators plus strings. `"..."`, `'...'` and heredocs all work. `$` is an identifier start, so `$foo` and `$_` are single tokens, but `@` and `%` are not, so `@ARGV` reads as a sigil plus a variable; `${foo}` interpolates into `$`, `{`, `foo`, `}`.
+- **Haskell** `--` starts a comment, so the `a --> b` arrow operator comments out the rest of the line. Qualified names (`Data.List.sort`) are indistinguishable from `.` composition.
+- **Zig** `///` and `//!` doc comments lex as ordinary comments; the lexer only recognises `/**` and `/*!` as documentation, and has no inline doc-comment form. `@"quoted identifiers"` read as `@` plus a string.
+- **OCaml** produces no fold region for `let ... in`, `begin ... end`, `struct ... end` or `sig ... end`, so folding an OCaml file relies on the `{ }` of records.
 
 #### JSON renderer
 The JSON renderer emits each token as its own NDJSON line, designed to be streamed to higher-level applications over websocket/udp so editors and IDEs can build syntax highlighting:

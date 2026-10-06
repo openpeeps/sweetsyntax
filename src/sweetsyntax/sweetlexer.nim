@@ -82,6 +82,18 @@ type
     percentLiterals*: bool
       # whether `%w[..]`, `%i(..)`, `%q{..}` and friends are percent string
       # literals (Ruby) rather than the `%` operator
+    filtersSkipLiterals*: bool
+      # when true, filter attrs are not applied to string, char, regex,
+      # comment or doc-comment tokens, so a filter describing code structure
+      # cannot restyle a literal that merely looks like code. Off by default:
+      # Markdown filters deliberately reach inside code spans.
+    longBrackets*: bool
+      # whether `[[ ... ]]`, `[=[ ... ]=]` open a string literal (Lua) rather
+      # than two `[` delimiters
+    heredocOpenerPunctuation*: bool
+      # whether `;`/`,` may follow a heredoc opener before the newline
+      # (Perl's `print <<"EOF";`). Off by default: the opener must end the
+      # line, which is what keeps `arr << 5` from opening a heredoc named `5`.
     inferRegex*: bool
       # when true, decide `/regex/` vs division from the previous significant
       # token and the spec's `expect_regex_after` lists. Only for consumers
@@ -412,6 +424,14 @@ proc applyFilterAttrs(l: SweetLexer, tok: var Token) =
   if l.filterHits.len == 0:
     return
 
+  # A filter that describes code structure must not restyle a literal or a
+  # comment that merely contains the same text, e.g. a preprocessor filter
+  # matching `#if` inside `"#if DEBUG"`. Specs opt in via
+  # `filters_skip_literals`; Markdown's code-span filters do not.
+  if l.filtersSkipLiterals and tok.kind in
+      {tkString, tkChar, tkRegex, tkComment, tkDocComment}:
+    return
+
   while l.filterScanIdx < l.filterHits.len and l.filterHits[l.filterScanIdx].stop <= tok.start:
     inc l.filterScanIdx
 
@@ -550,6 +570,12 @@ proc scanHeredoc(l: var SweetLexer, startPos, startLine, startCol: int): Token =
     j += 1
   if l.charAt(j) == '#':
     while l.charAt(j) != '\0' and l.charAt(j) != '\n':
+      j += 1
+  # Perl terminates a heredoc opener with `;` or `,` on the same line. Only
+  # specs that opt in accept that, so Ruby/PHP keep the strict end-of-line rule
+  # that stops `arr << 5` from opening a heredoc.
+  if l.heredocOpenerPunctuation:
+    while l.charAt(j) in {' ', '\t', ';', ','}:
       j += 1
   if l.charAt(j) == '\r' and l.charAt(j + 1) == '\n':
     j += 2
@@ -793,6 +819,40 @@ proc regexAllowed(l: var SweetLexer): bool =
     return true
   false
 
+proc scanLongBracketString(l: var SweetLexer, startPos, startLine, startCol: int): Token =
+  ## Scan a Lua long bracket string: `[[ ... ]]`, `[=[ ... ]=]`,
+  ## `[==[ ... ]==]`. Called with `l.current == '['`; returns nil when the
+  ## text is an ordinary bracket (table access or a nested `[`), so the
+  ## caller falls back to delimiter scanning. The opening bracket, the run of
+  ## `=` and the second `[` are consumed, then the body runs to the matching
+  ## `]` + the same number of `=` + `]`, so a `]` or `]=` inside the body is
+  ## literal. A newline immediately after the opener is skipped, per Lua.
+  ## Only reached when the spec sets `long_brackets: true` (Lua), so a `[`
+  ## in other languages keeps its current meaning.
+  var eqCount = 0
+  while l.charAt(l.pos + 1 + eqCount) == '=': inc eqCount
+  if l.charAt(l.pos + 1 + eqCount) != '[':
+    return nil # plain index / table access
+  for _ in 0 .. eqCount + 1:
+    discard l.advance()
+  # Lua drops a newline directly after the opening bracket.
+  if l.current == '\r':
+    discard l.advance()
+    if l.current == '\n': discard l.advance()
+  elif l.current == '\n':
+    discard l.advance()
+    if l.current == '\r': discard l.advance()
+  while l.current != '\0':
+    if l.current == ']':
+      var seen = 0
+      while seen < eqCount and l.charAt(l.pos + 1 + seen) == '=': inc seen
+      if seen == eqCount and l.charAt(l.pos + 1 + eqCount) == ']':
+        for _ in 0 .. eqCount + 1:
+          discard l.advance()
+        return l.makeRange(tkString, startPos, startLine, startCol)
+    discard l.advance()
+  l.makeRange(tkString, startPos, startLine, startCol) # unterminated, but safe
+
 proc lexToken(l: var SweetLexer): Token =
   ## Scan one token. See `getToken`, which wraps this to remember the last
   ## significant token so the regex heuristic can look at it.
@@ -846,13 +906,23 @@ proc lexToken(l: var SweetLexer): Token =
   if l.current == '\0':
     return Token(kind: tkEOF, line: startLine, col: startCol, pos: startPos, start: startPos, stop: startPos)
 
-  # Prefixed string literals (C++ `u8"x"`, `L'c'`, `R"tag(...)tag"`) must be
-  # tested before the plain identifier scan, because the prefix is glued to
-  # the quote and would otherwise be read as an identifier.
-  if l.stringPrefixes.len > 0 and isIdentStart(l.current):
-    let prefixed = l.scanStringPrefix(startPos, startLine, startCol)
-    if prefixed != nil:
-      return prefixed
+  # Prefixed string literals (C++ `u8"x"`, `L'c'`, `R"tag(...)tag"`, C#
+  # `@"verbatim"`) must be tested before the plain identifier scan, because the
+  # prefix is glued to the quote and would otherwise be read as an identifier
+  # (or, for `@`, as punctuation). A prefix need not start like an identifier:
+  # C#'s `@` is punctuation, so a prefix's own first character also arms this
+  # check.
+  if l.stringPrefixes.len > 0:
+    var mayBePrefix = isIdentStart(l.current)
+    if not mayBePrefix:
+      for pfx in l.stringPrefixes:
+        if pfx.len > 0 and pfx[0] == l.current:
+          mayBePrefix = true
+          break
+    if mayBePrefix:
+      let prefixed = l.scanStringPrefix(startPos, startLine, startCol)
+      if prefixed != nil:
+        return prefixed
 
   if isIdentStart(l.current) or ord(l.current) >= 0x80:
     if ord(l.current) >= 0x80:
@@ -1073,8 +1143,9 @@ proc lexToken(l: var SweetLexer): Token =
         matchesStart = false
         break
     if matchesStart:
-      # Check if this is a doc comment (/** or /*!)
-      let isDocComment = startSyntax == "/*" and (l.peek(2) == '*' or l.peek(2) == '!')
+      # Check if this is a doc comment (`/**`, `/*!`, `(**`, `(*!`)
+      let isDocComment = (startSyntax == "/*" or startSyntax == "(*") and
+        (l.peek(2) == '*' or l.peek(2) == '!')
       
       # Consume start syntax
       for i in 0 ..< startSyntax.len:
@@ -1179,6 +1250,14 @@ proc lexToken(l: var SweetLexer): Token =
       if l.current == '`':
         discard l.advance() # consume closing '`'
       return l.makeRange(tkIdentifier, startPos, startLine, startCol)
+
+  # Lua long bracket strings (`[[ ... ]]`, `[==[ ... ]==]`). Checked after
+  # comments so `--[[ ... ]]` is a comment, and before punctuation so the
+  # opener is not read as two `[` delimiters.
+  if l.longBrackets and l.current == '[':
+    let long = l.scanLongBracketString(startPos, startLine, startCol)
+    if long != nil:
+      return long
 
   # Check for punctuation
   if isDelimiterPunct(l.current):
@@ -1337,6 +1416,9 @@ proc initLexerFromFile*(spec: SweetSpec, path: string, enableFilters: bool = fal
     stringPrefixes: spec.string_prefixes,
     rawStringDelims: spec.raw_string_delims,
     percentLiterals: spec.percent_literals,
+    filtersSkipLiterals: spec.filters_skip_literals,
+    longBrackets: spec.long_brackets,
+    heredocOpenerPunctuation: spec.heredoc_opener_punctuation,
     openTag: spec.open_tag,
     closeTag: spec.close_tag,
     filters: spec.filters,
@@ -1385,6 +1467,9 @@ proc initLexerFromFile*(pre: SweetLexerInit, path: string, enableFilters: bool =
     stringPrefixes: pre.stringPrefixes,
     rawStringDelims: pre.rawStringDelims,
     percentLiterals: pre.percentLiterals,
+    filtersSkipLiterals: pre.filtersSkipLiterals,
+    longBrackets: pre.longBrackets,
+    heredocOpenerPunctuation: pre.heredocOpenerPunctuation,
     inferRegex: pre.inferRegex,
     openTag: pre.openTag,
     closeTag: pre.closeTag,
@@ -1424,6 +1509,9 @@ proc initLexer*(spec: SweetSpec, input: sink string, enableFilters: bool = false
     stringPrefixes: spec.string_prefixes,
     rawStringDelims: spec.raw_string_delims,
     percentLiterals: spec.percent_literals,
+    filtersSkipLiterals: spec.filters_skip_literals,
+    longBrackets: spec.long_brackets,
+    heredocOpenerPunctuation: spec.heredoc_opener_punctuation,
     openTag: spec.open_tag,
     closeTag: spec.close_tag,
     filters: spec.filters,
@@ -1470,6 +1558,9 @@ proc initLexer*(pre: SweetLexerInit, input: sink string, enableFilters: bool = f
     stringPrefixes: pre.stringPrefixes,
     rawStringDelims: pre.rawStringDelims,
     percentLiterals: pre.percentLiterals,
+    filtersSkipLiterals: pre.filtersSkipLiterals,
+    longBrackets: pre.longBrackets,
+    heredocOpenerPunctuation: pre.heredocOpenerPunctuation,
     inferRegex: pre.inferRegex,
     openTag: pre.openTag,
     closeTag: pre.closeTag,
@@ -1510,6 +1601,9 @@ proc initLexerFromMemFile*(spec: SweetSpec, mf: MemFile, path: string = "", enab
     stringPrefixes: spec.string_prefixes,
     rawStringDelims: spec.raw_string_delims,
     percentLiterals: spec.percent_literals,
+    filtersSkipLiterals: spec.filters_skip_literals,
+    longBrackets: spec.long_brackets,
+    heredocOpenerPunctuation: spec.heredoc_opener_punctuation,
     openTag: spec.open_tag,
     closeTag: spec.close_tag,
     filters: spec.filters,

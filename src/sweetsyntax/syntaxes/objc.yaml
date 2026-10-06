@@ -1,0 +1,232 @@
+# Objective-C — highlight-only spec (lexer + renderers, no parser/AST).
+#
+# There is deliberately no `operators:` or `statements:` section: those drive the
+# Pratt parser's precedence tables and statement handlers, and Objective-C is
+# supported for syntax highlighting only. The lexer gets everything it needs
+# from `symbols`, `identifiers` and the flags below.
+#
+# This is a superset of the C spec: same comments, literals and operators, plus
+# the `@`-keywords and the property/method type qualifiers.
+#
+# Limitations, all from single-pass lexing rather than from this spec:
+#   - Boxed literals (`@42`, `@YES`, `@"a".uppercaseString`) are an `@` symbol
+#     followed by an ordinary token, so `@42` does not read as a literal.
+#   - NSString format specifiers (`%@`, `%d`) highlight as the `%` operator
+#     followed by an identifier rather than as string interpolation.
+#   - Block comments do not nest.
+#   - `@`-keywords are listed in `identifiers`, so the bare word is styled
+#     wherever it appears, not only after an `@`. `end` is deliberately omitted
+#     because `end` is a common variable and field name; `@end` therefore
+#     renders its `@` as punctuation and `end` as a plain identifier.
+
+name: Objective-C
+extension:
+  - m
+  - mm
+
+inline_comment: '//'
+block_comment:
+  - '/*'
+  - '*/'
+
+int_suffixes: true
+
+# `hash_comments` stays off: `#` introduces preprocessor directives in
+# Objective-C, never a comment. The filter below styles them instead.
+
+# The preprocessor vocabulary: #import, #include, #define, #undef, #if, #ifdef,
+# #ifndef, #elif, #else, #endif, #pragma, #error, #warning, #line, #assert.
+# The filter describes code structure, so `filters_skip_literals` keeps it from
+# restyling an NSString or comment that merely contains one.
+filters_skip_literals: true
+filters:
+  - name: directive
+    pattern: "#[a-zA-Z_]+"
+    group: 0
+    attr: "meta.preprocessor"
+
+symbols:
+  plus: '+'
+  minus: '-'
+  multiply: '*'
+  divide: '/'
+  modulo: '%'
+  assign: '='
+  eq: '=='
+  ne: '!='
+  lt: '<'
+  lte: '<='
+  gt: '>'
+  gte: '>='
+  and: '&'
+  andand: '&&'
+  or: '|'
+  oror: '||'
+  xor: '^'
+  not: '!'
+  tilde: '~'
+  shiftLeft: '<<'
+  shiftRight: '>>'
+  plusAssign: '+='
+  minusAssign: '-='
+  multiplyAssign: '*='
+  divideAssign: '/='
+  moduloAssign: '%='
+  andAssign: '&='
+  orAssign: '|='
+  xorAssign: '^='
+  shiftLeftAssign: '<<='
+  shiftRightAssign: '>>='
+  increment: '++'
+  decrement: '--'
+  arrow: '->'
+  dot: '.'
+  ellipsis: '...'
+  parl: '('
+  parr: ')'
+  sqbl: '['
+  sqbr: ']'
+  curl: '{'
+  curr: '}'
+  squote: "'"
+  quote: '"'
+  colon: ':'
+  scolon: ';'
+  comma: ','
+  question: '?'
+  hash: '#'
+  backslash: '\\'
+  at: '@'
+  dollar: '$'
+
+identifiers:
+  # C keywords
+  auto: "auto"
+  break: "break"
+  case: "case"
+  char: "char"
+  const: "const"
+  continue: "continue"
+  default: "default"
+  do: "do"
+  double: "double"
+  else: "else"
+  enum: "enum"
+  extern: "extern"
+  float: "float"
+  for: "for"
+  goto: "goto"
+  if: "if"
+  inline: "inline"
+  int: "int"
+  long: "long"
+  register: "register"
+  restrict: "restrict"
+  return: "return"
+  short: "short"
+  signed: "signed"
+  sizeof: "sizeof"
+  static: "static"
+  struct: "struct"
+  switch: "switch"
+  typedef: "typedef"
+  union: "union"
+  unsigned: "unsigned"
+  void: "void"
+  volatile: "volatile"
+  while: "while"
+
+  # Objective-C types
+  BOOL: "BOOL"
+  Class: "Class"
+  IMP: "IMP"
+  SEL: "SEL"
+  id: "id"
+  instancetype: "instancetype"
+
+  # `@`-keywords
+  autoreleasepool: "autoreleasepool"
+  catch: "catch"
+  dynamic: "dynamic"
+  encode: "encode"
+  finally: "finally"
+  implementation: "implementation"
+  interface: "interface"
+  optional: "optional"
+  property: "property"
+  protocol: "protocol"
+  required: "required"
+  selector: "selector"
+  synchronized: "synchronized"
+  synthesize: "synthesize"
+  throw: "throw"
+  try: "try"
+
+  # Property attributes
+  assign: "assign"
+  atomic: "atomic"
+  copy: "copy"
+  getter: "getter"
+  nonatomic: "nonatomic"
+  readonly: "readonly"
+  readwrite: "readwrite"
+  retain: "retain"
+  setter: "setter"
+  strong: "strong"
+  unsafe_unretained: "unsafe_unretained"
+  weak: "weak"
+
+  # Method type qualifiers
+  bycopy: "bycopy"
+  byref: "byref"
+  in: "in"
+  inout: "inout"
+  oneway: "oneway"
+  out: "out"
+
+  # Ownership qualifiers
+  __block: "__block"
+  __strong: "__strong"
+  __unsafe_unretained: "__unsafe_unretained"
+  __weak: "__weak"
+
+  # Constants and builtins
+  NO: "NO"
+  Nil: "Nil"
+  NULL: "NULL"
+  YES: "YES"
+  __func__: "__func__"
+  __PRETTY_FUNCTION__: "__PRETTY_FUNCTION__"
+  __VA_ARGS__: "__VA_ARGS__"
+  bool: "bool"
+  false: "false"
+  nil: "nil"
+  self: "self"
+  super: "super"
+  true: "true"
+
+# Keyword scopes give a keyword its TextMate scope. These live here so that
+# each spec owns its own vocabulary and the renderer holds none of it; any
+# identifier left out below still highlights, as a plain `keyword`.
+keyword_scopes:
+  storage.type: ["void", "char", "short", "int", "long", "float", "double", "signed", "unsigned", "bool", "BOOL", "Class", "IMP", "SEL", "id", "instancetype", "__block"]
+  storage.modifier: ["const", "volatile", "static", "extern", "register", "restrict", "inline", "auto", "typedef", "assign", "atomic", "copy", "nonatomic", "readonly", "readwrite", "retain", "strong", "unsafe_unretained", "weak", "__strong", "__unsafe_unretained", "__weak", "bycopy", "byref", "in", "inout", "oneway", "out"]
+  keyword.control: ["if", "else", "for", "while", "do", "switch", "case", "default", "break", "continue", "goto", "return", "try", "catch", "finally", "throw"]
+  keyword: ["enum", "struct", "union", "sizeof", "interface", "implementation", "property", "synthesize", "dynamic", "protocol", "selector", "optional", "required", "synchronized", "autoreleasepool", "encode", "getter", "setter"]
+  constant.language.boolean: ["true", "false", "YES", "NO"]
+  constant.language.null: ["nil", "Nil", "NULL"]
+  constant.language: ["__func__", "__PRETTY_FUNCTION__", "__VA_ARGS__"]
+  variable.language: ["self", "super"]
+
+blocks:
+  open: "{"
+  close: "}"
+
+features:
+  regex_literals: false
+  async_await: false
+  generators: false
+  arrow_functions: false
+  template_literals: false
+  labeled_statements: true
+  adjacent_concat: false

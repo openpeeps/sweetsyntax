@@ -49,7 +49,7 @@ proc scopeForFilterAttr(tok: Token): string =
        "markup.indicator", "markup.tag",
        "entity.name.tag", "entity.other.attribute-name",
        "constant.numeric.date", "constant.character.escape",
-       "selector.id", "selector.class", "at.rule":
+       "selector.id", "selector.class", "at.rule", "meta.preprocessor":
       return a
     of "property.name":
       return "variable.other.property"

@@ -1,0 +1,238 @@
+# C# — highlight-only spec (lexer + renderers, no parser/AST).
+#
+# There is deliberately no `operators:` or `statements:` section: those drive the
+# Pratt parser's precedence tables and statement handlers, and C# is supported
+# for syntax highlighting only.
+#
+# Limitations, all from single-pass lexing rather than from this spec:
+#   - Block comments nest in C#; the lexer stores a single pair and closes on
+#     the first `*/`.
+#   - Interpolated strings are lexed as plain strings: the `$"..."` prefix is
+#     folded into the token, but the `{expr}` holes inside are not highlighted
+#     as code, so `"a{b}"` styles the whole thing green.
+#   - Raw string literals are recognised only in their three-quote form
+#     (`"""`), so a five-quote raw literal closes early.
+#   - Generic method type arguments (`Foo<T>.Bar`) read as ordinary punctuation.
+
+name: C#
+extension:
+  - cs
+  - csx
+
+inline_comment: '//'
+block_comment:
+  - '/*'
+  - '*/'
+
+int_suffixes: true
+
+# `@"..."` verbatim (no escapes, `""` for a quote), `$"..."` interpolated and
+# the combined `$@"..."` / `@$"..."` all fold into a single string token. The
+# lexer keeps the longest matching prefix.
+string_prefixes: ["@", "$", "@$", "$@"]
+
+# `hash_comments` stays off: `#` introduces preprocessor directives in C#,
+# never a comment. The filter below styles them instead.
+filters_skip_literals: true
+filters:
+  - name: directive
+    pattern: "#[a-zA-Z_]+"
+    group: 0
+    attr: "meta.preprocessor"
+
+symbols:
+  plus: '+'
+  minus: '-'
+  multiply: '*'
+  divide: '/'
+  modulo: '%'
+  increment: '++'
+  decrement: '--'
+  assign: '='
+  plusAssign: '+='
+  minusAssign: '-='
+  multiplyAssign: '*='
+  divideAssign: '/='
+  moduloAssign: '%='
+  andAssign: '&='
+  orAssign: '|='
+  xorAssign: '^='
+  shiftLeftAssign: '<<='
+  shiftRightAssign: '>>='
+  unsignedShiftRightAssign: '>>>='
+  shiftLeft: '<<'
+  shiftRight: '>>'
+  unsignedShiftRight: '>>>'
+  eq: '=='
+  ne: '!='
+  lt: '<'
+  lte: '<='
+  gt: '>'
+  gte: '>='
+  and: '&'
+  andand: '&&'
+  or: '|'
+  oror: '||'
+  xor: '^'
+  not: '!'
+  tilde: '~'
+  question: '?'
+  questionQuestion: '??'
+  nullCoalescingAssign: '??='
+  colon: ':'
+  doubleColon: '::'
+  parenL: '('
+  parenR: ')'
+  curlyL: '{'
+  curlyR: '}'
+  bracketL: '['
+  bracketR: ']'
+  semi: ';'
+  comma: ','
+  dot: '.'
+  arrow: '->'
+  lambda: '=>'
+
+identifiers:
+  # Declarations
+  class: "class"
+  delegate: "delegate"
+  enum: "enum"
+  event: "event"
+  explicit: "explicit"
+  extern: "extern"
+  fixed: "fixed"
+  implicit: "implicit"
+  interface: "interface"
+  namespace: "namespace"
+  operator: "operator"
+  partial: "partial"
+  record: "record"
+  struct: "struct"
+  using: "using"
+  var: "var"
+  yield: "yield"
+
+  # Statements
+  break: "break"
+  case: "case"
+  catch: "catch"
+  checked: "checked"
+  continue: "continue"
+  default: "default"
+  do: "do"
+  else: "else"
+  finally: "finally"
+  for: "for"
+  foreach: "foreach"
+  goto: "goto"
+  if: "if"
+  in: "in"
+  lock: "lock"
+  out: "out"
+  params: "params"
+  return: "return"
+  switch: "switch"
+  throw: "throw"
+  try: "try"
+  unchecked: "unchecked"
+  while: "while"
+
+  # Modifiers
+  abstract: "abstract"
+  async: "async"
+  await: "await"
+  const: "const"
+  dynamic: "dynamic"
+  file: "file"
+  init: "init"
+  internal: "internal"
+  override: "override"
+  private: "private"
+  protected: "protected"
+  public: "public"
+  readonly: "readonly"
+  ref: "ref"
+  required: "required"
+  sealed: "sealed"
+  static: "static"
+  unsafe: "unsafe"
+  virtual: "virtual"
+  volatile: "volatile"
+
+  # Primitive types
+  bool: "bool"
+  byte: "byte"
+  char: "char"
+  decimal: "decimal"
+  double: "double"
+  float: "float"
+  int: "int"
+  long: "long"
+  object: "object"
+  sbyte: "sbyte"
+  short: "short"
+  string: "string"
+  uint: "uint"
+  ulong: "ulong"
+  ushort: "ushort"
+  void: "void"
+
+  # LINQ and pattern keywords
+  from: "from"
+  group: "group"
+  join: "join"
+  let: "let"
+  nameof: "nameof"
+  orderby: "orderby"
+  select: "select"
+  where: "where"
+
+  # Exceptions and misc
+  base: "base"
+  global: "global"
+  is: "is"
+  new: "new"
+  not: "not"
+  notnull: "notnull"
+  null: "null"
+  sizeof: "sizeof"
+  stackalloc: "stackalloc"
+  this: "this"
+  true: "true"
+  false: "false"
+  typeof: "typeof"
+  when: "when"
+
+  # Contextual keywords used as accessors / properties
+  add: "add"
+  get: "get"
+  remove: "remove"
+  set: "set"
+  value: "value"
+  into: "into"
+
+# Keyword scopes give a keyword its TextMate scope. These live here so that
+# each spec owns its own vocabulary and the renderer holds none of it; any
+# identifier left out below still highlights, as a plain `keyword`.
+keyword_scopes:
+  storage.type: ["bool", "byte", "char", "decimal", "double", "float", "int", "long", "object", "sbyte", "short", "string", "uint", "ulong", "ushort", "void", "dynamic", "var"]
+  storage.modifier: ["abstract", "async", "const", "extern", "file", "init", "internal", "override", "partial", "private", "protected", "public", "readonly", "ref", "required", "sealed", "static", "unsafe", "virtual", "volatile"]
+  keyword.control: ["break", "case", "catch", "checked", "continue", "default", "do", "else", "finally", "for", "foreach", "goto", "if", "in", "lock", "out", "params", "return", "switch", "throw", "try", "unchecked", "while", "yield", "await"]
+  keyword: ["class", "delegate", "enum", "event", "explicit", "implicit", "interface", "namespace", "new", "operator", "record", "struct", "using", "fixed", "sizeof", "stackalloc", "typeof", "nameof", "global", "is", "not", "notnull", "when", "where", "let", "from", "group", "join", "orderby", "select", "into", "base", "add", "get", "set", "remove", "value"]
+  constant.language.boolean: ["true", "false"]
+  constant.language.null: ["null"]
+  variable.language: ["this"]
+
+blocks:
+  open: "{"
+  close: "}"
+
+features:
+  regex_literals: false
+  async_await: false
+  generators: false
+  arrow_functions: false
+  template_literals: false
+  labeled_statements: true
+  adjacent_concat: false

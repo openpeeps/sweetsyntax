@@ -65,6 +65,40 @@ const cases: seq[Case] = @[
     "auto x = 1;\n/* one\n   two */\n", "auto x = 1;", 1),
   (KnownSyntax.nim, "Nim",
     "echo 1\n# one\n   two\n", "echo 1", 1),
+  (KnownSyntax.py, "Python",
+    "def f():\n  return 1\n", "x = 1", 1),
+  (KnownSyntax.ruby, "Ruby",
+    "def x\n  1\nend\n", "puts 1", 1),
+  (KnownSyntax.rust, "Rust",
+    "fn main() {\n  let x = 1;\n}\n", "fn main() {}", 1),
+  (KnownSyntax.go, "Go",
+    "func x() {\n  return\n}\n", "package main", 1),
+  (KnownSyntax.php, "PHP",
+    "<?php\nif (true) {\n  echo 1;\n}\n", "echo 1;", 1),
+  (KnownSyntax.d, "D",
+    "void main() {\n  auto x = 1;\n}\n", "int x;", 1),
+  (KnownSyntax.swift, "Swift",
+    "func f() -> Int {\n  return 1\n}\n", "func f() {}", 1),
+  (KnownSyntax.objc, "Objective-C",
+    "int main(void) {\n  return 0;\n}\n", "int x;", 1),
+  (KnownSyntax.java, "Java",
+    "class A {\n  // c\n}\n", "int x;", 1),
+  (KnownSyntax.csharp, "C#",
+    "class A {\n  // c\n}\n", "int x;", 1),
+  (KnownSyntax.kotlin, "Kotlin",
+    "fun f(): Int {\n  return 1\n}\n", "val x = 1", 1),
+  (KnownSyntax.perl, "Perl",
+    "sub f {\n  return 1;\n}\n", "my $x = 1;", 1),
+  # OCaml, Lua and Haskell have no brace blocks in these samples, so `fmAuto`
+  # falls back to indent folding, which is the mode they actually need.
+  (KnownSyntax.ocaml, "OCaml",
+    "let f x =\n  x + 1\n", "let x = 1", 1),
+  (KnownSyntax.lua, "Lua",
+    "function f()\n  return 1\nend\n", "local x = 1", 1),
+  (KnownSyntax.haskell, "Haskell",
+    "f x =\n  x + 1\n", "x = 1", 1),
+  (KnownSyntax.zig, "Zig",
+    "fn f() void {\n  return;\n}\n", "const x = 1;", 1),
 ]
 
 proc jsonLines(lang: KnownSyntax, code: string): seq[JsonNode] =
@@ -279,3 +313,26 @@ suite "Format selection and options":
     let withoutAttr = "entity.other.attribute-name" in without
     check withAttr
     check not withoutAttr
+
+suite "Matrix coverage":
+  test "every known language appears in the matrix exactly once":
+    ## Keeps the table from drifting behind `KnownSyntax` as languages are
+    ## added: a new spec that never enters this matrix would otherwise go
+    ## untested by every per-language renderer and fold assertion above.
+    var seen = initTable[string, int]()
+    for c in cases:
+      ## `inc t[key]` raises KeyError on a missing key for a plain `Table`,
+      ## so count explicitly rather than incrementing in place.
+      seen[$(c.lang)] = seen.getOrDefault($(c.lang)) + 1
+
+    var missing: seq[string] = @[]
+    for lang in KnownSyntax:
+      if $lang notin seen:
+        missing.add $lang
+    check missing.len == 0
+
+    var duplicated: seq[string] = @[]
+    for c in cases:
+      if seen[$(c.lang)] > 1:
+        duplicated.add c.name
+    check duplicated.len == 0

@@ -1,0 +1,113 @@
+# Lua — highlight-only spec (lexer + renderers, no parser/AST).
+#
+# There is deliberately no `operators:` or `statements:` section: those drive the
+# Pratt parser's precedence tables and statement handlers, and Lua is supported
+# for syntax highlighting only.
+#
+# Lua's comment and string syntax is unusual enough to be worth spelling out:
+#   - `--` runs to the end of the line, and `--[[ ... ]]` is a block comment.
+#     Block comments are checked before inline comments, so the long form wins.
+#   - `long_brackets` makes `[[ ... ]]`, `[=[ ... ]=]` and `[==[ ... ]==]` scan
+#     as single string tokens, with the run of `=` choosing the closer. A
+#     newline directly after the opener is skipped, per Lua.
+#
+# Limitations, all from single-pass lexing rather than from this spec:
+#   - Long comments nest in Lua, and the lexer stores a single pair, so
+#     `--[[ a --[[ b ]] c ]]` closes at the first `]]`.
+#   - Numbers with a hexadecimal float exponent (`0x1p4`) and integer division
+#     `//` are not recognised.
+#   - Lua has no keywords beyond the 22 below, so `self` is listed explicitly;
+#     every other identifier is a plain variable.
+
+name: Lua
+extension:
+  - lua
+
+inline_comment: '--'
+block_comment:
+  - '--[['
+  - ']]'
+
+long_brackets: true
+
+symbols:
+  plus: '+'
+  minus: '-'
+  multiply: '*'
+  divide: '/'
+  doubleDivide: '//'
+  power: '^'
+  modulo: '%'
+  hashLength: '#'
+  assign: '='
+  plusAssign: '+='
+  minusAssign: '-='
+  multiplyAssign: '*='
+  divideAssign: '/='
+  concatAssign: '..='
+  eq: '=='
+  ne: '~='
+  lt: '<'
+  lte: '<='
+  gt: '>'
+  gte: '>='
+  concat: '..'
+  ellipsis: '...'
+  colon: ':'
+  semi: ';'
+  comma: ','
+  dot: '.'
+  parenL: '('
+  parenR: ')'
+  curlyL: '{'
+  curlyR: '}'
+  bracketL: '['
+  bracketR: ']'
+
+identifiers:
+  and: "and"
+  break: "break"
+  do: "do"
+  else: "else"
+  elseif: "elseif"
+  end: "end"
+  for: "for"
+  function: "function"
+  goto: "goto"
+  if: "if"
+  in: "in"
+  local: "local"
+  not: "not"
+  or: "or"
+  repeat: "repeat"
+  return: "return"
+  then: "then"
+  until: "until"
+  while: "while"
+  false: "false"
+  nil: "nil"
+  true: "true"
+  self: "self"
+
+# Keyword scopes give a keyword its TextMate scope. These live here so that
+# each spec owns its own vocabulary and the renderer holds none of it; any
+# identifier left out below still highlights, as a plain `keyword`.
+keyword_scopes:
+  keyword.control: ["break", "do", "else", "elseif", "end", "for", "goto", "if", "in", "repeat", "return", "then", "until", "while"]
+  keyword: ["and", "function", "local", "not", "or"]
+  constant.language.boolean: ["true", "false"]
+  constant.language.null: ["nil"]
+  variable.language: ["self"]
+
+blocks:
+  open: "{"
+  close: "}"
+
+features:
+  regex_literals: false
+  async_await: false
+  generators: false
+  arrow_functions: false
+  template_literals: false
+  labeled_statements: false
+  adjacent_concat: false

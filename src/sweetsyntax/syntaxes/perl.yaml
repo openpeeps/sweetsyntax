@@ -1,0 +1,253 @@
+# Perl — highlight-only spec (lexer + renderers, no parser/AST).
+#
+# There is deliberately no `operators:` or `statements:` section: those drive the
+# Pratt parser's precedence tables and statement handlers, and Perl is supported
+# for syntax highlighting only.
+#
+# Perl's sigils need no special support for `$`: the lexer treats `$` as an
+# identifier start, so `$foo`, `$#array` and `$_` each scan as one identifier.
+# `@` and `%` are not identifier starts, so `@ARGV` reads as a sigil in
+# punctuation followed by a plain variable, and `%ENV` likewise.
+#
+# Limitations, all from single-pass lexing rather than from this spec:
+#   - Braced dereferences interpolate: `${foo}` reads as `$`, `{`, `foo`, `}`
+#     and `@{$ref}` likewise, because `{` cannot be part of an identifier.
+#   - Bareword quotes are not recognised. `qw(a b c)` — very common in Perl —
+#     reads as a call to a variable named `qw` followed by `(a b c)`, and
+#     `qq{...}`, `m//`, `s///` and `tr///` read as operators plus strings. Use
+#     `"..."`, `'...'` or a heredoc for string literals; those all work.
+#   - String interpolation (`"@a"`, `"$x"`) stays inside the string span, so
+#     the interpolated variable is not highlighted as code.
+#   - `//` reads as division unless the previous token suggests a regex.
+#   - Format blocks (`format`/`picture`) and POD (`=pod` ... `=cut`) are not
+#     recognised; POD lexes as ordinary code.
+
+name: Perl
+extension:
+  - pl
+  - pm
+  - t
+  - pod
+  - plx
+
+hash_comments: true
+
+# `print <<"EOF";` and `$x = <<'EOF';` run to the terminator line. Perl
+# terminates the opener with `;` or `,` on the same line, which the default
+# strict end-of-line rule rejects, so this spec opts in.
+heredocs: true
+heredoc_opener_punctuation: true
+
+symbols:
+  plus: '+'
+  minus: '-'
+  multiply: '*'
+  divide: '/'
+  modulo: '%'
+  power: '**'
+  assign: '='
+  plusAssign: '+='
+  minusAssign: '-='
+  multiplyAssign: '*='
+  divideAssign: '/='
+  moduloAssign: '%='
+  powerAssign: '**='
+  andAssign: '&='
+  orAssign: '|='
+  xorAssign: '^='
+  eq: '=='
+  ne: '!='
+  le: '<='
+  ge: '>='
+  lt: '<'
+  gt: '>'
+  spaceship: '<=>'
+  stringEq: 'eq'
+  stringNe: 'ne'
+  stringLt: 'lt'
+  stringGt: 'gt'
+  stringLe: 'le'
+  stringGe: 'ge'
+  andand: '&&'
+  oror: '||'
+  and: '&'
+  or: '|'
+  xor: '^'
+  not: '!'
+  tilde: '~'
+  shiftLeft: '<<'
+  shiftRight: '>>'
+  increment: '++'
+  decrement: '--'
+  fatComma: '=>'
+  fatArrow: '->'
+  flipFlop: '..'
+  transpose: '\\'
+  colonColon: '::'
+  ellipsis: '...'
+  colon: ':'
+  semi: ';'
+  comma: ','
+  parenL: '('
+  parenR: ')'
+  curlyL: '{'
+  curlyR: '}'
+  bracketL: '['
+  bracketR: ']'
+  pipe: '|'
+  question: '?'
+  dot: '.'
+  quote: '"'
+  squote: "'"
+
+identifiers:
+  # Declarations
+  sub: "sub"
+  package: "package"
+  use: "use"
+  no: "no"
+  require: "require"
+  my: "my"
+  our: "our"
+  local: "local"
+  state: "state"
+
+  # Control flow
+  if: "if"
+  elsif: "elsif"
+  else: "else"
+  unless: "unless"
+  while: "while"
+  until: "until"
+  for: "for"
+  foreach: "foreach"
+  do: "do"
+  last: "last"
+  next: "next"
+  redo: "redo"
+  goto: "goto"
+  return: "return"
+  given: "given"
+  when: "when"
+  default: "default"
+
+  # References and introspection
+  ref: "ref"
+  wantarray: "wantarray"
+  defined: "defined"
+  undef: "undef"
+  bless: "bless"
+  eval: "eval"
+  caller: "caller"
+
+  # Data structures
+  push: "push"
+  pop: "pop"
+  shift: "shift"
+  unshift: "unshift"
+  splice: "splice"
+  join: "join"
+  split: "split"
+  map: "map"
+  grep: "grep"
+  sort: "sort"
+  reverse: "reverse"
+  keys: "keys"
+  values: "values"
+  each: "each"
+  exists: "exists"
+  delete: "delete"
+  scalar: "scalar"
+
+  # I/O and flow
+  print: "print"
+  printf: "printf"
+  say: "say"
+  die: "die"
+  warn: "warn"
+  exit: "exit"
+  open: "open"
+  close: "close"
+  binmode: "binmode"
+  eof: "eof"
+
+  # Strings
+  chomp: "chomp"
+  chop: "chop"
+  substr: "substr"
+  index: "index"
+  rindex: "rindex"
+  length: "length"
+  uc: "uc"
+  lc: "lc"
+  ucfirst: "ucfirst"
+  lcfirst: "lcfirst"
+  sprintf: "sprintf"
+  pos: "pos"
+  quotemeta: "quotemeta"
+  study: "study"
+
+  # Numbers
+  srand: "srand"
+  rand: "rand"
+  int: "int"
+  abs: "abs"
+  sqrt: "sqrt"
+  hex: "hex"
+  oct: "oct"
+  ord: "ord"
+  chr: "chr"
+
+  # Time
+  time: "time"
+  localtime: "localtime"
+  gmtime: "gmtime"
+
+  # Misc
+  format: "format"
+  new: "new"
+  AUTOLOAD: "AUTOLOAD"
+  DESTROY: "DESTROY"
+  BEGIN: "BEGIN"
+  END: "END"
+  INIT: "INIT"
+  CHECK: "CHECK"
+
+  # Special variables. `$` is an identifier start, so these scan as one token.
+  # `$@`, `$!` and `$?` are deliberately absent: `@`, `!` and `?` are not
+  # identifier parts, so the identifier would stop at the sigil.
+  _: "$_"
+  _0: "$0"
+  _dollar_dollar: "$$"
+
+  # Compile-time constants
+  __PACKAGE__: "__PACKAGE__"
+  __FILE__: "__FILE__"
+  __LINE__: "__LINE__"
+  __SUB__: "__SUB__"
+  __WARN__: "__WARN__"
+  __END__: "__END__"
+  __DATA__: "__DATA__"
+
+# Keyword scopes give a keyword its TextMate scope. These live here so that
+# each spec owns its own vocabulary and the renderer holds none of it; any
+# identifier left out below still highlights, as a plain `keyword`.
+keyword_scopes:
+  storage.modifier: ["my", "our", "local", "state"]
+  keyword.control: ["if", "elsif", "else", "unless", "while", "until", "for", "foreach", "do", "last", "next", "redo", "goto", "return", "given", "when", "default"]
+  keyword: ["sub", "package", "use", "no", "require", "format", "new", "BEGIN", "END", "INIT", "CHECK", "AUTOLOAD", "DESTROY", "eval", "ref", "wantarray", "defined", "undef", "bless", "caller", "print", "printf", "say", "die", "warn", "exit", "open", "close", "binmode", "eof", "chomp", "chop", "substr", "index", "rindex", "length", "uc", "lc", "ucfirst", "lcfirst", "sprintf", "pos", "quotemeta", "study", "srand", "rand", "int", "abs", "sqrt", "hex", "oct", "ord", "chr", "time", "localtime", "gmtime", "push", "pop", "shift", "unshift", "splice", "join", "split", "map", "grep", "sort", "reverse", "keys", "values", "each", "exists", "delete", "scalar"]
+  constant.language: ["__PACKAGE__", "__FILE__", "__LINE__", "__SUB__", "__WARN__", "__END__", "__DATA__"]
+  variable.language: ["$_", "$0", "$$"]
+
+blocks:
+  open: "{"
+  close: "}"
+
+features:
+  regex_literals: false
+  async_await: false
+  generators: false
+  arrow_functions: false
+  template_literals: false
+  labeled_statements: true
+  adjacent_concat: true

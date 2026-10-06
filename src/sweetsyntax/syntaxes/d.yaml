@@ -1,7 +1,34 @@
+# D — highlight-only spec (lexer + renderers, no parser/AST).
+#
+# There is deliberately no `operators:` or `statements:` section: those drive the
+# Pratt parser's precedence tables and statement handlers, and D is supported
+# for syntax highlighting only.
+#
+# Limitations, all from single-pair lexing in the lexer rather than from this
+# spec: D's block comments nest and also come in a `/+ +/` flavour, so only
+# `/* */` is recognised here and `/+ +/` bodies highlight as code. The same
+# applies to `/+! +/` doc comments, which are not detected as documentation.
+
 name: D
 extension:
   - d
   - di
+
+inline_comment: '//'
+block_comment:
+  - '/*'
+  - '*/'
+
+# `10L`, `1u`, `0xFFUL`, `1.0f`
+int_suffixes: true
+
+# Backquotes delimit token strings (`` `ident` ``), which may span lines with
+# no escapes or interpolation.
+raw_strings: true
+
+# `c"x"`, `w"x"`, `d"x"`, `r"x"`, `q"x"`, `hex"ff"` fold into one string
+# token. The delimited forms (`q{...}`, `hex[...]`) are not recognised.
+string_prefixes: ["c", "w", "d", "r", "q", "hex"]
 
 symbols:
   plus: '+'
@@ -168,3 +195,32 @@ identifiers:
   __traits: "__traits"
   __vector: "__vector"
   __parameters: "__parameters"
+  ptrdiff_t: "ptrdiff_t"
+  size_t: "size_t"
+  string: "string"
+
+# Keyword scopes give a keyword its TextMate scope. These live here so that
+# each spec owns its own vocabulary and the renderer holds none of it; any
+# identifier left out below still highlights, as a plain `keyword`.
+keyword_scopes:
+  storage.type: ["void", "bool", "byte", "ubyte", "short", "ushort", "int", "uint", "long", "ulong", "float", "double", "real", "ifloat", "idouble", "cfloat", "cdouble", "ireal", "creal", "char", "wchar", "dchar", "string", "size_t", "ptrdiff_t", "cent", "ucent", "auto"]
+  storage.modifier: ["const", "immutable", "inout", "out", "ref", "scope", "static", "extern", "override", "abstract", "final", "pure", "nothrow", "shared", "lazy", "align", "deprecated", "version", "unittest", "__gshared", "__vector", "__parameters"]
+  keyword.control: ["if", "else", "while", "for", "foreach", "foreach_reverse", "switch", "case", "default", "break", "continue", "return", "goto", "do", "try", "catch", "finally", "throw", "with", "invariant", "assert", "body", "asm", "cast", "new", "delete", "is", "in", "mixin", "template", "debug"]
+  keyword: ["module", "import", "export", "package", "alias", "enum", "struct", "union", "class", "interface", "delegate", "function", "macro", "pragma", "typeid", "typedef", "typeof", "synchronized"]
+  constant.language.boolean: ["true", "false"]
+  constant.language.null: ["null"]
+  constant.language: ["__FILE__", "__LINE__", "__traits"]
+  variable.language: ["this", "super"]
+
+blocks:
+  open: "{"
+  close: "}"
+
+features:
+  regex_literals: false
+  async_await: false
+  generators: false
+  arrow_functions: false
+  template_literals: false
+  labeled_statements: true
+  adjacent_concat: false

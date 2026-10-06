@@ -1,0 +1,259 @@
+# Swift — highlight-only spec (lexer + renderers, no parser/AST).
+#
+# There is deliberately no `operators:` or `statements:` section: those drive the
+# Pratt parser's precedence tables and statement handlers, and Swift is
+# supported for syntax highlighting only. The lexer gets everything it needs
+# from `symbols`, `identifiers` and the flags below.
+#
+# Limitations, all from the lexer's single-pass string and comment scanning
+# rather than from this spec:
+#   - Raw strings (`#"..."#`, `##"..."##`) are not recognised, so the `#`
+#     highlights as a preprocessor directive and the body as plain text.
+#   - String interpolation `"\(expr)"` stays inside the string span, so an
+#     interpolated expression is not highlighted as code.
+#   - Block comments nest in Swift; the lexer closes on the first `*/`.
+#   - `@`-prefixed attributes (`@objc`, `@escaping`, `@MainActor`) are an `@`
+#     symbol followed by a plain identifier, so the name is not styled.
+
+name: Swift
+extension:
+  - swift
+
+inline_comment: '//'
+block_comment:
+  - '/*'
+  - '*/'
+
+# `hash_comments` stays off: `#` introduces compiler directives and literal
+# macros in Swift (`#if`, `#endif`, `#selector`, `#available`, `#warning`,
+# `#colorLiteral`), never a comment. The filter below styles them instead.
+
+# Swift has no C-style numeric suffixes (`1u`, `1.5f`); `int_suffixes` stays
+# off so those spellings are not silently folded into a number token.
+
+# Conditional compilation and literal macros are all spelled `#name`. The
+# filter describes code structure, so `filters_skip_literals` keeps it from
+# restyling a string or comment that merely contains one.
+filters_skip_literals: true
+filters:
+  - name: directive
+    pattern: "#[a-zA-Z]+"
+    group: 0
+    attr: "meta.preprocessor"
+
+symbols:
+  plus: '+'
+  minus: '-'
+  multiply: '*'
+  divide: '/'
+  modulo: '%'
+  assign: '='
+  eq: '=='
+  ne: '!='
+  lt: '<'
+  lte: '<='
+  gt: '>'
+  gte: '>='
+  and: '&'
+  andand: '&&'
+  or: '|'
+  oror: '||'
+  xor: '^'
+  not: '!'
+  tilde: '~'
+  shiftLeft: '<<'
+  shiftRight: '>>'
+  plusAssign: '+='
+  minusAssign: '-='
+  multiplyAssign: '*='
+  divideAssign: '/='
+  moduloAssign: '%='
+  andAssign: '&='
+  orAssign: '|='
+  xorAssign: '^='
+  shiftLeftAssign: '<<='
+  shiftRightAssign: '>>='
+  increment: '++'
+  decrement: '--'
+  arrow: '->'
+  dot: '.'
+  ellipsis: '...'
+  openRange: '..<'
+  nilCoalescing: '??'
+  nilCoalescingAssign: '??='
+  optionalChaining: '?.'
+  parl: '('
+  parr: ')'
+  sqbl: '['
+  sqbr: ']'
+  curl: '{'
+  curr: '}'
+  squote: "'"
+  quote: '"'
+  colon: ':'
+  scolon: ';'
+  comma: ','
+  question: '?'
+  hash: '#'
+  backslash: '\\'
+  at: '@'
+  dollar: '$'
+  underscore: '_'
+
+identifiers:
+  # Declarations
+  actor: "actor"
+  associatedtype: "associatedtype"
+  class: "class"
+  deinit: "deinit"
+  enum: "enum"
+  extension: "extension"
+  func: "func"
+  import: "import"
+  init: "init"
+  inout: "inout"
+  let: "let"
+  macro: "macro"
+  operator: "operator"
+  package: "package"
+  precedencegroup: "precedencegroup"
+  protocol: "protocol"
+  struct: "struct"
+  subscript: "subscript"
+  typealias: "typealias"
+  var: "var"
+
+  # Statements
+  break: "break"
+  case: "case"
+  catch: "catch"
+  continue: "continue"
+  default: "default"
+  defer: "defer"
+  do: "do"
+  else: "else"
+  fallthrough: "fallthrough"
+  for: "for"
+  guard: "guard"
+  if: "if"
+  in: "in"
+  repeat: "repeat"
+  return: "return"
+  switch: "switch"
+  throw: "throw"
+  where: "where"
+  while: "while"
+
+  # Expressions and types
+  Any: "Any"
+  AnyObject: "AnyObject"
+  Self: "Self"
+  as: "as"
+  async: "async"
+  await: "await"
+  borrowing: "borrowing"
+  consuming: "consuming"
+  each: "each"
+  false: "false"
+  is: "is"
+  nil: "nil"
+  rethrows: "rethrows"
+  self: "self"
+  some: "some"
+  super: "super"
+  throws: "throws"
+  true: "true"
+  try: "try"
+  any: "any"
+
+  # Standard-library types
+  Array: "Array"
+  Bool: "Bool"
+  Character: "Character"
+  Codable: "Codable"
+  Collection: "Collection"
+  Comparable: "Comparable"
+  Data: "Data"
+  Date: "Date"
+  Decodable: "Decodable"
+  Dictionary: "Dictionary"
+  Double: "Double"
+  Encodable: "Encodable"
+  Equatable: "Equatable"
+  Error: "Error"
+  Float: "Float"
+  Float16: "Float16"
+  Float32: "Float32"
+  Float64: "Float64"
+  Hashable: "Hashable"
+  Int: "Int"
+  Int8: "Int8"
+  Int16: "Int16"
+  Int32: "Int32"
+  Int64: "Int64"
+  Never: "Never"
+  Optional: "Optional"
+  Result: "Result"
+  Sendable: "Sendable"
+  Sequence: "Sequence"
+  Set: "Set"
+  String: "String"
+  Substring: "Substring"
+  Task: "Task"
+  URL: "URL"
+  UInt: "UInt"
+  UInt8: "UInt8"
+  UInt16: "UInt16"
+  UInt32: "UInt32"
+  UInt64: "UInt64"
+  Void: "Void"
+
+  # Declaration modifiers
+  convenience: "convenience"
+  distributed: "distributed"
+  dynamic: "dynamic"
+  fileprivate: "fileprivate"
+  final: "final"
+  indirect: "indirect"
+  infix: "infix"
+  internal: "internal"
+  lazy: "lazy"
+  mutating: "mutating"
+  nonisolated: "nonisolated"
+  nonmutating: "nonmutating"
+  open: "open"
+  optional: "optional"
+  override: "override"
+  postfix: "postfix"
+  prefix: "prefix"
+  private: "private"
+  public: "public"
+  required: "required"
+  static: "static"
+  unowned: "unowned"
+  weak: "weak"
+
+# Keyword scopes give a keyword its TextMate scope. These live here so that
+# each spec owns its own vocabulary and the renderer holds none of it; any
+# identifier left out below still highlights, as a plain `keyword`.
+keyword_scopes:
+  storage.type: ["Any", "AnyObject", "Self", "Array", "Bool", "Character", "Codable", "Collection", "Comparable", "Data", "Date", "Decodable", "Dictionary", "Double", "Encodable", "Equatable", "Error", "Float", "Float16", "Float32", "Float64", "Hashable", "Int", "Int8", "Int16", "Int32", "Int64", "Never", "Optional", "Result", "Sendable", "Sequence", "Set", "String", "Substring", "Task", "URL", "UInt", "UInt8", "UInt16", "UInt32", "UInt64", "Void"]
+  storage.modifier: ["convenience", "distributed", "dynamic", "fileprivate", "final", "indirect", "infix", "internal", "lazy", "mutating", "nonisolated", "nonmutating", "open", "optional", "override", "postfix", "prefix", "private", "public", "required", "static", "unowned", "weak", "package", "borrowing", "consuming"]
+  keyword.control: ["break", "case", "catch", "continue", "default", "defer", "do", "else", "fallthrough", "for", "guard", "if", "in", "repeat", "return", "switch", "throw", "where", "while", "await", "async"]
+  keyword: ["actor", "associatedtype", "class", "deinit", "enum", "extension", "func", "import", "init", "inout", "let", "macro", "operator", "precedencegroup", "protocol", "struct", "subscript", "typealias", "var", "as", "is", "some", "any", "each", "rethrows", "throws", "try"]
+  constant.language.boolean: ["true", "false"]
+  constant.language.null: ["nil"]
+  variable.language: ["self", "super"]
+
+blocks:
+  open: "{"
+  close: "}"
+
+features:
+  regex_literals: false
+  async_await: false
+  generators: false
+  arrow_functions: false
+  template_literals: false
+  labeled_statements: true
+  adjacent_concat: false

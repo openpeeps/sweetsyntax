@@ -173,6 +173,13 @@ type
     intSuffixes*: bool
       # C-style integer/float suffixes folded into number tokens
       # (`1U`, `100ULL`, `0xFFL`, `1.5f`)
+    filtersSkipLiterals*: bool
+      # whether `filters` only apply to code tokens, never to literals or
+      # comments (see `filters_skip_literals` on SweetSpec)
+    longBrackets*: bool
+      # whether `[[ ... ]]`, `[=[ ... ]=]` open a string literal (Lua)
+    heredocOpenerPunctuation*: bool
+      # whether `;`/`,` may follow a heredoc opener before the newline (Perl)
     heredocs*: bool
       # whether `<<NAME` opens a here-document that runs to a terminator
       # line (Ruby, PHP, shell). Off for languages where `<<` is only a
@@ -254,6 +261,19 @@ type
       ## identifier renders as a plain `keyword`.
     filters*: seq[SweetFilter]
       ## list of filters that define regex patterns for token matching
+    filters_skip_literals*: bool
+      ## whether `filters` only apply to code tokens, never to string, char,
+      ## regex, comment or doc-comment tokens. Off by default because Markdown
+      ## deliberately filters inside code spans (`` `code` ``). Set it for
+      ## specs whose filters describe code structure and would otherwise
+      ## restyle a literal that merely looks like code — e.g. a preprocessor
+      ## filter matching `#if` inside the string `"#if DEBUG"`.
+    long_brackets*: bool
+      ## whether `[[ ... ]]`, `[=[ ... ]=]` open a string literal (Lua)
+      ## rather than two `[` delimiters
+    heredoc_opener_punctuation*: bool
+      ## whether `;`/`,` may follow a heredoc opener before the newline
+      ## (Perl's `print <<"EOF";`). Off by default.
     definitions*: Definitions
       ## mapping of definition names to their details, used for more complex token patterns
     operators*: OperatorsSpec
@@ -279,6 +299,16 @@ type
     php = "php"
     go = "go"
     d = "d"
+    swift = "swift"
+    objc = "objc"
+    java = "java"
+    csharp = "cs"
+    kotlin = "kt"
+    perl = "perl"
+    ocaml = "ocaml"
+    lua = "lua"
+    haskell = "hs"
+    zig = "zig"
     crystal = "crystal"
     css = "css"
     md = "md"
@@ -318,6 +348,16 @@ const
   phpSyntaxSource = staticRead(currentSourcePath().parentDir / "syntaxes" / "php.yaml")
   goSyntaxSource = staticRead(currentSourcePath().parentDir / "syntaxes" / "go.yaml")
   dSyntaxSource = staticRead(currentSourcePath().parentDir / "syntaxes" / "d.yaml")
+  swiftSyntaxSource = staticRead(currentSourcePath().parentDir / "syntaxes" / "swift.yaml")
+  objcSyntaxSource = staticRead(currentSourcePath().parentDir / "syntaxes" / "objc.yaml")
+  javaSyntaxSource = staticRead(currentSourcePath().parentDir / "syntaxes" / "java.yaml")
+  csharpSyntaxSource = staticRead(currentSourcePath().parentDir / "syntaxes" / "csharp.yaml")
+  kotlinSyntaxSource = staticRead(currentSourcePath().parentDir / "syntaxes" / "kotlin.yaml")
+  perlSyntaxSource = staticRead(currentSourcePath().parentDir / "syntaxes" / "perl.yaml")
+  ocamlSyntaxSource = staticRead(currentSourcePath().parentDir / "syntaxes" / "ocaml.yaml")
+  luaSyntaxSource = staticRead(currentSourcePath().parentDir / "syntaxes" / "lua.yaml")
+  haskellSyntaxSource = staticRead(currentSourcePath().parentDir / "syntaxes" / "haskell.yaml")
+  zigSyntaxSource = staticRead(currentSourcePath().parentDir / "syntaxes" / "zig.yaml")
   crSyntaxSource = staticRead(currentSourcePath().parentDir / "syntaxes" / "crystal.yaml")
   cssSyntaxSource = staticRead(currentSourcePath().parentDir / "syntaxes" / "css.yaml")
   mdSyntaxSource = staticRead(currentSourcePath().parentDir / "syntaxes" / "markdown.yaml")
@@ -357,6 +397,16 @@ let
     "php": phpSyntaxSource,
     "go": goSyntaxSource,
     "d": dSyntaxSource,
+    "swift": swiftSyntaxSource,
+    "objc": objcSyntaxSource,
+    "java": javaSyntaxSource,
+    "cs": csharpSyntaxSource,
+    "kt": kotlinSyntaxSource,
+    "perl": perlSyntaxSource,
+    "ocaml": ocamlSyntaxSource,
+    "lua": luaSyntaxSource,
+    "hs": haskellSyntaxSource,
+    "zig": zigSyntaxSource,
     "crystal": crSyntaxSource,
     "css": cssSyntaxSource,
     "md": mdSyntaxSource,

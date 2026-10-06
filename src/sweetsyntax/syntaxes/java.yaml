@@ -1,0 +1,185 @@
+# Java — highlight-only spec (lexer + renderers, no parser/AST).
+#
+# There is deliberately no `operators:` or `statements:` section: those drive the
+# Pratt parser's precedence tables and statement handlers, and Java is
+# supported for syntax highlighting only.
+#
+# Limitations, all from single-pass lexing rather than from this spec:
+#   - Block comments nest in Java; the lexer stores a single pair and closes on
+#     the first `*/`.
+#   - Text blocks (`"""`) are recognised as one string token, but their
+#     incidental-whitespace rules are not applied, so the value keeps the
+#     leading newline and closing-quote indentation.
+#   - Annotations are styled by a filter, so `@Override` inside a string or
+#     comment is left alone (`filters_skip_literals`).
+#   - Module directives (`module`, `requires`, `exports` at the top of a
+#     module-info.java) highlight as plain identifiers.
+
+name: Java
+extension:
+  - java
+
+inline_comment: '//'
+block_comment:
+  - '/*'
+  - '*/'
+
+int_suffixes: true
+
+# Annotations (`@Override`, `@FunctionalInterface`, ...). A filter rather than
+# a symbol so the name is styled too. `filters_skip_literals` keeps
+# `user@example.com` inside a string, or an `@` in a comment, from matching.
+filters_skip_literals: true
+filters:
+  - name: annotation
+    pattern: "@[A-Za-z_][A-Za-z0-9_]*"
+    group: 0
+    attr: "entity.name.tag"
+
+symbols:
+  plus: '+'
+  minus: '-'
+  multiply: '*'
+  divide: '/'
+  modulo: '%'
+  increment: '++'
+  decrement: '--'
+  assign: '='
+  plusAssign: '+='
+  minusAssign: '-='
+  multiplyAssign: '*='
+  divideAssign: '/='
+  moduloAssign: '%='
+  andAssign: '&='
+  orAssign: '|='
+  xorAssign: '^='
+  shiftLeftAssign: '<<='
+  shiftRightAssign: '>>='
+  unsignedShiftRightAssign: '>>>='
+  shiftLeft: '<<'
+  shiftRight: '>>'
+  unsignedShiftRight: '>>>'
+  eq: '=='
+  ne: '!='
+  lt: '<'
+  lte: '<='
+  gt: '>'
+  gte: '>='
+  and: '&'
+  andand: '&&'
+  or: '|'
+  oror: '||'
+  xor: '^'
+  not: '!'
+  tilde: '~'
+  question: '?'
+  colon: ':'
+  coloncolon: '::'
+  parenL: '('
+  parenR: ')'
+  curlyL: '{'
+  curlyR: '}'
+  bracketL: '['
+  bracketR: ']'
+  semi: ';'
+  comma: ','
+  dot: '.'
+  ellipsis: '...'
+  arrow: '->'
+  at: '@'
+
+identifiers:
+  # Declarations and modifiers
+  abstract: "abstract"
+  class: "class"
+  enum: "enum"
+  extends: "extends"
+  final: "final"
+  implements: "implements"
+  import: "import"
+  interface: "interface"
+  native: "native"
+  package: "package"
+  private: "private"
+  protected: "protected"
+  public: "public"
+  record: "record"
+  sealed: "sealed"
+  static: "static"
+  strictfp: "strictfp"
+  synchronized: "synchronized"
+  transient: "transient"
+  var: "var"
+  volatile: "volatile"
+  yield: "yield"
+
+  # Statements
+  assert: "assert"
+  break: "break"
+  case: "case"
+  catch: "catch"
+  continue: "continue"
+  default: "default"
+  do: "do"
+  else: "else"
+  finally: "finally"
+  for: "for"
+  goto: "goto"
+  if: "if"
+  instanceof: "instanceof"
+  new: "new"
+  return: "return"
+  switch: "switch"
+  this: "this"
+  throw: "throw"
+  throws: "throws"
+  try: "try"
+  while: "while"
+
+  # Primitive types
+  boolean: "boolean"
+  byte: "byte"
+  char: "char"
+  double: "double"
+  float: "float"
+  int: "int"
+  long: "long"
+  short: "short"
+  void: "void"
+
+  # Reserved
+  const: "const"
+  super: "super"
+
+  # Literals
+  false: "false"
+  null: "null"
+  true: "true"
+
+  # `_` has been a reserved keyword since Java 9
+  _: "_"
+
+# Keyword scopes give a keyword its TextMate scope. These live here so that
+# each spec owns its own vocabulary and the renderer holds none of it; any
+# identifier left out below still highlights, as a plain `keyword`.
+keyword_scopes:
+  storage.type: ["boolean", "byte", "char", "double", "float", "int", "long", "short", "void"]
+  storage.modifier: ["abstract", "const", "final", "native", "private", "protected", "public", "sealed", "static", "strictfp", "synchronized", "transient", "volatile"]
+  keyword.control: ["assert", "break", "case", "catch", "continue", "default", "do", "else", "finally", "for", "goto", "if", "return", "switch", "throw", "try", "while", "yield"]
+  keyword: ["class", "enum", "extends", "implements", "import", "interface", "new", "package", "record", "var", "instanceof", "throws", "_"]
+  constant.language.boolean: ["true", "false"]
+  constant.language.null: ["null"]
+  variable.language: ["this", "super"]
+
+blocks:
+  open: "{"
+  close: "}"
+
+features:
+  regex_literals: false
+  async_await: false
+  generators: false
+  arrow_functions: false
+  template_literals: false
+  labeled_statements: true
+  adjacent_concat: false

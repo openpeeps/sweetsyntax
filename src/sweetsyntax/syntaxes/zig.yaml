@@ -1,0 +1,200 @@
+# Zig — highlight-only spec (lexer + renderers, no parser/AST).
+#
+# There is deliberately no `operators:` or `statements:` section: those drive the
+# Pratt parser's precedence tables and statement handlers, and Zig is supported
+# for syntax highlighting only.
+#
+# Limitations, all from single-pass lexing rather than from this spec:
+#   - Block comments nest in Zig, and the lexer stores a single pair, so
+#     `/* a /* b */ c */` closes at the first `*/`.
+#   - `///` and `//!` doc comments lex as ordinary comments. The lexer only
+#     recognises `/**` and `/*!` as documentation, and it has no inline
+#     doc-comment form, so the extra `/` or `!` stays in the comment text.
+#   - `@"quoted identifiers"` lex as an `@` symbol followed by a string, not as
+#     a single identifier token.
+#   - `0b1010`, `0o17`, `0xFF` and `_`-separated digits are folded into one
+#     number token; `0x1p4` hexadecimal float exponents are not.
+
+name: Zig
+extension:
+  - zig
+  - zon
+
+inline_comment: '//'
+block_comment:
+  - '/*'
+  - '*/'
+
+symbols:
+  plus: '+'
+  minus: '-'
+  multiply: '*'
+  divide: '/'
+  modulo: '%'
+  assign: '='
+  plusAssign: '+='
+  minusAssign: '-='
+  multiplyAssign: '*='
+  divideAssign: '/='
+  moduloAssign: '%='
+  bitwiseAndAssign: '&='
+  bitwiseOrAssign: '|='
+  bitwiseXorAssign: '^='
+  shlAssign: '<<='
+  shrAssign: '>>='
+  saturatingAdd: '+|='
+  saturatingSub: '-|='
+  wrappingAdd: '+%='
+  wrappingSub: '-%='
+  shiftLeft: '<<'
+  shiftRight: '>>'
+  eq: '=='
+  ne: '!='
+  lt: '<'
+  lte: '<='
+  gt: '>'
+  gte: '>='
+  and: '&'
+  or: '|'
+  xor: '^'
+  not: '!'
+  tilde: '~'
+  andand: '&&'
+  oror: '||'
+  question: '?'
+  arrow: '->'
+  doubleArrow: '=>'
+  ellipsis: '...'
+  rangeExclusive: '..'
+  rangeInclusive: '..='
+  plusWrap: '+%'
+  colon: ':'
+  semi: ';'
+  comma: ','
+  dot: '.'
+  parenL: '('
+  parenR: ')'
+  curlyL: '{'
+  curlyR: '}'
+  bracketL: '['
+  bracketR: ']'
+  at: '@'
+
+identifiers:
+  # Keywords
+  addrspace: "addrspace"
+  align: "align"
+  allowzero: "allowzero"
+  and: "and"
+  anyframe: "anyframe"
+  anytype: "anytype"
+  asm: "asm"
+  async: "async"
+  await: "await"
+  break: "break"
+  callconv: "callconv"
+  catch: "catch"
+  comptime: "comptime"
+  const: "const"
+  continue: "continue"
+  defer: "defer"
+  else: "else"
+  enum: "enum"
+  errdefer: "errdefer"
+  error: "error"
+  export: "export"
+  extern: "extern"
+  fn: "fn"
+  for: "for"
+  if: "if"
+  inline: "inline"
+  noalias: "noalias"
+  nosuspend: "nosuspend"
+  noinline: "noinline"
+  opaque: "opaque"
+  or: "or"
+  orelse: "orelse"
+  packed: "packed"
+  pub: "pub"
+  resume: "resume"
+  return: "return"
+  linksection: "linksection"
+  struct: "struct"
+  suspend: "suspend"
+  switch: "switch"
+  test: "test"
+  threadlocal: "threadlocal"
+  try: "try"
+  union: "union"
+  unreachable: "unreachable"
+  usingnamespace: "usingnamespace"
+  var: "var"
+  volatile: "volatile"
+  while: "while"
+
+  # Literals
+  true: "true"
+  false: "false"
+  null: "null"
+  undefined: "undefined"
+
+  # Primitive and builtin types
+  i8: "i8"
+  i16: "i16"
+  i32: "i32"
+  i64: "i64"
+  i128: "i128"
+  isize: "isize"
+  u8: "u8"
+  u16: "u16"
+  u32: "u32"
+  u64: "u64"
+  u128: "u128"
+  usize: "usize"
+  c_char: "c_char"
+  c_short: "c_short"
+  c_ushort: "c_ushort"
+  c_int: "c_int"
+  c_uint: "c_uint"
+  c_long: "c_long"
+  c_ulong: "c_ulong"
+  c_longlong: "c_longlong"
+  c_ulonglong: "c_ulonglong"
+  c_longdouble: "c_longdouble"
+  f16: "f16"
+  f32: "f32"
+  f64: "f64"
+  f80: "f80"
+  f128: "f128"
+  bool: "bool"
+  anyopaque: "anyopaque"
+  noreturn: "noreturn"
+  type: "type"
+  anyerror: "anyerror"
+  comptime_int: "comptime_int"
+  comptime_float: "comptime_float"
+  void: "void"
+
+# Keyword scopes give a keyword its TextMate scope. These live here so that
+# each spec owns its own vocabulary and the renderer holds none of it; any
+# identifier left out below still highlights, as a plain `keyword`.
+keyword_scopes:
+  storage.type: ["i8", "i16", "i32", "i64", "i128", "isize", "u8", "u16", "u32", "u64", "u128", "usize", "c_char", "c_short", "c_ushort", "c_int", "c_uint", "c_long", "c_ulong", "c_longlong", "c_ulonglong", "c_longdouble", "f16", "f32", "f64", "f80", "f128", "bool", "anyopaque", "noreturn", "type", "anyerror", "comptime_int", "comptime_float", "void"]
+  storage.modifier: ["addrspace", "align", "allowzero", "callconv", "extern", "export", "packed", "pub", "linksection", "opaque", "threadlocal", "volatile", "noalias", "nosuspend"]
+  keyword.control: ["break", "continue", "defer", "errdefer", "for", "if", "return", "switch", "while", "catch", "try", "orelse", "resume", "suspend", "await", "async", "comptime", "inline", "noinline"]
+  keyword: ["and", "anyframe", "anytype", "asm", "const", "else", "enum", "error", "fn", "or", "struct", "test", "union", "unreachable", "usingnamespace", "var"]
+  constant.language.boolean: ["true", "false"]
+  constant.language.null: ["null", "undefined"]
+
+blocks:
+  open: "{"
+  close: "}"
+
+features:
+  regex_literals: false
+  async_await: false
+  generators: false
+  arrow_functions: false
+  template_literals: false
+  labeled_statements: false
+  adjacent_concat: false

@@ -1,0 +1,170 @@
+# OCaml — highlight-only spec (lexer + renderers, no parser/AST).
+#
+# There is deliberately no `operators:` or `statements:` section: those drive the
+# Pratt parser' precedence tables and statement handlers, and OCaml is
+# supported for syntax highlighting only.
+#
+# OCaml's only comment form is `(* ... *)` and it has no inline comment, so
+# `inline_comment` is left unset. `(** ... *)` is recognised as a doc comment.
+#
+# Limitations, all from single-pass lexing rather than from this spec:
+#   - Comments nest, and the lexer stores a single pair, so `(* a (* b *) c *)`
+#     closes at the first `*)` and `c *)` lexes as code.
+#   - String gaps (`"a\
+#       b"`) and `{|...|}` quoted string literals are not recognised; a `|`
+#     inside a quoted string reads as an operator.
+#   - Constructs that are not identifier-based do not fold. `let ... in`,
+#     `begin ... end`, `struct ... end` and `sig ... end` produce no fold
+#     region, so folding an OCaml file relies on the `{ }` of records.
+
+name: OCaml
+extension:
+  - ml
+  - mli
+
+block_comment:
+  - '(*'
+  - '*)'
+
+symbols:
+  plus: '+'
+  minus: '-'
+  multiply: '*'
+  divide: '/'
+  modulo: '%'
+  power: '**'
+  assign: '='
+  plusAssign: '+='
+  minusAssign: '-='
+  multiplyAssign: '*='
+  divideAssign: '/='
+  ne: '<>'
+  lt: '<'
+  gt: '>'
+  le: '<='
+  ge: '>='
+  compare: 'compare'
+  pipe: '|'
+  oror: '||'
+  pipePipe: '|>'
+  atAt: '@@'
+  cons: '::'
+  arrow: '->'
+  larrow: '<-'
+  assignmentOp: ':='
+  not: '!'
+  tilde: '~'
+  question: '?'
+  colon: ':'
+  semi: ';'
+  semiSemi: ';;'
+  comma: ','
+  dot: '.'
+  hash: '#'
+  parenL: '('
+  parenR: ')'
+  bracketL: '['
+  bracketR: ']'
+  curlyL: '{'
+  curlyR: '}'
+  ellipsis: '...'
+  quote: "'"
+
+identifiers:
+  # Declarations and structure
+  and: "and"
+  as: "as"
+  begin: "begin"
+  class: "class"
+  constraint: "constraint"
+  do: "do"
+  done: "done"
+  downto: "downto"
+  else: "else"
+  end: "end"
+  exception: "exception"
+  external: "external"
+  for: "for"
+  fun: "fun"
+  function: "function"
+  functor: "functor"
+  if: "if"
+  in: "in"
+  include: "include"
+  inherit: "inherit"
+  initializer: "initializer"
+  land: "land"
+  lazy: "lazy"
+  let: "let"
+  lor: "lor"
+  lsl: "lsl"
+  lsr: "lsr"
+  lxor: "lxor"
+  match: "match"
+  method: "method"
+  mod: "mod"
+  module: "module"
+  mutable: "mutable"
+  new: "new"
+  nonrec: "nonrec"
+  object: "object"
+  of: "of"
+  open: "open"
+  or: "or"
+  private: "private"
+  rec: "rec"
+  sig: "sig"
+  struct: "struct"
+  then: "then"
+  to: "to"
+  try: "try"
+  type: "type"
+  val: "val"
+  virtual: "virtual"
+  when: "when"
+  while: "while"
+  with: "with"
+
+  # Literals
+  false: "false"
+  true: "true"
+
+  # Predefined types
+  int: "int"
+  float: "float"
+  char: "char"
+  string: "string"
+  bool: "bool"
+  unit: "unit"
+  bytes: "bytes"
+  array: "array"
+  list: "list"
+  exn: "exn"
+  nativeint: "nativeint"
+  int32: "int32"
+  int64: "int64"
+  format: "format"
+
+# Keyword scopes give a keyword its TextMate scope. These live here so that
+# each spec owns its own vocabulary and the renderer holds none of it; any
+# identifier left out below still highlights, as a plain `keyword`. Every
+# lexeme appears in exactly one scope.
+keyword_scopes:
+  storage.type: ["int", "float", "char", "string", "bool", "unit", "bytes", "array", "list", "exn", "nativeint", "int32", "int64", "format"]
+  storage.modifier: ["mutable", "private", "virtual", "rec", "nonrec", "external", "constraint"]
+  keyword.control: ["if", "else", "match", "try", "for", "while", "done", "downto", "to", "when", "fun", "function", "in", "then", "with", "do"]
+  keyword: ["and", "as", "begin", "class", "end", "exception", "functor", "include", "inherit", "initializer", "land", "lazy", "let", "lor", "lsl", "lsr", "lxor", "method", "mod", "module", "new", "object", "of", "open", "or", "sig", "struct", "type", "val"]
+  constant.language.boolean: ["true", "false"]
+
+blocks:
+  open: "{"
+  close: "}"
+
+features:
+  regex_literals: false
+  async_await: false
+  generators: false
+  arrow_functions: false
+  template_literals: false
+  labeled_statements: false
+  adjacent_concat: false

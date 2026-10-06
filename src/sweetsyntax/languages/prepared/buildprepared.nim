@@ -54,6 +54,18 @@ macro buildPrepared*(yamlPath: static string): untyped =
   if spec.hash_comments:
     body.add parseStmt("t.hashComments = true")
 
+  # filters that must not restyle literals or comments
+  if spec.filters_skip_literals:
+    body.add parseStmt("t.filtersSkipLiterals = true")
+
+  # Lua long bracket strings
+  if spec.long_brackets:
+    body.add parseStmt("t.longBrackets = true")
+
+  # Perl heredoc openers terminated with `;`/`,`
+  if spec.heredoc_opener_punctuation:
+    body.add parseStmt("t.heredocOpenerPunctuation = true")
+
   # trailing ?/! on identifiers
   if spec.trailing_bang_question:
     body.add parseStmt("t.trailingBangQuestion = true")

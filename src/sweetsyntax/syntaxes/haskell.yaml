@@ -1,0 +1,154 @@
+# Haskell — highlight-only spec (lexer + renderers, no parser/AST).
+#
+# There is deliberately no `operators:` or `statements:` section: those drive the
+# Pratt parser's precedence tables and statement handlers, and Haskell is
+# supported for syntax highlighting only.
+#
+# Haskell's two comment forms are both block-ish: `--` runs to the end of the
+# line and `{- ... -}` spans lines. Block comments are checked first, so the
+# long form wins. Haddock markup (`-- |` and `{-| ... -}`) is read as an
+# ordinary comment, not as a doc comment.
+#
+# Limitations, all from single-pass lexing rather than from this spec:
+#   - Block comments nest, and the lexer stores a single pair, so
+#     `{- a {- b -} c -}` closes at the first `-}`.
+#   - `-->` (the sequencing arrow from Data.Arrow) is read as an empty comment,
+#     because `--` starts a comment. Bind it with a space (`a --> b` still
+#     comments out the rest of the line) or avoid the operator.
+#   - Qualified names (`Data.List.sort`) read as `Data`, `.`, `List`, `.`,
+#     `sort`, and the `.` composition operator reads the same way, so the two
+#     are indistinguishable.
+#   - Layout (`where`, `let ... in`, `do`) produces no fold region; only `{}`
+#     records fold.
+
+name: Haskell
+extension:
+  - hs
+  - lhs
+
+inline_comment: '--'
+block_comment:
+  - '{-'
+  - '-}'
+
+symbols:
+  plus: '+'
+  minus: '-'
+  multiply: '*'
+  divide: '/'
+  power: '^'
+  modulo: '%'
+  assign: '='
+  plusAssign: '+='
+  minusAssign: '-='
+  multiplyAssign: '*='
+  divideAssign: '/='
+  colonEq: ':='
+  typeSig: '::'
+  fatArrow: '=>'
+  leftArrow: '<-'
+  rightArrow: '->'
+  lambda: '\\'
+  bind: '>>='
+  lshift: '<<'
+  rshift: '>>'
+  dot: '.'
+  concat: '++'
+  dollar: '$'
+  at: '@'
+  question: '?'
+  colon: ':'
+  semi: ';'
+  comma: ','
+  backtick: '`'
+  parenL: '('
+  parenR: ')'
+  curlyL: '{'
+  curlyR: '}'
+  bracketL: '['
+  bracketR: ']'
+  quote: "'"
+
+identifiers:
+  # Declarations
+  data: "data"
+  type: "type"
+  newtype: "newtype"
+  class: "class"
+  instance: "instance"
+  deriving: "deriving"
+  where: "where"
+  module: "module"
+  import: "import"
+  qualified: "qualified"
+  as: "as"
+  hiding: "hiding"
+  infix: "infix"
+  infixl: "infixl"
+  infixr: "infixr"
+  foreign: "foreign"
+  default: "default"
+
+  # Expressions and statements
+  case: "case"
+  of: "of"
+  let: "let"
+  in: "in"
+  do: "do"
+  if: "if"
+  then: "then"
+  else: "else"
+  forall: "forall"
+  mdo: "mdo"
+  family: "family"
+  role: "role"
+  pattern: "pattern"
+  stock: "stock"
+  anyclass: "anyclass"
+  via: "via"
+  proc: "proc"
+  rec: "rec"
+
+  # Prelude types
+  Int: "Int"
+  Integer: "Integer"
+  Float: "Float"
+  Double: "Double"
+  Char: "Char"
+  String: "String"
+  Bool: "Bool"
+  Maybe: "Maybe"
+  Either: "Either"
+  IO: "IO"
+  Ordering: "Ordering"
+  Rational: "Rational"
+  Word: "Word"
+
+  # Literals and the wildcard
+  True: "True"
+  False: "False"
+  _: "_"
+
+# Keyword scopes give a keyword its TextMate scope. These live here so that
+# each spec owns its own vocabulary and the renderer holds none of it; any
+# identifier left out below still highlights, as a plain `keyword`.
+keyword_scopes:
+  storage.type: ["Int", "Integer", "Float", "Double", "Char", "String", "Bool", "Maybe", "Either", "IO", "Ordering", "Rational", "Word"]
+  storage.modifier: ["foreign", "qualified", "infix", "infixl", "infixr", "default", "deriving", "family", "role", "pattern", "stock", "anyclass", "via", "rec"]
+  keyword.control: ["case", "of", "if", "then", "else", "do", "let", "in", "where", "mdo", "forall"]
+  keyword: ["data", "type", "newtype", "class", "instance", "module", "import", "as", "hiding", "proc"]
+  constant.language.boolean: ["True", "False"]
+  variable.language: ["_"]
+
+blocks:
+  open: "{"
+  close: "}"
+
+features:
+  regex_literals: false
+  async_await: false
+  generators: false
+  arrow_functions: false
+  template_literals: false
+  labeled_statements: false
+  adjacent_concat: false
