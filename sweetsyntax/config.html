@@ -97,7 +97,9 @@
 <li><a class="reference" href="#KeywordScopes" title="KeywordScopes = Table[string, seq[string]]">KeywordScopes</a></li>
 <li><a class="reference" href="#KnownSyntax" title="KnownSyntax = enum
   js = &quot;js&quot;, ts = &quot;ts&quot;, py = &quot;py&quot;, nim = &quot;nim&quot;, c = &quot;c&quot;, cpp = &quot;cpp&quot;,
-  rust = &quot;rs&quot;, ruby = &quot;rb&quot;, php = &quot;php&quot;, go = &quot;go&quot;, d = &quot;d&quot;,
+  rust = &quot;rs&quot;, ruby = &quot;rb&quot;, php = &quot;php&quot;, go = &quot;go&quot;, d = &quot;d&quot;, swift = &quot;swift&quot;,
+  objc = &quot;objc&quot;, java = &quot;java&quot;, csharp = &quot;cs&quot;, kotlin = &quot;kt&quot;, perl = &quot;perl&quot;,
+  ocaml = &quot;ocaml&quot;, lua = &quot;lua&quot;, haskell = &quot;hs&quot;, zig = &quot;zig&quot;,
   crystal = &quot;crystal&quot;, css = &quot;css&quot;, md = &quot;md&quot;, yaml = &quot;yaml&quot;, json = &quot;json&quot;,
   toml = &quot;toml&quot;, csv = &quot;csv&quot;, html = &quot;html&quot;, xml = &quot;xml&quot;, shell = &quot;shell&quot;,
   ini = &quot;ini&quot;, make = &quot;make&quot;, cmake = &quot;cmake&quot;, docker = &quot;docker&quot;,
@@ -143,6 +145,9 @@
   rawStrings*: bool
   extendedNumbers*: bool
   intSuffixes*: bool
+  filtersSkipLiterals*: bool
+  longBrackets*: bool
+  heredocOpenerPunctuation*: bool
   heredocs*: bool
   stringPrefixes*: seq[string]
   rawStringDelims*: bool
@@ -193,6 +198,16 @@
                                  ## driving, so a spec owns its own vocabulary. Omit it and every declared
                                  ## identifier renders as a plain `keyword`.
   filters*: seq[SweetFilter] ## list of filters that define regex patterns for token matching
+  filters_skip_literals*: bool ## whether `filters` only apply to code tokens, never to string, char,
+                               ## regex, comment or doc-comment tokens. Off by default because Markdown
+                               ## deliberately filters inside code spans (`` `code` ``). Set it for
+                               ## specs whose filters describe code structure and would otherwise
+                               ## restyle a literal that merely looks like code — e.g. a preprocessor
+                               ## filter matching `#if` inside the string `&quot;#if DEBUG&quot;`.
+  long_brackets*: bool ## whether `[[ ... ]]`, `[=[ ... ]=]` open a string literal (Lua)
+                       ## rather than two `[` delimiters
+  heredoc_opener_punctuation*: bool ## whether `;`/`,` may follow a heredoc opener before the newline
+                                    ## (Perl's `print &lt;&lt;&quot;EOF&quot;;`). Off by default.
   definitions*: Definitions  ## mapping of definition names to their details, used for more complex token patterns
   operators*: OperatorsSpec  ## specification of operators, including their tokens, precedence, associativity, and handler types
   statements*: StatementsSpec ## mapping of statement types to their specifications, e.g. &quot;if&quot;, &quot;for&quot;, &quot;while&quot;, etc.
@@ -220,7 +235,17 @@
                             (&quot;c&quot;, cSyntaxSource), (&quot;cpp&quot;, cppSyntaxSource),
                             (&quot;rs&quot;, rsSyntaxSource), (&quot;rb&quot;, rbSyntaxSource),
                             (&quot;php&quot;, phpSyntaxSource), (&quot;go&quot;, goSyntaxSource),
-                            (&quot;d&quot;, dSyntaxSource), (&quot;crystal&quot;, crSyntaxSource),
+                            (&quot;d&quot;, dSyntaxSource), (&quot;swift&quot;, swiftSyntaxSource),
+                            (&quot;objc&quot;, objcSyntaxSource),
+                            (&quot;java&quot;, javaSyntaxSource),
+                            (&quot;cs&quot;, csharpSyntaxSource),
+                            (&quot;kt&quot;, kotlinSyntaxSource),
+                            (&quot;perl&quot;, perlSyntaxSource),
+                            (&quot;ocaml&quot;, ocamlSyntaxSource),
+                            (&quot;lua&quot;, luaSyntaxSource),
+                            (&quot;hs&quot;, haskellSyntaxSource),
+                            (&quot;zig&quot;, zigSyntaxSource),
+                            (&quot;crystal&quot;, crSyntaxSource),
                             (&quot;css&quot;, cssSyntaxSource), (&quot;md&quot;, mdSyntaxSource),
                             (&quot;yaml&quot;, yamlSyntaxSource),
                             (&quot;json&quot;, jsonSyntaxSource),
@@ -404,7 +429,9 @@
 <div id="KnownSyntax">
   <dt><pre><a href="#KnownSyntax"><span class="Identifier">KnownSyntax</span></a> <span class="Other">=</span> <span class="Keyword">enum</span>
   <span class="Identifier">js</span> <span class="Other">=</span> <span class="StringLit">&quot;js&quot;</span><span class="Other">,</span> <span class="Identifier">ts</span> <span class="Other">=</span> <span class="StringLit">&quot;ts&quot;</span><span class="Other">,</span> <span class="Identifier">py</span> <span class="Other">=</span> <span class="StringLit">&quot;py&quot;</span><span class="Other">,</span> <span class="Identifier">nim</span> <span class="Other">=</span> <span class="StringLit">&quot;nim&quot;</span><span class="Other">,</span> <span class="Identifier">c</span> <span class="Other">=</span> <span class="StringLit">&quot;c&quot;</span><span class="Other">,</span> <span class="Identifier">cpp</span> <span class="Other">=</span> <span class="StringLit">&quot;cpp&quot;</span><span class="Other">,</span>
-  <span class="Identifier">rust</span> <span class="Other">=</span> <span class="StringLit">&quot;rs&quot;</span><span class="Other">,</span> <span class="Identifier">ruby</span> <span class="Other">=</span> <span class="StringLit">&quot;rb&quot;</span><span class="Other">,</span> <span class="Identifier">php</span> <span class="Other">=</span> <span class="StringLit">&quot;php&quot;</span><span class="Other">,</span> <span class="Identifier">go</span> <span class="Other">=</span> <span class="StringLit">&quot;go&quot;</span><span class="Other">,</span> <span class="Identifier">d</span> <span class="Other">=</span> <span class="StringLit">&quot;d&quot;</span><span class="Other">,</span>
+  <span class="Identifier">rust</span> <span class="Other">=</span> <span class="StringLit">&quot;rs&quot;</span><span class="Other">,</span> <span class="Identifier">ruby</span> <span class="Other">=</span> <span class="StringLit">&quot;rb&quot;</span><span class="Other">,</span> <span class="Identifier">php</span> <span class="Other">=</span> <span class="StringLit">&quot;php&quot;</span><span class="Other">,</span> <span class="Identifier">go</span> <span class="Other">=</span> <span class="StringLit">&quot;go&quot;</span><span class="Other">,</span> <span class="Identifier">d</span> <span class="Other">=</span> <span class="StringLit">&quot;d&quot;</span><span class="Other">,</span> <span class="Identifier">swift</span> <span class="Other">=</span> <span class="StringLit">&quot;swift&quot;</span><span class="Other">,</span>
+  <span class="Identifier">objc</span> <span class="Other">=</span> <span class="StringLit">&quot;objc&quot;</span><span class="Other">,</span> <span class="Identifier">java</span> <span class="Other">=</span> <span class="StringLit">&quot;java&quot;</span><span class="Other">,</span> <span class="Identifier">csharp</span> <span class="Other">=</span> <span class="StringLit">&quot;cs&quot;</span><span class="Other">,</span> <span class="Identifier">kotlin</span> <span class="Other">=</span> <span class="StringLit">&quot;kt&quot;</span><span class="Other">,</span> <span class="Identifier">perl</span> <span class="Other">=</span> <span class="StringLit">&quot;perl&quot;</span><span class="Other">,</span>
+  <span class="Identifier">ocaml</span> <span class="Other">=</span> <span class="StringLit">&quot;ocaml&quot;</span><span class="Other">,</span> <span class="Identifier">lua</span> <span class="Other">=</span> <span class="StringLit">&quot;lua&quot;</span><span class="Other">,</span> <span class="Identifier">haskell</span> <span class="Other">=</span> <span class="StringLit">&quot;hs&quot;</span><span class="Other">,</span> <span class="Identifier">zig</span> <span class="Other">=</span> <span class="StringLit">&quot;zig&quot;</span><span class="Other">,</span>
   <span class="Identifier">crystal</span> <span class="Other">=</span> <span class="StringLit">&quot;crystal&quot;</span><span class="Other">,</span> <span class="Identifier">css</span> <span class="Other">=</span> <span class="StringLit">&quot;css&quot;</span><span class="Other">,</span> <span class="Identifier">md</span> <span class="Other">=</span> <span class="StringLit">&quot;md&quot;</span><span class="Other">,</span> <span class="Identifier">yaml</span> <span class="Other">=</span> <span class="StringLit">&quot;yaml&quot;</span><span class="Other">,</span> <span class="Identifier">json</span> <span class="Other">=</span> <span class="StringLit">&quot;json&quot;</span><span class="Other">,</span>
   <span class="Identifier">toml</span> <span class="Other">=</span> <span class="StringLit">&quot;toml&quot;</span><span class="Other">,</span> <span class="Identifier">csv</span> <span class="Other">=</span> <span class="StringLit">&quot;csv&quot;</span><span class="Other">,</span> <span class="Identifier">html</span> <span class="Other">=</span> <span class="StringLit">&quot;html&quot;</span><span class="Other">,</span> <span class="Identifier">xml</span> <span class="Other">=</span> <span class="StringLit">&quot;xml&quot;</span><span class="Other">,</span> <span class="Identifier">shell</span> <span class="Other">=</span> <span class="StringLit">&quot;shell&quot;</span><span class="Other">,</span>
   <span class="Identifier">ini</span> <span class="Other">=</span> <span class="StringLit">&quot;ini&quot;</span><span class="Other">,</span> <span class="Identifier">make</span> <span class="Other">=</span> <span class="StringLit">&quot;make&quot;</span><span class="Other">,</span> <span class="Identifier">cmake</span> <span class="Other">=</span> <span class="StringLit">&quot;cmake&quot;</span><span class="Other">,</span> <span class="Identifier">docker</span> <span class="Other">=</span> <span class="StringLit">&quot;docker&quot;</span><span class="Other">,</span>
@@ -513,6 +540,9 @@
   <span class="Identifier">rawStrings</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">bool</span>
   <span class="Identifier">extendedNumbers</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">bool</span>
   <span class="Identifier">intSuffixes</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">bool</span>
+  <span class="Identifier">filtersSkipLiterals</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">bool</span>
+  <span class="Identifier">longBrackets</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">bool</span>
+  <span class="Identifier">heredocOpenerPunctuation</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">bool</span>
   <span class="Identifier">heredocs</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">bool</span>
   <span class="Identifier">stringPrefixes</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">seq</span><span class="Other">[</span><span class="Identifier">string</span><span class="Other">]</span>
   <span class="Identifier">rawStringDelims</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">bool</span>
@@ -570,6 +600,16 @@
                                  <span class="Comment">## driving, so a spec owns its own vocabulary. Omit it and every declared</span>
                                  <span class="Comment">## identifier renders as a plain `keyword`.</span>
   <span class="Identifier">filters</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">seq</span><span class="Other">[</span><a href="#SweetFilter"><span class="Identifier">SweetFilter</span></a><span class="Other">]</span> <span class="Comment">## list of filters that define regex patterns for token matching</span>
+  <span class="Identifier">filters_skip_literals</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">bool</span> <span class="Comment">## whether `filters` only apply to code tokens, never to string, char,</span>
+                               <span class="Comment">## regex, comment or doc-comment tokens. Off by default because Markdown</span>
+                               <span class="Comment">## deliberately filters inside code spans (`` `code` ``). Set it for</span>
+                               <span class="Comment">## specs whose filters describe code structure and would otherwise</span>
+                               <span class="Comment">## restyle a literal that merely looks like code — e.g. a preprocessor</span>
+                               <span class="Comment">## filter matching `#if` inside the string `&quot;#if DEBUG&quot;`.</span>
+  <span class="Identifier">long_brackets</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">bool</span> <span class="Comment">## whether `[[ ... ]]`, `[=[ ... ]=]` open a string literal (Lua)</span>
+                       <span class="Comment">## rather than two `[` delimiters</span>
+  <span class="Identifier">heredoc_opener_punctuation</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">bool</span> <span class="Comment">## whether `;`/`,` may follow a heredoc opener before the newline</span>
+                                    <span class="Comment">## (Perl's `print &lt;&lt;&quot;EOF&quot;;`). Off by default.</span>
   <span class="Identifier">definitions</span><span class="Operator">*</span><span class="Other">:</span> <a href="#Definitions"><span class="Identifier">Definitions</span></a>  <span class="Comment">## mapping of definition names to their details, used for more complex token patterns</span>
   <span class="Identifier">operators</span><span class="Operator">*</span><span class="Other">:</span> <a href="#OperatorsSpec"><span class="Identifier">OperatorsSpec</span></a>  <span class="Comment">## specification of operators, including their tokens, precedence, associativity, and handler types</span>
   <span class="Identifier">statements</span><span class="Operator">*</span><span class="Other">:</span> <a href="#StatementsSpec"><span class="Identifier">StatementsSpec</span></a> <span class="Comment">## mapping of statement types to their specifications, e.g. &quot;if&quot;, &quot;for&quot;, &quot;while&quot;, etc.</span>
@@ -623,7 +663,17 @@
                             <span class="Other">(</span><span class="StringLit">&quot;c&quot;</span><span class="Other">,</span> <span class="Identifier">cSyntaxSource</span><span class="Other">)</span><span class="Other">,</span> <span class="Other">(</span><span class="StringLit">&quot;cpp&quot;</span><span class="Other">,</span> <span class="Identifier">cppSyntaxSource</span><span class="Other">)</span><span class="Other">,</span>
                             <span class="Other">(</span><span class="StringLit">&quot;rs&quot;</span><span class="Other">,</span> <span class="Identifier">rsSyntaxSource</span><span class="Other">)</span><span class="Other">,</span> <span class="Other">(</span><span class="StringLit">&quot;rb&quot;</span><span class="Other">,</span> <span class="Identifier">rbSyntaxSource</span><span class="Other">)</span><span class="Other">,</span>
                             <span class="Other">(</span><span class="StringLit">&quot;php&quot;</span><span class="Other">,</span> <span class="Identifier">phpSyntaxSource</span><span class="Other">)</span><span class="Other">,</span> <span class="Other">(</span><span class="StringLit">&quot;go&quot;</span><span class="Other">,</span> <span class="Identifier">goSyntaxSource</span><span class="Other">)</span><span class="Other">,</span>
-                            <span class="Other">(</span><span class="StringLit">&quot;d&quot;</span><span class="Other">,</span> <span class="Identifier">dSyntaxSource</span><span class="Other">)</span><span class="Other">,</span> <span class="Other">(</span><span class="StringLit">&quot;crystal&quot;</span><span class="Other">,</span> <span class="Identifier">crSyntaxSource</span><span class="Other">)</span><span class="Other">,</span>
+                            <span class="Other">(</span><span class="StringLit">&quot;d&quot;</span><span class="Other">,</span> <span class="Identifier">dSyntaxSource</span><span class="Other">)</span><span class="Other">,</span> <span class="Other">(</span><span class="StringLit">&quot;swift&quot;</span><span class="Other">,</span> <span class="Identifier">swiftSyntaxSource</span><span class="Other">)</span><span class="Other">,</span>
+                            <span class="Other">(</span><span class="StringLit">&quot;objc&quot;</span><span class="Other">,</span> <span class="Identifier">objcSyntaxSource</span><span class="Other">)</span><span class="Other">,</span>
+                            <span class="Other">(</span><span class="StringLit">&quot;java&quot;</span><span class="Other">,</span> <span class="Identifier">javaSyntaxSource</span><span class="Other">)</span><span class="Other">,</span>
+                            <span class="Other">(</span><span class="StringLit">&quot;cs&quot;</span><span class="Other">,</span> <span class="Identifier">csharpSyntaxSource</span><span class="Other">)</span><span class="Other">,</span>
+                            <span class="Other">(</span><span class="StringLit">&quot;kt&quot;</span><span class="Other">,</span> <span class="Identifier">kotlinSyntaxSource</span><span class="Other">)</span><span class="Other">,</span>
+                            <span class="Other">(</span><span class="StringLit">&quot;perl&quot;</span><span class="Other">,</span> <span class="Identifier">perlSyntaxSource</span><span class="Other">)</span><span class="Other">,</span>
+                            <span class="Other">(</span><span class="StringLit">&quot;ocaml&quot;</span><span class="Other">,</span> <span class="Identifier">ocamlSyntaxSource</span><span class="Other">)</span><span class="Other">,</span>
+                            <span class="Other">(</span><span class="StringLit">&quot;lua&quot;</span><span class="Other">,</span> <span class="Identifier">luaSyntaxSource</span><span class="Other">)</span><span class="Other">,</span>
+                            <span class="Other">(</span><span class="StringLit">&quot;hs&quot;</span><span class="Other">,</span> <span class="Identifier">haskellSyntaxSource</span><span class="Other">)</span><span class="Other">,</span>
+                            <span class="Other">(</span><span class="StringLit">&quot;zig&quot;</span><span class="Other">,</span> <span class="Identifier">zigSyntaxSource</span><span class="Other">)</span><span class="Other">,</span>
+                            <span class="Other">(</span><span class="StringLit">&quot;crystal&quot;</span><span class="Other">,</span> <span class="Identifier">crSyntaxSource</span><span class="Other">)</span><span class="Other">,</span>
                             <span class="Other">(</span><span class="StringLit">&quot;css&quot;</span><span class="Other">,</span> <span class="Identifier">cssSyntaxSource</span><span class="Other">)</span><span class="Other">,</span> <span class="Other">(</span><span class="StringLit">&quot;md&quot;</span><span class="Other">,</span> <span class="Identifier">mdSyntaxSource</span><span class="Other">)</span><span class="Other">,</span>
                             <span class="Other">(</span><span class="StringLit">&quot;yaml&quot;</span><span class="Other">,</span> <span class="Identifier">yamlSyntaxSource</span><span class="Other">)</span><span class="Other">,</span>
                             <span class="Other">(</span><span class="StringLit">&quot;json&quot;</span><span class="Other">,</span> <span class="Identifier">jsonSyntaxSource</span><span class="Other">)</span><span class="Other">,</span>
@@ -750,7 +800,7 @@
       <div class="twelve-columns footer">
         <span class="nim-sprite"></span>
         <br>
-        <small style="color: var(--hint);">Made with Nim. Generated: 2026-09-30 20:53:32 UTC</small>
+        <small style="color: var(--hint);">Made with Nim. Generated: 2026-10-06 18:39:38 UTC</small>
       </div>
     </div>
   </div>

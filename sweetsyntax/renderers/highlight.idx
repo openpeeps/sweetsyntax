@@ -4,7 +4,7 @@ nim	hfHtml	sweetsyntax/renderers/highlight.html#hfHtml	HighlightFormat.hfHtml		2
 nim	hfJson	sweetsyntax/renderers/highlight.html#hfJson	HighlightFormat.hfJson		20
 nim	HighlightFormat	sweetsyntax/renderers/highlight.html#HighlightFormat	enum HighlightFormat		20
 nim	SweetHighlightError	sweetsyntax/renderers/highlight.html#SweetHighlightError	object SweetHighlightError		25
-nim	syntaxForFilename	sweetsyntax/renderers/highlight.html#syntaxForFilename,string	proc syntaxForFilename(path: string): KnownSyntax		96
-nim	syntaxForExt	sweetsyntax/renderers/highlight.html#syntaxForExt,string	proc syntaxForExt(ext: string): KnownSyntax		105
-nim	highlight	sweetsyntax/renderers/highlight.html#highlight,KnownSyntax,string,HighlightFormat	proc highlight(lang: KnownSyntax; code: string; format: HighlightFormat = hfHtml;\n          useColor = true; enableFilters = true; includeValue = true): string		114
-nim	highlightFile	sweetsyntax/renderers/highlight.html#highlightFile,string,HighlightFormat	proc highlightFile(path: string; format: HighlightFormat = hfHtml; useColor = true;\n              enableFilters = true; includeValue = true): string		135
+nim	syntaxForFilename	sweetsyntax/renderers/highlight.html#syntaxForFilename,string	proc syntaxForFilename(path: string): KnownSyntax		107
+nim	syntaxForExt	sweetsyntax/renderers/highlight.html#syntaxForExt,string	proc syntaxForExt(ext: string): KnownSyntax		116
+nim	highlight	sweetsyntax/renderers/highlight.html#highlight,KnownSyntax,string,HighlightFormat	proc highlight(lang: KnownSyntax; code: string; format: HighlightFormat = hfHtml;\n          useColor = true; enableFilters = true; includeValue = true): string		125
+nim	highlightFile	sweetsyntax/renderers/highlight.html#highlightFile,string,HighlightFormat	proc highlightFile(path: string; format: HighlightFormat = hfHtml; useColor = true;\n              enableFilters = true; includeValue = true): string		146

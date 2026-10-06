@@ -86,6 +86,9 @@
   stringPrefixes*: seq[string]
   rawStringDelims*: bool
   percentLiterals*: bool
+  filtersSkipLiterals*: bool
+  longBrackets*: bool
+  heredocOpenerPunctuation*: bool
   inferRegex*: bool
   expectRegexTokens*: HashSet[string]
   expectRegexKeywords*: HashSet[string]
@@ -235,6 +238,9 @@
   <span class="Identifier">stringPrefixes</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">seq</span><span class="Other">[</span><span class="Identifier">string</span><span class="Other">]</span>
   <span class="Identifier">rawStringDelims</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">bool</span>
   <span class="Identifier">percentLiterals</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">bool</span>
+  <span class="Identifier">filtersSkipLiterals</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">bool</span>
+  <span class="Identifier">longBrackets</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">bool</span>
+  <span class="Identifier">heredocOpenerPunctuation</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">bool</span>
   <span class="Identifier">inferRegex</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">bool</span>
   <span class="Identifier">expectRegexTokens</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">HashSet</span><span class="Other">[</span><span class="Identifier">string</span><span class="Other">]</span>
   <span class="Identifier">expectRegexKeywords</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">HashSet</span><span class="Other">[</span><span class="Identifier">string</span><span class="Other">]</span>
@@ -483,7 +489,7 @@
       <div class="twelve-columns footer">
         <span class="nim-sprite"></span>
         <br>
-        <small style="color: var(--hint);">Made with Nim. Generated: 2026-09-30 20:53:32 UTC</small>
+        <small style="color: var(--hint);">Made with Nim. Generated: 2026-10-06 18:39:39 UTC</small>
       </div>
     </div>
   </div>
