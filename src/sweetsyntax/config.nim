@@ -329,6 +329,7 @@ type
     handlebars = "handlebars"
     liquid = "liquid"
     ejs = "ejs"
+    apache = "apache"
 
   SweetSyntax* = ref object
     spec*: SweetSpec
@@ -378,6 +379,7 @@ const
   handlebarsSyntaxSource = staticRead(currentSourcePath().parentDir / "syntaxes" / "handlebars.yaml")
   liquidSyntaxSource = staticRead(currentSourcePath().parentDir / "syntaxes" / "liquid.yaml")
   ejsSyntaxSource = staticRead(currentSourcePath().parentDir / "syntaxes" / "ejs.yaml")
+  apacheSyntaxSource = staticRead(currentSourcePath().parentDir / "syntaxes" / "apache.yaml")
 
 let
   # NOTE: this must stay a `let` (runtime init), not a `const`.
@@ -426,7 +428,8 @@ let
     "jinja2": jinja2SyntaxSource,
     "handlebars": handlebarsSyntaxSource,
     "liquid": liquidSyntaxSource,
-    "ejs": ejsSyntaxSource
+    "ejs": ejsSyntaxSource,
+    "apache": apacheSyntaxSource
   }.toTable
 
 proc parseHook*(p: var YamlParser, v: var SymbolsTable) =

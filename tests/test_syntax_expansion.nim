@@ -1,6 +1,6 @@
 import std/[unittest, strutils, os, tables]
 import ../src/sweetsyntax
-import ../src/sweetsyntax/renderers/[highlight, foldrenderer]
+import ../src/sweetsyntax/renderers/[highlight, foldrenderer, jsonrenderer]
 
 type Tok = tuple[kind: string, value: string, attrs: seq[string]]
 
@@ -62,6 +62,7 @@ suite "New syntaxes load and render":
       KnownSyntax.cmake: "project(x)",
       KnownSyntax.nginx: "server { listen 80; }",
       KnownSyntax.systemd: "[Unit]\nDescription=x",
+      KnownSyntax.apache: "<VirtualHost *:80>\nServerName x\n</VirtualHost>",
       KnownSyntax.jinja2: "{{ a }}",
       KnownSyntax.handlebars: "{{#each a}}{{b}}{{/each}}",
       KnownSyntax.liquid: "{% if a %}{{ b }}{% endif %}",
@@ -160,6 +161,71 @@ suite "Nginx and systemd":
     check hasAttr(toks, "Description", "property.name")
     check hasAttr(toks, "After", "property.name")
 
+  test "systemd highlights without filters too":
+    ## Filter-less consumers (the ZenCode backend runs `enableFilters = false`)
+    ## must still see sections, keys and booleans: the spec carries its own
+    ## vocabulary in `identifiers` + `keyword_scopes` for exactly this path.
+    let syntax = getKnownSyntax(KnownSyntax.systemd)
+    var lx = initLexer(syntax.spec,
+      "[Unit]\nDescription=x\nAfter=network.target\nRestart=no\n", false)
+    lx.inferRegex = true
+    var scopes: Table[string, string]
+    var tok = lx.getToken()
+    while tok.kind != tkEOF:
+      scopes[lx.getTokenValue(tok)] = scopeForToken(lx, tok)
+      tok = lx.getToken()
+    check scopes["Unit"] == "entity.name.tag"
+    check scopes["Description"] == "variable.other.property"
+    check scopes["After"] == "variable.other.property"
+    check scopes["no"] == "constant.language.boolean"
+
+suite "Apache configuration":
+  test "comments, directives and section names":
+    let toks = tokens(KnownSyntax.apache,
+      "# c\nServerRoot \"/etc/httpd\"\n<VirtualHost *:80>\n" &
+      "  ServerName x\n</VirtualHost>\n")
+    check hasKind(toks, "c", "comment")
+    check hasAttr(toks, "ServerRoot", "ServerRoot")
+    check hasAttr(toks, "ServerName", "ServerName")
+    check hasAttr(toks, "VirtualHost", "entity.name.tag")
+    check hasKind(toks, "\"/etc/httpd\"", "string")
+    check hasKind(toks, "*", "punct")
+
+  test "apache highlights without filters too":
+    ## Directives and section names are plain identifiers, so the filter-less
+    ## path keeps a keyword scope instead of going plain.
+    let syntax = getKnownSyntax(KnownSyntax.apache)
+    var lx = initLexer(syntax.spec,
+      "ServerName x\n<Directory \"/var/www\">\nOptions Indexes\n</Directory>\n",
+      false)
+    lx.inferRegex = true
+    var scopes: Table[string, string]
+    var tok = lx.getToken()
+    while tok.kind != tkEOF:
+      scopes[lx.getTokenValue(tok)] = scopeForToken(lx, tok)
+      tok = lx.getToken()
+    check scopes["ServerName"] == "keyword"
+    check scopes["Directory"] == "keyword"
+    check scopes["Options"] == "keyword"
+
+  test "apache resolves by extension and filename":
+    check syntaxForExt("htaccess") == KnownSyntax.apache
+    check syntaxForExt("apache") == KnownSyntax.apache
+    check syntaxForFilename(".htaccess") == KnownSyntax.apache
+    check syntaxForFilename("httpd.conf") == KnownSyntax.apache
+    check syntaxForFilename("apache2.conf") == KnownSyntax.apache
+
+  test "a full filename wins over a generic extension":
+    ## `httpd.conf` is Apache config even though `.conf` alone is INI.
+    let dir = getTempDir() / "sweetsyntax_apache_test"
+    createDir(dir)
+    let path = dir / "httpd.conf"
+    writeFile(path, "ServerName x\n")
+    check "keyword" in highlightFile(path, hfJson)
+    let iniPath = dir / "other.conf"
+    writeFile(iniPath, "k = v\n")
+    check syntaxForExt("conf") == KnownSyntax.ini
+
 suite "Template engines":
   test "jinja2 delimiters and comments":
     let toks = tokens(KnownSyntax.jinja2,
@@ -204,6 +270,16 @@ suite "Highlight-only languages lex multi-character operators":
     let toks = tokens(KnownSyntax.d, "x = a >>> b >>>= c;\n")
     check hasKind(toks, ">>>", "punct")
     check hasKind(toks, ">>>=", "punct")
+
+  test "rust comments and doc comments":
+    let toks = tokens(KnownSyntax.rust,
+      "// line\n/// outer docs\n//! crate docs\n/* block */\n/** block docs */\n/*! important */\n")
+    check hasKind(toks, "line", "comment")
+    check hasKind(toks, "/ outer docs", "comment")
+    check hasKind(toks, "! crate docs", "comment")
+    check hasKind(toks, " block ", "comment")
+    check hasKind(toks, " block docs ", "doc_comment")
+    check hasKind(toks, " important ", "doc_comment")
 
   test "rust operators stay whole":
     let toks = tokens(KnownSyntax.rust, "fn f() -> bool { a >= b }\n")

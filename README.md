@@ -21,7 +21,7 @@
 - JSON-based AST generator / indent-based dump tree
 - ANSI, HTML and JSON-LD Renderers
 - **Parsers** (lexer + Pratt parser + AST + validation) for: C, Go, JavaScript, Nim, PHP, Ruby — plus TypeScript, which reuses the JavaScript handlers
-- **Highlight-only** (lexer + renderers, no parser, no AST) for: C++, Crystal, C#, D lang, Haskell, Java, Kotlin, Lua, Objective-C, OCaml, Perl, Python, Rust, Swift, Zig, CMake, CSV, CSS, Dockerfile, EJS, Handlebars, HTML, INI, Jinja2, JSON, Liquid, Makefile, Markdown, Nginx, Shell, systemd, TOML, XML and YAML
+- **Highlight-only** (lexer + renderers, no parser, no AST) for: C++, Crystal, C#, D lang, Haskell, Java, Kotlin, Lua, Objective-C, OCaml, Perl, Python, Rust, Swift, Zig, Apache, CMake, CSV, CSS, Dockerfile, EJS, Handlebars, HTML, INI, Jinja2, JSON, Liquid, Makefile, Markdown, Nginx, Shell, systemd, TOML, XML and YAML
 - Every one of those also highlights through the lexer alone, so broken or half-written code still renders — see [Unified highlight](#unified-highlight)
 - Resolves language by extension or by well-known filename (`Dockerfile`, `Makefile`, `CMakeLists.txt`, `.env`)
 - **Context-aware error** reporting while parsing
@@ -62,7 +62,7 @@ echo highlight(KnownSyntax.md, "# Hello", hfAscii)
 echo highlightFile("Dockerfile", hfJson)
 ```
 
-Highlights derived scopes for configuration, markup and template formats come from YAML `filters`: YAML/TOML/JSON keys, Makefile targets and systemd keys become `variable.other.property`, YAML tags/anchors, TOML tables and systemd sections become `entity.name.tag`, HTML/XML tag names become `markup.tag` with attributes as `entity.other.attribute-name`, Markdown/CSS get `markup.*` / `selector.*` scopes, and template engines add their own delimiter scopes.
+Highlights derived scopes for configuration, markup and template formats come from YAML `filters`: YAML/TOML/JSON keys, Makefile targets and systemd keys become `variable.other.property`, YAML tags/anchors, TOML tables, systemd sections and Apache section names become `entity.name.tag`, HTML/XML tag names become `markup.tag` with attributes as `entity.other.attribute-name`, Markdown/CSS get `markup.*` / `selector.*` scopes, and template engines add their own delimiter scopes.
 
 A highlight-only spec needs just `name`, `extension`, `symbols`, `identifiers` and the lexer flags — no `operators:` or `statements:`, since those only drive the Pratt parser. The lexer-only flags are:
 
@@ -102,7 +102,7 @@ This is also why no renderer keeps a keyword list of its own. It used to, and th
 Because no parser runs, the lexer decides `/regex/` versus division itself: it reuses the spec's `statements.expect_regex_after` token and keyword lists to reach the same verdict `GenericParser` would. Languages that declare no such list never see a regex token. Because `/` after a *value* is genuinely ambiguous (`f(a) / 2`), a regex directly after an identifier, `)`, `]` or a literal still reads as division — bind it to a name (`r = /re/`) if you want it recognised.
 
 #### Known gaps
-The Python and Rust specs are still keyword-and-symbol only: neither declares comment syntax yet, so `#` in Python and `//` in Rust highlight as punctuation. Python additionally has no f-string/b-prefix support and Rust lifetimes (`'a`) still lex as character literals. These are the only languages whose highlighting is materially incomplete.
+The Python spec is still keyword-and-symbol only: it declares no comment syntax yet, so `#` highlights as punctuation. Python additionally has no f-string/b-prefix support. Rust now declares `//` and `/* */` comments, but it has no keyword scopes yet and its lifetimes (`'a`) still lex as character literals. Python and Rust are the only languages whose highlighting is materially incomplete.
 
 Swift and D both nest block comments, but the lexer stores a single `block_comment` pair and closes on the first `*/`, so a nested comment ends early. D's `/+ +/` comments and `/+! +/` doc comments are not recognised either. Swift raw strings (`#"..."#`) and string interpolation (`"\(x)"`) are likewise not recognised: the interpolation stays inside the string span, and the raw-string `#` reads as a compiler directive. D's delimited forms (`q{...}`, `hex[...]`) are not recognised, though `c"..."`, `q"..."` and `` `backtick` `` are. Objective-C boxed literals (`@42`, `@YES`) read as an `@` symbol followed by an ordinary token.
 
