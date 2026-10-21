@@ -18,11 +18,55 @@ import ./sweetsyntax/renderers/highlight
 export config, sweetlexer, ast, parser, highlight
 
 when isMainModule:
-  import std/[tables, os, strutils]
+  import std/[tables, os, parseopt, strutils]
   import pkg/openparser/json
-  import pkg/kapsis
-  import pkg/kapsis/[runtime, interactive/prompts]
   import ./sweetsyntax/languages/[js, nim, c, php, ruby, go]
+
+  const versionStr = "0.2.1"
+
+  const
+    ansiReset = "\e[0m"
+    ansiBoldWhite = "\e[1;37m"
+    ansiGrey = "\e[90m"
+    ansiRed = "\e[31m"
+
+  proc useColor(): bool =
+    getEnv("NO_COLOR") == "" and getEnv("TERM") != "dumb"
+
+  proc paint(s, code: string): string =
+    if useColor():
+      code & s & ansiReset
+    else:
+      s
+
+  proc label(s: string): string =
+    paint(s, ansiBoldWhite)
+
+  proc grey(s: string): string =
+    paint(s, ansiGrey)
+
+  proc errPrefix(): string =
+    paint("error:", ansiRed)
+
+  proc printHelp() =
+    echo grey("sweetsyntax " & versionStr & " - generic parser and AST explorer") & "\n"
+    echo grey("MIT license | Made by Humans from OpenPeeps\n  https://github.com/openpeeps/sweetsyntax")
+    echo ""
+    echo "usage: sweetsyntax <command> <file> [options]"
+    echo ""
+    echo label("commands:")
+    echo "  parse               " & grey("validate: parse and report errors")
+    echo "  ast                 " & grey("print the full AST as JSON")
+    echo "  tree                " & grey("print the AST as an indent-based tree")
+    echo "  highlight           " & grey("highlight a file with the lexer only, no parsing or AST")
+    echo ""
+    echo label("options:")
+    echo "  --format:<fmt>      " & grey("highlight only: ascii, html or json (default: ascii)")
+    echo "  -o                  " & grey("ast: write <file>.json next to the input; highlight: write <file>.txt/.html/.json")
+    echo "  -y                  " & grey("ast: overwrite the existing JSON file without asking")
+    echo "  --no-color          " & grey("highlight: drop ANSI codes from ascii output")
+    echo "  -h, --help          " & grey("show this help")
+    echo "  --version           " & grey("show version")
 
   proc getLanguageHandlers(ext: string): (ParsingCallback, set[LanguageFeature]) =
     ## Resolve language handlers and features by file extension.
@@ -50,81 +94,93 @@ when isMainModule:
       result[0] = nil
       result[1] = {}
 
-  proc parseCommand(v: Values) =
-    let srcPath = $(v.get("script").getPath)
-    let ext = srcPath.splitFile.ext[1..^1].toLowerAscii
+  proc extOf(path: string): string =
+    let ext = path.splitFile.ext
+    if ext.len > 1: ext[1..^1].toLowerAscii else: ""
+
+  proc confirmOverwrite(path: string): bool =
+    stdout.write("Confirm overwrite of the existing JSON file (" &
+      extractFilename(path) & ")? [y/N]: ")
+    stdout.flushFile()
+    try:
+      result = stdin.readLine().strip().toLowerAscii in ["y", "yes"]
+    except EOFError:
+      result = false
+
+  proc parseCommand(srcPath: string): int =
+    let ext = extOf(srcPath)
     let (handler, features) = getLanguageHandlers(ext)
     if handler == nil:
-      echo "Unsupported file extension: ." & ext
-      quit 1
+      echo errPrefix() & " unsupported file extension: ." & ext
+      return 1
     try:
       discard parseScript(srcPath, handler, features)
     except OpenAstParsingError as e:
       echo e.msg
-      quit 1
+      return 1
+    0
 
-  proc astCommand(v: Values) =
-    # kapsis command handler for generating the AST of a script file
-    let srcPath = absolutePath($(v.get("script").getPath))
-    let splitFileTuple = srcPath.splitFile()
-    let ext = splitFileTuple.ext[1..^1].toLowerAscii
+  proc astCommand(srcPath: string, writeOut, overwrite: bool): int =
+    # Generate the AST of a script file, either to stdout or to a sibling
+    # JSON file next to the input.
+    let absPath = absolutePath(srcPath)
+    let ext = extOf(absPath)
     let (handler, features) = getLanguageHandlers(ext)
     if handler == nil:
-      echo "Unsupported file extension: ." & ext
-      quit 1
+      echo errPrefix() & " unsupported file extension: ." & ext
+      return 1
     try:
-      let astProgram = parseScript(srcPath, handler, features)
-      if v.has("-o"):
-        let outputPath = srcPath.changeFileExt("json")
+      let astProgram = parseScript(absPath, handler, features)
+      if writeOut:
+        let outputPath = absPath.changeFileExt("json")
         if fileExists(outputPath):
-          if not v.has("-y") and promptConfirm("Confirm overwrite of the existing JSON file (" & extractFilename(outputPath) & ")?") == false:
-            quit 0
+          if not overwrite and not confirmOverwrite(outputPath):
+            return 0
         writeFile(outputPath, toJson(astProgram))
       else:
         echo toJson(astProgram)
     except OpenAstParsingError as e:
       echo e.msg
-      quit 1    
+      return 1
+    0
 
-  proc treeCommand(v: Values) =
-    # kapsis command handler for printing the AST of a script file
-    # as an indent-based tree (2 spaces per level), Nim dumpTree-style
-    let srcPath = absolutePath($(v.get("script").getPath))
-    let splitFileTuple = srcPath.splitFile()
-    let ext = splitFileTuple.ext[1..^1].toLowerAscii
+  proc treeCommand(srcPath: string): int =
+    # Print the AST of a script file as an indent-based tree
+    # (2 spaces per level), Nim dumpTree-style.
+    let absPath = absolutePath(srcPath)
+    let ext = extOf(absPath)
     let (handler, features) = getLanguageHandlers(ext)
     if handler == nil:
-      echo "Unsupported file extension: ." & ext
-      quit 1
+      echo errPrefix() & " unsupported file extension: ." & ext
+      return 1
     try:
-      let astProgram = parseScript(srcPath, handler, features)
+      let astProgram = parseScript(absPath, handler, features)
       stdout.write dumpTree(astProgram)
     except OpenAstParsingError as e:
       echo e.msg
-      quit 1
+      return 1
+    0
 
-  proc highlightCommand(v: Values) =
+  proc highlightCommand(srcPath, formatArg: string, useColor,
+      writeOut: bool): int =
     # Lexer-only highlighting: tokenize with the language's YAML spec and
     # render, without parsing or validating. Works for every known syntax,
     # including the highlight-only ones that have no parser handlers.
-    let srcPath = $(v.get("script").getPath)
     var format = hfAscii
-    if v.has("format"):
-      case v.get("format").getStr
-      of "ascii", "ansi", "terminal": discard
-      of "html": format = hfHtml
-      of "json", "ndjson": format = hfJson
-      else:
-        echo "Unknown format: use ascii, html or json"
-        quit 1
-    let useColor = not v.has("--no-color")
+    case formatArg.toLowerAscii
+    of "ascii", "ansi", "terminal": discard
+    of "html": format = hfHtml
+    of "json", "ndjson": format = hfJson
+    else:
+      echo errPrefix() & " unknown format: use ascii, html or json"
+      return 1
     var output: string
     try:
       output = highlightFile(srcPath, format, useColor)
     except SweetHighlightError as e:
-      echo e.msg
-      quit 1
-    if v.has("-o"):
+      echo errPrefix() & " " & e.msg
+      return 1
+    if writeOut:
       let outExt =
         if format == hfHtml: ".html"
         elif format == hfJson: ".json"
@@ -134,14 +190,72 @@ when isMainModule:
       echo "Wrote " & outPath
     else:
       stdout.write output
+    0
 
-  initKapsis do:
-    commands:
-      parse path(script):
-        ## Parse a script by extension
-      ast path(script), ?bool("-o"), ?bool("-y"):
-        ## Generate AST of a script by extension
-      tree path(script):
-        ## Print the AST of a script as an indent-based tree
-      highlight path(script), ?string(format), ?bool("-o"), ?bool("--no-color"):
-        ## Highlight a file with the lexer only, no parsing or AST
+  proc main(): int =
+    var positionals: seq[string] = @[]
+    var formatArg = "ascii"
+    var writeOut = false
+    var overwrite = false
+    var noColor = false
+    var showHelp = false
+    var showVersion = false
+    var p = initOptParser(commandLineParams())
+    for kind, key, val in p.getopt():
+      case kind
+      of cmdArgument:
+        positionals.add(key)
+      of cmdLongOption, cmdShortOption:
+        case key
+        of "help", "h":
+          showHelp = true
+        of "version":
+          showVersion = true
+        of "format":
+          formatArg = val
+        of "o":
+          writeOut = true
+        of "y":
+          overwrite = true
+        of "no-color":
+          noColor = true
+        else:
+          echo errPrefix() & " unknown option --" & key
+          printHelp()
+          return 1
+      of cmdEnd:
+        discard
+    if showVersion:
+      echo versionStr
+      return 0
+    if showHelp:
+      printHelp()
+      return 0
+    if positionals.len == 0:
+      printHelp()
+      echo "\n" & errPrefix() & " a command is required"
+      return 1
+    let cmd = positionals[0].toLowerAscii
+    if cmd in ["help", "--help", "-h"]:
+      printHelp()
+      return 0
+    if cmd notin ["parse", "ast", "tree", "highlight"]:
+      echo errPrefix() & " unknown command: " & cmd
+      printHelp()
+      return 1
+    if positionals.len < 2:
+      printHelp()
+      echo "\n" & errPrefix() & " " & cmd & " needs a file"
+      return 1
+    let srcPath = positionals[1]
+    case cmd
+    of "parse":
+      return parseCommand(srcPath)
+    of "ast":
+      return astCommand(srcPath, writeOut, overwrite)
+    of "tree":
+      return treeCommand(srcPath)
+    else:
+      return highlightCommand(srcPath, formatArg, not noColor, writeOut)
+
+  quit(main())
