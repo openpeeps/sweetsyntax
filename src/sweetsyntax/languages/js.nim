@@ -24,6 +24,13 @@ template expectString(body: untyped) {.dirty.} =
 proc jsHandlers*(p: var GenericParser) =
   # Register Nim-specific statement handlers.
 
+  prefixHandler p, "undefined":
+    ## `undefined` is an ordinary identifier, not null. The generic
+    ## engine folds it into nkNil, which codegen would emit as `null`
+    ## and silently change `=== undefined` checks — keep it distinct.
+    result = Node(kind: nkIdent, name: "undefined").stamp(p.curr)
+    walk p
+
   template expectSemiColonNewLine() =
     if p.next.kind != tkEOF and p.next.line == p.prev.line: 
       p.walkOpt(";")
@@ -104,7 +111,11 @@ proc jsHandlers*(p: var GenericParser) =
   stmtHandler p, "return":
     walk p # consume 'return'
     result = Node(kind: nkReturn)
-    if (p.curr.kind == tkPunct and p.curr.value in [";", "}"]) or p.curr.kind == tkEOF:
+    # `return` is a restricted production: a LineTerminator between the
+    # keyword and its value ends the statement (ASI), so a value is only
+    # parsed on the same line (e.g. `return\nfoo` returns undefined).
+    if (p.curr.kind == tkPunct and p.curr.value in [";", "}"]) or p.curr.kind == tkEOF or
+       p.curr.line > p.prev.line:
       expectSemiColonNewLine()
       return
     result.children.add(parseCommaExpr(p))
@@ -335,13 +346,18 @@ proc jsHandlers*(p: var GenericParser) =
 
   stmtHandler p, "class":
     ## class Name extends Base { members }
+    ## The name may be omitted in expression position
+    ## (`var K = class {}`, `var K = class extends Base {}`).
     ## Members: methods (with static/get/set/async/* modifiers),
     ## fields (`x`, `x = init`) and class static blocks.
     walk p # consume 'class'
     var name: Node
-    expectIdent:
+    if p.curr.kind == tkIdentifier and p.curr.value != "extends":
       name = Node(kind: nkIdent, name: p.curr.value).stamp(p.curr)
-    walk p
+      walk p
+    else:
+      # Anonymous class: `class {}` or `class extends Base {}`
+      name = newEmptyNode()
     var parent: Node
     if p.curr.kind == tkIdentifier and p.curr.value == "extends":
       walk p
@@ -1055,8 +1071,9 @@ proc jsHandlers*(p: var GenericParser) =
     walk p # consume 'break'
     result = Node(kind: nkStatement,
       children: @[Node(kind: nkIdent, name: "break")])
-    # optional label
-    if p.curr.kind == tkIdentifier:
+    # optional label, same line only: `break\nfoo` ends the statement (ASI),
+    # otherwise a following `case`/`default` would be swallowed as a label.
+    if p.curr.kind == tkIdentifier and p.curr.line == p.prev.line:
       result.children.add(Node(kind: nkIdent, name: p.curr.value).stamp(p.curr))
       walk p
     p.walkOpt(";")
