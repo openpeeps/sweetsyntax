@@ -90,6 +90,7 @@ const extToSyntax = {
   "mustache": KnownSyntax.handlebars,
   "liquid": KnownSyntax.liquid,
   "ejs": KnownSyntax.ejs,
+  "htaccess": KnownSyntax.apache, "apache": KnownSyntax.apache,
 }.toTable
 
 const
@@ -99,6 +100,9 @@ const
     "makefile": KnownSyntax.make,
     "gnumakefile": KnownSyntax.make,
     "cmakelists.txt": KnownSyntax.cmake,
+    "httpd.conf": KnownSyntax.apache,
+    "apache2.conf": KnownSyntax.apache,
+    ".htaccess": KnownSyntax.apache,
     ".env": KnownSyntax.ini,
     ".env.local": KnownSyntax.ini,
     ".env.production": KnownSyntax.ini,
@@ -147,17 +151,18 @@ proc highlightFile*(path: string,
                     format: HighlightFormat = hfHtml,
                     useColor = true, enableFilters = true,
                     includeValue = true): string =
-  ## Highlight the file at `path`, resolving the language from its
-  ## extension, or from a well-known bare filename (`Dockerfile`,
-  ## `Makefile`, `CMakeLists.txt`, `.env`) when there is no usable
-  ## extension. Raises `SweetHighlightError` when neither resolves.
+  ## Highlight the file at `path`, resolving the language from a well-known
+  ## filename first (`httpd.conf`, `Dockerfile`, `Makefile`, `CMakeLists.txt`,
+  ## `.env`, ...), then from the extension. The filename wins because it is
+  ## more specific: `httpd.conf` is Apache config even though a generic
+  ## `.conf` file is INI. Raises `SweetHighlightError` when neither resolves.
   let name = extractFilename(path)
   var ext = name.splitFile.ext
   var lang: KnownSyntax
-  if ext.len > 1 and extToSyntax.hasKey(ext.strip(chars = {'.'}).toLowerAscii):
-    lang = syntaxForExt(ext)
-  elif filenameToSyntax.hasKey(name.toLowerAscii):
+  if filenameToSyntax.hasKey(name.toLowerAscii):
     lang = syntaxForFilename(name)
+  elif ext.len > 1 and extToSyntax.hasKey(ext.strip(chars = {'.'}).toLowerAscii):
+    lang = syntaxForExt(ext)
   else:
     raise newException(SweetHighlightError,
       if ext.len > 1: "Unsupported file extension: ." &

@@ -1,0 +1,185 @@
+# Apache HTTP Server configuration — highlight-only spec (lexer + renderers,
+# no parser/AST).
+#
+# There is deliberately no `operators:` or `statements:` section: those drive the
+# Pratt parser's precedence tables and statement handlers, and Apache config is
+# supported for syntax highlighting only.
+#
+# File layout this spec targets:
+#   - `#` comments (hash_comments)
+#   - `Directive arguments...` lines (directives are plain `keyword` tokens via
+#     `identifiers`, in their canonical documented casing)
+#   - `<SectionName args...>` ... `</SectionName>` blocks, whose names are
+#     styled `entity.name.tag` by the filter below
+#   - `"quoted"` and `'quoted'` strings, numbers and `*`/`:`/`/` punctuation
+#     for values like `*:80`
+#
+# Limitations, all from single-pass lexing rather than from this spec:
+#   - Directives are case-insensitive in Apache but the lexer matches
+#     identifiers exactly, so only the canonical casing listed below carries a
+#     keyword scope; any other casing still tokenizes, as a plain variable.
+#   - Section blocks (`<VirtualHost>` ... `</VirtualHost>`) produce no fold
+#     region: folding only understands `{...}` braces, not angle-bracket
+#     sections, so an indented body may report a presentational indent fold.
+
+name: Apache
+extension:
+  - htaccess
+  - apache
+
+hash_comments: true
+
+# The section filter describes code structure, so `filters_skip_literals` keeps
+# it from restyling a string or comment that merely contains `<Name`.
+filters_skip_literals: true
+filters:
+  - name: section
+    pattern: "<[ ]*/?[ ]*([A-Za-z][A-Za-z0-9]*)"
+    group: 1
+    attr: "entity.name.tag"
+
+symbols:
+  lt: '<'
+  gt: '>'
+  slash: '/'
+  star: '*'
+  colon: ':'
+  dot: '.'
+  comma: ','
+  assign: '='
+  plus: '+'
+  minus: '-'
+  pipe: '|'
+  tilde: '~'
+  dollar: '$'
+  at: '@'
+  percent: '%'
+  amp: '&'
+  question: '?'
+  backslash: '\'
+  quote: '"'
+  squote: "'"
+  parenl: '('
+  parenr: ')'
+  sqbl: '['
+  sqbr: ']'
+  curl: '{'
+  curr: '}'
+  hash: '#'
+
+identifiers:
+  ServerRoot: "ServerRoot"
+  Listen: "Listen"
+  ListenBacklog: "ListenBacklog"
+  LoadModule: "LoadModule"
+  LoadFile: "LoadFile"
+  ServerName: "ServerName"
+  ServerAdmin: "ServerAdmin"
+  ServerAlias: "ServerAlias"
+  ServerTokens: "ServerTokens"
+  ServerSignature: "ServerSignature"
+  DocumentRoot: "DocumentRoot"
+  DirectoryIndex: "DirectoryIndex"
+  AccessFileName: "AccessFileName"
+  UseCanonicalName: "UseCanonicalName"
+  HostnameLookups: "HostnameLookups"
+  ErrorLog: "ErrorLog"
+  CustomLog: "CustomLog"
+  LogLevel: "LogLevel"
+  LogFormat: "LogFormat"
+  ErrorDocument: "ErrorDocument"
+  Alias: "Alias"
+  AliasMatch: "AliasMatch"
+  ScriptAlias: "ScriptAlias"
+  Redirect: "Redirect"
+  RedirectMatch: "RedirectMatch"
+  Options: "Options"
+  AllowOverride: "AllowOverride"
+  Require: "Require"
+  RequireAll: "RequireAll"
+  RequireAny: "RequireAny"
+  RequireNone: "RequireNone"
+  Order: "Order"
+  Allow: "Allow"
+  Deny: "Deny"
+  Satisfy: "Satisfy"
+  AuthType: "AuthType"
+  AuthName: "AuthName"
+  AuthUserFile: "AuthUserFile"
+  AuthGroupFile: "AuthGroupFile"
+  Directory: "Directory"
+  DirectoryMatch: "DirectoryMatch"
+  Files: "Files"
+  FilesMatch: "FilesMatch"
+  Location: "Location"
+  LocationMatch: "LocationMatch"
+  VirtualHost: "VirtualHost"
+  IfModule: "IfModule"
+  IfVersion: "IfVersion"
+  IfDefine: "IfDefine"
+  If: "If"
+  Else: "Else"
+  ElseIf: "ElseIf"
+  Define: "Define"
+  UnDefine: "UnDefine"
+  Include: "Include"
+  IncludeOptional: "IncludeOptional"
+  ProxyPass: "ProxyPass"
+  ProxyPassReverse: "ProxyPassReverse"
+  ProxyPreserveHost: "ProxyPreserveHost"
+  ProxyRequests: "ProxyRequests"
+  RewriteEngine: "RewriteEngine"
+  RewriteBase: "RewriteBase"
+  RewriteCond: "RewriteCond"
+  RewriteRule: "RewriteRule"
+  SetEnv: "SetEnv"
+  SetEnvIf: "SetEnvIf"
+  Header: "Header"
+  RequestHeader: "RequestHeader"
+  ExpiresActive: "ExpiresActive"
+  ExpiresDefault: "ExpiresDefault"
+  AddType: "AddType"
+  AddHandler: "AddHandler"
+  AddDefaultCharset: "AddDefaultCharset"
+  TypesConfig: "TypesConfig"
+  DefaultType: "DefaultType"
+  MIMEMagicFile: "MIMEMagicFile"
+  EnableSendfile: "EnableSendfile"
+  EnableMMAP: "EnableMMAP"
+  KeepAlive: "KeepAlive"
+  MaxKeepAliveRequests: "MaxKeepAliveRequests"
+  KeepAliveTimeout: "KeepAliveTimeout"
+  Timeout: "Timeout"
+  GracefulShutdownTimeout: "GracefulShutdownTimeout"
+  MaxRequestWorkers: "MaxRequestWorkers"
+  MaxConnectionsPerChild: "MaxConnectionsPerChild"
+  StartServers: "StartServers"
+  MinSpareServers: "MinSpareServers"
+  MaxSpareServers: "MaxSpareServers"
+  ThreadLimit: "ThreadLimit"
+  ThreadsPerChild: "ThreadsPerChild"
+  AsyncRequestWorkerFactor: "AsyncRequestWorkerFactor"
+  User: "User"
+  Group: "Group"
+  PidFile: "PidFile"
+  Mutex: "Mutex"
+  TraceEnable: "TraceEnable"
+  LimitRequestBody: "LimitRequestBody"
+  DirectorySlash: "DirectorySlash"
+  AcceptFilter: "AcceptFilter"
+  MaxMemFree: "MaxMemFree"
+  SSLEngine: "SSLEngine"
+  SSLCertificateFile: "SSLCertificateFile"
+  SSLCertificateKeyFile: "SSLCertificateKeyFile"
+  SSLProtocol: "SSLProtocol"
+  SSLCipherSuite: "SSLCipherSuite"
+  On: "On"
+  Off: "Off"
+
+features:
+  regex_literals: false
+  async_await: false
+  generators: false
+  arrow_functions: false
+  template_literals: false
+  labeled_statements: false

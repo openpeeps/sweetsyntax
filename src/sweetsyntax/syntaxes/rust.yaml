@@ -2,6 +2,11 @@ name: Rust
 extension:
   - rs
 
+inline_comment: '//'
+block_comment:
+  - '/*'
+  - '*/'
+
 symbols:
   plus: '+'
   minus: '-'
