@@ -94,7 +94,8 @@
     <div id="highlightHtml-procs-all">
   <div id="highlightHtml,SweetLexer">
   <dt><pre><span class="Keyword">proc</span> <a href="#highlightHtml%2CSweetLexer"><span class="Identifier">highlightHtml</span></a><span class="Other">(</span><span class="Identifier">lexer</span><span class="Other">:</span> <span class="Keyword">var</span> <a href="../sweetlexer.html#SweetLexer"><span class="Identifier">SweetLexer</span></a><span class="Other">)</span><span class="Other">:</span> <span class="Identifier">string</span> {.
-    <span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">KeyError</span><span class="Other">,</span> <span class="Identifier">Exception</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">RootEffect</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
+    <span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">IOError</span><span class="Other">,</span> <span class="Identifier">DynasmError</span><span class="Other">,</span> <span class="Identifier">ValueError</span><span class="Other">,</span> <span class="Identifier">KeyError</span><span class="Other">,</span> <span class="Identifier">Exception</span><span class="Other">]</span><span class="Other">,</span>
+    <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">RootEffect</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
   <dd>
     
     Render full source with HTML highlighting. Preserves skipped whitespace/newlines between tokens (mirrors <tt class="docutils literal"><span class="pre"><span class="Identifier">highlightAscii</span></span></tt>), HTML-escaped so <tt class="docutils literal"><span class="pre"><span class="Identifier">int</span> <span class="Identifier">x</span></span></tt> keeps its space.
@@ -125,7 +126,7 @@
       <div class="twelve-columns footer">
         <span class="nim-sprite"></span>
         <br>
-        <small style="color: var(--hint);">Made with Nim. Generated: 2026-10-06 18:39:39 UTC</small>
+        <small style="color: var(--hint);">Made with Nim. Generated: 2026-10-21 15:45:30 UTC</small>
       </div>
     </div>
   </div>

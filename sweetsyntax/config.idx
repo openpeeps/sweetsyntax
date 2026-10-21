@@ -76,15 +76,16 @@ nim	jinja2	sweetsyntax/config.html#jinja2	KnownSyntax.jinja2		290
 nim	handlebars	sweetsyntax/config.html#handlebars	KnownSyntax.handlebars		290
 nim	liquid	sweetsyntax/config.html#liquid	KnownSyntax.liquid		290
 nim	ejs	sweetsyntax/config.html#ejs	KnownSyntax.ejs		290
+nim	apache	sweetsyntax/config.html#apache	KnownSyntax.apache		290
 nim	KnownSyntax	sweetsyntax/config.html#KnownSyntax	enum KnownSyntax		290
-nim	SweetSyntax	sweetsyntax/config.html#SweetSyntax	type SweetSyntax		333
-nim	knownSyntaxTable	sweetsyntax/config.html#knownSyntaxTable	let knownSyntaxTable		388
-nim	parseHook	sweetsyntax/config.html#parseHook,YamlParser,SymbolsTable	proc parseHook(p: var YamlParser; v: var SymbolsTable)		432
-nim	parseHook	sweetsyntax/config.html#parseHook,YamlParser,Definitions	proc parseHook(p: var YamlParser; v: var Definitions)		443
-nim	parseHook	sweetsyntax/config.html#parseHook,YamlParser,SweetFilter	proc parseHook(p: var YamlParser; v: var SweetFilter)		470
-nim	parseHook	sweetsyntax/config.html#parseHook,YamlParser,PrefixGroup	proc parseHook(p: var YamlParser; v: var PrefixGroup)		487
-nim	parseHook	sweetsyntax/config.html#parseHook,YamlParser,FeaturesSpec	proc parseHook(p: var YamlParser; v: var FeaturesSpec)		498
-nim	parseHook	sweetsyntax/config.html#parseHook,YamlParser,StatementSpec	proc parseHook(p: var YamlParser; v: var StatementSpec)		513
-nim	newSyntax	sweetsyntax/config.html#newSyntax,string	proc newSyntax(specPath: string): SweetSyntax		525
-nim	getKnownSyntax	sweetsyntax/config.html#getKnownSyntax,KnownSyntax	proc getKnownSyntax(knownSyntax: KnownSyntax): SweetSyntax		529
-nimgrp	parsehook	sweetsyntax/config.html#parseHook-procs-all	proc		432
+nim	SweetSyntax	sweetsyntax/config.html#SweetSyntax	type SweetSyntax		334
+nim	knownSyntaxTable	sweetsyntax/config.html#knownSyntaxTable	let knownSyntaxTable		390
+nim	parseHook	sweetsyntax/config.html#parseHook,YamlParser,SymbolsTable	proc parseHook(p: var YamlParser; v: var SymbolsTable)		435
+nim	parseHook	sweetsyntax/config.html#parseHook,YamlParser,Definitions	proc parseHook(p: var YamlParser; v: var Definitions)		446
+nim	parseHook	sweetsyntax/config.html#parseHook,YamlParser,SweetFilter	proc parseHook(p: var YamlParser; v: var SweetFilter)		473
+nim	parseHook	sweetsyntax/config.html#parseHook,YamlParser,PrefixGroup	proc parseHook(p: var YamlParser; v: var PrefixGroup)		490
+nim	parseHook	sweetsyntax/config.html#parseHook,YamlParser,FeaturesSpec	proc parseHook(p: var YamlParser; v: var FeaturesSpec)		501
+nim	parseHook	sweetsyntax/config.html#parseHook,YamlParser,StatementSpec	proc parseHook(p: var YamlParser; v: var StatementSpec)		516
+nim	newSyntax	sweetsyntax/config.html#newSyntax,string	proc newSyntax(specPath: string): SweetSyntax		528
+nim	getKnownSyntax	sweetsyntax/config.html#getKnownSyntax,KnownSyntax	proc getKnownSyntax(knownSyntax: KnownSyntax): SweetSyntax		532
+nimgrp	parsehook	sweetsyntax/config.html#parseHook-procs-all	proc		435

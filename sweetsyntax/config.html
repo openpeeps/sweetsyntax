@@ -104,7 +104,7 @@
   toml = &quot;toml&quot;, csv = &quot;csv&quot;, html = &quot;html&quot;, xml = &quot;xml&quot;, shell = &quot;shell&quot;,
   ini = &quot;ini&quot;, make = &quot;make&quot;, cmake = &quot;cmake&quot;, docker = &quot;docker&quot;,
   nginx = &quot;nginx&quot;, systemd = &quot;systemd&quot;, jinja2 = &quot;jinja2&quot;,
-  handlebars = &quot;handlebars&quot;, liquid = &quot;liquid&quot;, ejs = &quot;ejs&quot;">KnownSyntax</a></li>
+  handlebars = &quot;handlebars&quot;, liquid = &quot;liquid&quot;, ejs = &quot;ejs&quot;, apache = &quot;apache&quot;">KnownSyntax</a></li>
 <li><a class="reference" href="#LanguageFeature" title="LanguageFeature = enum
   featRegex = &quot;regex_literals&quot;, featAsync = &quot;async_await&quot;,
   featGenerators = &quot;generators&quot;, featArrowFn = &quot;arrow_functions&quot;,
@@ -263,7 +263,8 @@
                             (&quot;jinja2&quot;, jinja2SyntaxSource),
                             (&quot;handlebars&quot;, handlebarsSyntaxSource),
                             (&quot;liquid&quot;, liquidSyntaxSource),
-                            (&quot;ejs&quot;, ejsSyntaxSource)])">knownSyntaxTable</a></li>
+                            (&quot;ejs&quot;, ejsSyntaxSource),
+                            (&quot;apache&quot;, apacheSyntaxSource)])">knownSyntaxTable</a></li>
 
     </ul>
   </details>
@@ -436,7 +437,7 @@
   <span class="Identifier">toml</span> <span class="Other">=</span> <span class="StringLit">&quot;toml&quot;</span><span class="Other">,</span> <span class="Identifier">csv</span> <span class="Other">=</span> <span class="StringLit">&quot;csv&quot;</span><span class="Other">,</span> <span class="Identifier">html</span> <span class="Other">=</span> <span class="StringLit">&quot;html&quot;</span><span class="Other">,</span> <span class="Identifier">xml</span> <span class="Other">=</span> <span class="StringLit">&quot;xml&quot;</span><span class="Other">,</span> <span class="Identifier">shell</span> <span class="Other">=</span> <span class="StringLit">&quot;shell&quot;</span><span class="Other">,</span>
   <span class="Identifier">ini</span> <span class="Other">=</span> <span class="StringLit">&quot;ini&quot;</span><span class="Other">,</span> <span class="Identifier">make</span> <span class="Other">=</span> <span class="StringLit">&quot;make&quot;</span><span class="Other">,</span> <span class="Identifier">cmake</span> <span class="Other">=</span> <span class="StringLit">&quot;cmake&quot;</span><span class="Other">,</span> <span class="Identifier">docker</span> <span class="Other">=</span> <span class="StringLit">&quot;docker&quot;</span><span class="Other">,</span>
   <span class="Identifier">nginx</span> <span class="Other">=</span> <span class="StringLit">&quot;nginx&quot;</span><span class="Other">,</span> <span class="Identifier">systemd</span> <span class="Other">=</span> <span class="StringLit">&quot;systemd&quot;</span><span class="Other">,</span> <span class="Identifier">jinja2</span> <span class="Other">=</span> <span class="StringLit">&quot;jinja2&quot;</span><span class="Other">,</span>
-  <span class="Identifier">handlebars</span> <span class="Other">=</span> <span class="StringLit">&quot;handlebars&quot;</span><span class="Other">,</span> <span class="Identifier">liquid</span> <span class="Other">=</span> <span class="StringLit">&quot;liquid&quot;</span><span class="Other">,</span> <span class="Identifier">ejs</span> <span class="Other">=</span> <span class="StringLit">&quot;ejs&quot;</span></pre></dt>
+  <span class="Identifier">handlebars</span> <span class="Other">=</span> <span class="StringLit">&quot;handlebars&quot;</span><span class="Other">,</span> <span class="Identifier">liquid</span> <span class="Other">=</span> <span class="StringLit">&quot;liquid&quot;</span><span class="Other">,</span> <span class="Identifier">ejs</span> <span class="Other">=</span> <span class="StringLit">&quot;ejs&quot;</span><span class="Other">,</span> <span class="Identifier">apache</span> <span class="Other">=</span> <span class="StringLit">&quot;apache&quot;</span></pre></dt>
   <dd>
     
     
@@ -691,7 +692,8 @@
                             <span class="Other">(</span><span class="StringLit">&quot;jinja2&quot;</span><span class="Other">,</span> <span class="Identifier">jinja2SyntaxSource</span><span class="Other">)</span><span class="Other">,</span>
                             <span class="Other">(</span><span class="StringLit">&quot;handlebars&quot;</span><span class="Other">,</span> <span class="Identifier">handlebarsSyntaxSource</span><span class="Other">)</span><span class="Other">,</span>
                             <span class="Other">(</span><span class="StringLit">&quot;liquid&quot;</span><span class="Other">,</span> <span class="Identifier">liquidSyntaxSource</span><span class="Other">)</span><span class="Other">,</span>
-                            <span class="Other">(</span><span class="StringLit">&quot;ejs&quot;</span><span class="Other">,</span> <span class="Identifier">ejsSyntaxSource</span><span class="Other">)</span><span class="Other">]</span><span class="Other">)</span></pre></dt>
+                            <span class="Other">(</span><span class="StringLit">&quot;ejs&quot;</span><span class="Other">,</span> <span class="Identifier">ejsSyntaxSource</span><span class="Other">)</span><span class="Other">,</span>
+                            <span class="Other">(</span><span class="StringLit">&quot;apache&quot;</span><span class="Other">,</span> <span class="Identifier">apacheSyntaxSource</span><span class="Other">)</span><span class="Other">]</span><span class="Other">)</span></pre></dt>
   <dd>
     
     
@@ -800,7 +802,7 @@
       <div class="twelve-columns footer">
         <span class="nim-sprite"></span>
         <br>
-        <small style="color: var(--hint);">Made with Nim. Generated: 2026-10-06 18:39:38 UTC</small>
+        <small style="color: var(--hint);">Made with Nim. Generated: 2026-10-21 15:45:28 UTC</small>
       </div>
     </div>
   </div>
