@@ -94,9 +94,11 @@ type
       ## The root of the AST, containing a sequence of top-level
       ## nodes (e.g., statements or declarations)
 
-const LeafNodes* = {nkEmpty..nkIdent, nkImaginary}
+const LeafNodes* = {nkEmpty..nkIdent, nkNil, nkImaginary}
   ## A set of node kinds that are considered leaf
-  ## nodes (i.e., they do not have children)
+  ## nodes (i.e., they do not have children).
+  ## nkNil (`null`/`undefined` literals) is a `discard` variant
+  ## with no `children` field, so it must be listed here.
 
 proc len*(node: Node): int =
   ## Return the number of children for a non-leaf node, or 0 for leaf nodes.
