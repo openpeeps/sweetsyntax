@@ -917,10 +917,15 @@ proc jsHandlers*(p: var GenericParser) =
           children: @[Node(kind: nkIdent, name: "..."), paramName]))
         break
 
-      # Destructured parameter: {a, b} or [a, b]
+      # Destructured parameter: {a, b} or [a, b], with optional default
       if p.curr.kind == tkPunct and p.curr.value in ["{", "["]:
         let pattern = parseExpression(p)
-        params.children.add(pattern)
+        if p.curr.kind == tkPunct and p.curr.value == "=":
+          walk p
+          params.children.add(Node(kind: nkIdentDefs,
+            children: @[pattern, newEmptyNode(), parseExpression(p)]))
+        else:
+          params.children.add(pattern)
         p.walkOpt(",")
         continue
 

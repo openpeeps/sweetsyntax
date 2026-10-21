@@ -520,13 +520,45 @@ proc parseObjectLiteral*(p: var GenericParser, minPrec: int = 0): Node =
       let params = Node(kind: nkIdentDefs).stampFrom(key)
       while not (p.curr.kind == tkPunct and p.curr.value == ")"):
         if p.curr.kind == tkEOF: error(p, "Unexpected EOF in method params")
-        params.children.add(Node(kind: nkIdent, name: p.curr.value).stamp(p.curr))
+        if p.curr.kind == tkPunct and p.curr.value == "...":
+          # Rest parameter: ...name
+          walk p
+          if p.curr.kind != tkIdentifier:
+            error(p, "Expected rest parameter name")
+          let restName = Node(kind: nkIdent, name: p.curr.value).stamp(p.curr)
+          walk p
+          params.children.add(Node(kind: nkPrefix,
+            children: @[Node(kind: nkIdent, name: "..."), restName]))
+          break
+        if p.curr.kind == tkPunct and p.curr.value in ["{", "["]:
+          # Destructured parameter, with optional default
+          let pattern = parseExpression(p)
+          if p.curr.kind == tkPunct and p.curr.value == "=":
+            walk p
+            params.children.add(Node(kind: nkIdentDefs,
+              children: @[pattern, ast.newEmptyNode(), parseExpression(p)]))
+          else:
+            params.children.add(pattern)
+          p.walkOpt(",")
+          continue
+        if p.curr.kind != tkIdentifier:
+          error(p, "Expected parameter name")
+        let paramName = Node(kind: nkIdent, name: p.curr.value).stamp(p.curr)
         walk p
+        if p.curr.kind == tkPunct and p.curr.value == "=":
+          walk p
+          params.children.add(Node(kind: nkIdentDefs,
+            children: @[paramName, ast.newEmptyNode(), parseExpression(p)]))
+        else:
+          params.children.add(paramName)
         p.walkOpt(",")
       p.expectWalk(")")
       let body = parseBlock(p)
+      # Method layout [params, body] (flags prepended when present).
+      # Note: no empty marker — that shape is shared with arrows and
+      # must stay distinguishable (see isMethodShorthand).
       var fnNode = Node(kind: nkFunction,
-        children: @[Node(kind: nkEmpty), params, body]).stampFrom(key)
+        children: @[params, body]).stampFrom(key)
       if isGenerator:
         fnNode = Node(kind: nkFunction,
           children: @[Node(kind: nkIdent, name: "*").stamp(keyTk), params, body]).stamp(keyTk)
@@ -538,6 +570,18 @@ proc parseObjectLiteral*(p: var GenericParser, minPrec: int = 0): Node =
                 else: key
       result.children.add(Node(kind: nkColonExpr,
         children: @[key, val]).stampFrom(key))
+    elif p.curr.kind == tkPunct and p.curr.value == "=":
+      # Destructuring default: { key = default } / { [k] = v }.
+      # Genuine object literals never hold a bare `=` here, so no valid
+      # program changes meaning. Kept as a 3-child nkColonExpr carrying
+      # an `=` marker (not a bare nkInfix: statement blocks also hold
+      # bare `=` assignments, so that shape would be ambiguous).
+      let eqTk = p.curr
+      walk p # consume '='
+      let default = parseExpression(p)
+      result.children.add(Node(kind: nkColonExpr,
+        children: @[key, default,
+                    Node(kind: nkIdent, name: "=").stamp(eqTk)]).stampFrom(key))
     else:
       # Ruby-style hash rockets: { key => value } (also `:` pairs)
       if p.curr.kind == tkPunct and p.curr.value == "=>":
