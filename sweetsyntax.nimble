@@ -1,6 +1,6 @@
 # Package
 
-version       = "0.2.2"
+version       = "0.2.1"
 author        = "George Lemon"
 description   = "A generic syntax highlighter, tokenizer, parser and AST explorer"
 license       = "MIT"
