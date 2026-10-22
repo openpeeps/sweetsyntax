@@ -50,6 +50,17 @@ suite "JavaScript parser":
     let n = parseJS("({a: 1, b: 2})")
     check n.kind notin {nkEmpty}
 
+  test "tagged template parses as nkTagCall":
+    let n = parseJS("a`x${y}z`;")
+    check n.kind == nkTagCall
+    check n.children.len == 2
+    check n.children[1].kind == nkLitString
+
+  test "comment before else keeps association":
+    let prog = parseJS("if (a) { b(); } /*c*/ else { d(); }")
+    check prog.kind == nkStatement
+    check prog.children.len == 4 # if, cond, then, else (no detached nodes)
+
 proc countNodes(n: Node): int =
   result = 1
   if n != nil:

@@ -683,11 +683,14 @@ proc parseExpression*(p: var GenericParser, minPrec: int = 0): Node =
         continue
 
     # Tagged template: `tag`...``` — a string token directly after an
-    # expression is only valid as a template tag call.
+    # expression is only valid as a template tag call. Emitted as nkTagCall
+    # (never a plain nkCall) so code generators keep the tag form instead
+    # of wrapping it in call parens, which would pass the cooked string
+    # rather than the (strings, values...) tag protocol.
     if p.curr.kind == tkString and featTemplateLit in p.features and
-       lhs.kind in {nkIdent, nkDotExpr, nkCall, nkBracketExpr, nkInfix}:
+       lhs.kind in {nkIdent, nkDotExpr, nkCall, nkTagCall, nkBracketExpr, nkInfix}:
       let strTk = p.curr
-      lhs = Node(kind: nkCall,
+      lhs = Node(kind: nkTagCall,
         children: @[lhs, Node(kind: nkLitString, valStr: strTk.value).stamp(strTk)]).stampFrom(lhs)
       walk p
       continue

@@ -32,6 +32,10 @@ type
     nkBracketExpr
     nkColonExpr
     nkCall
+    nkTagCall
+      ## Tagged template call: `[tagNode, templateNode]` (`` tag`text${x}` ``).
+      ## Kept distinct from nkCall so emitters never wrap it in call parens,
+      ## which would demote the tag protocol to a plain cooked-string call.
     nkCast
       ## C-style cast: `[typeNode, operand]` (`(int)x`, `(T*)p`).
     nkRegex

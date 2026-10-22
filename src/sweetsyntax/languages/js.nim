@@ -139,7 +139,16 @@ proc jsHandlers*(p: var GenericParser) =
     children.add(
       if p.curr.kind == tkPunct and p.curr.value == "{": parseBlock(p)
       else: parseStatement(p))
-    while p.curr.kind == tkIdentifier and p.curr.value in ["elif", "else"]:
+    # A comment between the body and `else`/`elif` must not break the
+    # association (it would otherwise parse as a bare `else` identifier
+    # followed by a detached block, silently changing control flow).
+    # Skipped comments are dropped, matching the statement-level idiom
+    # used elsewhere in this file; minify drops them regardless.
+    while true:
+      while p.curr.kind in {tkComment, tkDocComment}:
+        discard parseCommentGeneric(p)
+      if p.curr.kind != tkIdentifier or p.curr.value notin ["elif", "else"]:
+        break
       let isElif = p.curr.value == "elif"
       walk p
       if isElif:
@@ -150,8 +159,6 @@ proc jsHandlers*(p: var GenericParser) =
         if p.curr.kind == tkPunct and p.curr.value == "{": parseBlock(p)
         else: parseStatement(p))
       if not isElif: break
-      if p.curr.kind != tkIdentifier or p.curr.value notin ["elif", "else"]:
-        break
     result = Node(kind: nkStatement,
       children: @[Node(kind: nkIdent, name: "if")] & children)
 
@@ -172,6 +179,10 @@ proc jsHandlers*(p: var GenericParser) =
     walk p # consume 'do'
     let body = if p.curr.kind == tkPunct and p.curr.value == "{": parseBlock(p)
                else: parseStatement(p)
+    # Comments between the body and `while` must not break the loop
+    # (same association hazard as `else`, see "conditional" above).
+    while p.curr.kind in {tkComment, tkDocComment}:
+      discard parseCommentGeneric(p)
     if p.curr.kind != tkIdentifier or p.curr.value != "while":
       error(p, "Expected 'while' after do block")
     walk p # consume 'while'
@@ -309,6 +320,10 @@ proc jsHandlers*(p: var GenericParser) =
     result.children.add(Node(kind: nkIdent, name: "try"))
     result.children.add(parseBlock(p))
     while true:
+      # Comments between `try`/`catch`/`finally` clauses must not break
+      # the association (same hazard as `else`, see "conditional" above).
+      while p.curr.kind in {tkComment, tkDocComment}:
+        discard parseCommentGeneric(p)
       if p.curr.kind == tkIdentifier and p.curr.value == "catch":
         walk p
         var param = newEmptyNode()
@@ -359,6 +374,10 @@ proc jsHandlers*(p: var GenericParser) =
       # Anonymous class: `class {}` or `class extends Base {}`
       name = newEmptyNode()
     var parent: Node
+    # A comment between the name and `extends` must not silently drop the
+    # heritage (same association hazard as `else`, see "conditional" above).
+    while p.curr.kind in {tkComment, tkDocComment}:
+      discard parseCommentGeneric(p)
     if p.curr.kind == tkIdentifier and p.curr.value == "extends":
       walk p
       parent = parseExpression(p)
