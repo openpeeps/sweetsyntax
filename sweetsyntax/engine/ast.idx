@@ -16,6 +16,7 @@ nim	nkDotExpr	sweetsyntax/engine/ast.html#nkDotExpr	NodeKind.nkDotExpr		13
 nim	nkBracketExpr	sweetsyntax/engine/ast.html#nkBracketExpr	NodeKind.nkBracketExpr		13
 nim	nkColonExpr	sweetsyntax/engine/ast.html#nkColonExpr	NodeKind.nkColonExpr		13
 nim	nkCall	sweetsyntax/engine/ast.html#nkCall	NodeKind.nkCall		13
+nim	nkTagCall	sweetsyntax/engine/ast.html#nkTagCall	NodeKind.nkTagCall		13
 nim	nkCast	sweetsyntax/engine/ast.html#nkCast	NodeKind.nkCast		13
 nim	nkRegex	sweetsyntax/engine/ast.html#nkRegex	NodeKind.nkRegex		13
 nim	nkReturn	sweetsyntax/engine/ast.html#nkReturn	NodeKind.nkReturn		13
@@ -36,37 +37,37 @@ nim	nkObjConstr	sweetsyntax/engine/ast.html#nkObjConstr	NodeKind.nkObjConstr		13
 nim	nkTypeAssert	sweetsyntax/engine/ast.html#nkTypeAssert	NodeKind.nkTypeAssert		13
 nim	nkImaginary	sweetsyntax/engine/ast.html#nkImaginary	NodeKind.nkImaginary		13
 nim	NodeKind	sweetsyntax/engine/ast.html#NodeKind	enum NodeKind		13
-nim	Node	sweetsyntax/engine/ast.html#Node	type Node		74
-nim	OpenAstProgram	sweetsyntax/engine/ast.html#OpenAstProgram	type OpenAstProgram		91
-nim	LeafNodes	sweetsyntax/engine/ast.html#LeafNodes	const LeafNodes		98
-nim	len	sweetsyntax/engine/ast.html#len,Node	proc len(node: Node): int		104
-nim	`[]`	sweetsyntax/engine/ast.html#[],Node,	proc `[]`(node: Node; index: int | BackwardsIndex): Node		108
-nim	`[]`	sweetsyntax/engine/ast.html#[],Node,HSlice	proc `[]`(node: Node; slice: HSlice): seq[Node]		112
-nim	`[]=`	sweetsyntax/engine/ast.html#[]=,Node,,Node	proc `[]=`(node: Node; index: int | BackwardsIndex; child: Node)		116
-nim	items	sweetsyntax/engine/ast.html#items.i,Node	iterator items(node: Node): Node		120
-nim	pairs	sweetsyntax/engine/ast.html#pairs.i,Node	iterator pairs(node: Node): tuple[i: int, n: Node]		133
-nim	add	sweetsyntax/engine/ast.html#add,Node,Node	proc add(node, child: Node): Node		138
-nim	add	sweetsyntax/engine/ast.html#add,Node,openArray[Node]	proc add(node: Node; children: openArray[Node]): Node		144
-nim	newNode	sweetsyntax/engine/ast.html#newNode,string	proc newNode(val: string): Node		150
-nim	newBlockNode	sweetsyntax/engine/ast.html#newBlockNode.t	template newBlockNode(): untyped		154
-nim	newNode	sweetsyntax/engine/ast.html#newNode.t,NodeKind	template newNode(nodeKind: NodeKind): untyped		158
-nim	newInlineComment	sweetsyntax/engine/ast.html#newInlineComment,string	proc newInlineComment(val: string): Node		163
-nim	newDocComment	sweetsyntax/engine/ast.html#newDocComment,string	proc newDocComment(val: string): Node		167
-nim	newFunction	sweetsyntax/engine/ast.html#newFunction,string,seq[Node],Node	proc newFunction(name: string; params: seq[Node]; body: Node): Node		171
-nim	newFunction	sweetsyntax/engine/ast.html#newFunction,TokenTuple	proc newFunction(tk: TokenTuple): Node		175
-nim	newIdent	sweetsyntax/engine/ast.html#newIdent,string,int,int	proc newIdent(name: string; ln, col: int): Node		179
-nim	newIdent	sweetsyntax/engine/ast.html#newIdent,TokenTuple,string	proc newIdent(tk: TokenTuple; id: string): Node		183
-nim	newPostfix	sweetsyntax/engine/ast.html#newPostfix,Node,Node	proc newPostfix(op: Node; operand: Node): Node		187
-nim	newEmptyNode	sweetsyntax/engine/ast.html#newEmptyNode	proc newEmptyNode(): Node		191
-nim	stamp	sweetsyntax/engine/ast.html#stamp,Node,int,int	proc stamp(n: Node; line, col: int): Node		195
-nim	stamp	sweetsyntax/engine/ast.html#stamp,Node,TokenTuple	proc stamp(n: Node; tk: TokenTuple): Node		204
-nim	stampFrom	sweetsyntax/engine/ast.html#stampFrom,Node,Node	proc stampFrom(n, src: Node): Node		211
-nim	treeRepr	sweetsyntax/engine/ast.html#treeRepr,Node	proc treeRepr(n: Node): string		220
-nim	dumpTree	sweetsyntax/engine/ast.html#dumpTree,Node,int	proc dumpTree(n: Node; indent = 0): string		239
-nim	dumpTree	sweetsyntax/engine/ast.html#dumpTree,OpenAstProgram	proc dumpTree(program: OpenAstProgram): string		248
-nimgrp	stamp	sweetsyntax/engine/ast.html#stamp-procs-all	proc		195
-nimgrp	[]	sweetsyntax/engine/ast.html#[]-procs-all	proc		108
-nimgrp	dumptree	sweetsyntax/engine/ast.html#dumpTree-procs-all	proc		239
-nimgrp	newident	sweetsyntax/engine/ast.html#newIdent-procs-all	proc		179
-nimgrp	newfunction	sweetsyntax/engine/ast.html#newFunction-procs-all	proc		171
-nimgrp	add	sweetsyntax/engine/ast.html#add-procs-all	proc		138
+nim	Node	sweetsyntax/engine/ast.html#Node	type Node		78
+nim	OpenAstProgram	sweetsyntax/engine/ast.html#OpenAstProgram	type OpenAstProgram		95
+nim	LeafNodes	sweetsyntax/engine/ast.html#LeafNodes	const LeafNodes		102
+nim	len	sweetsyntax/engine/ast.html#len,Node	proc len(node: Node): int		108
+nim	`[]`	sweetsyntax/engine/ast.html#[],Node,	proc `[]`(node: Node; index: int | BackwardsIndex): Node		112
+nim	`[]`	sweetsyntax/engine/ast.html#[],Node,HSlice	proc `[]`(node: Node; slice: HSlice): seq[Node]		116
+nim	`[]=`	sweetsyntax/engine/ast.html#[]=,Node,,Node	proc `[]=`(node: Node; index: int | BackwardsIndex; child: Node)		120
+nim	items	sweetsyntax/engine/ast.html#items.i,Node	iterator items(node: Node): Node		124
+nim	pairs	sweetsyntax/engine/ast.html#pairs.i,Node	iterator pairs(node: Node): tuple[i: int, n: Node]		137
+nim	add	sweetsyntax/engine/ast.html#add,Node,Node	proc add(node, child: Node): Node		142
+nim	add	sweetsyntax/engine/ast.html#add,Node,openArray[Node]	proc add(node: Node; children: openArray[Node]): Node		148
+nim	newNode	sweetsyntax/engine/ast.html#newNode,string	proc newNode(val: string): Node		154
+nim	newBlockNode	sweetsyntax/engine/ast.html#newBlockNode.t	template newBlockNode(): untyped		158
+nim	newNode	sweetsyntax/engine/ast.html#newNode.t,NodeKind	template newNode(nodeKind: NodeKind): untyped		162
+nim	newInlineComment	sweetsyntax/engine/ast.html#newInlineComment,string	proc newInlineComment(val: string): Node		167
+nim	newDocComment	sweetsyntax/engine/ast.html#newDocComment,string	proc newDocComment(val: string): Node		171
+nim	newFunction	sweetsyntax/engine/ast.html#newFunction,string,seq[Node],Node	proc newFunction(name: string; params: seq[Node]; body: Node): Node		175
+nim	newFunction	sweetsyntax/engine/ast.html#newFunction,TokenTuple	proc newFunction(tk: TokenTuple): Node		179
+nim	newIdent	sweetsyntax/engine/ast.html#newIdent,string,int,int	proc newIdent(name: string; ln, col: int): Node		183
+nim	newIdent	sweetsyntax/engine/ast.html#newIdent,TokenTuple,string	proc newIdent(tk: TokenTuple; id: string): Node		187
+nim	newPostfix	sweetsyntax/engine/ast.html#newPostfix,Node,Node	proc newPostfix(op: Node; operand: Node): Node		191
+nim	newEmptyNode	sweetsyntax/engine/ast.html#newEmptyNode	proc newEmptyNode(): Node		195
+nim	stamp	sweetsyntax/engine/ast.html#stamp,Node,int,int	proc stamp(n: Node; line, col: int): Node		199
+nim	stamp	sweetsyntax/engine/ast.html#stamp,Node,TokenTuple	proc stamp(n: Node; tk: TokenTuple): Node		208
+nim	stampFrom	sweetsyntax/engine/ast.html#stampFrom,Node,Node	proc stampFrom(n, src: Node): Node		215
+nim	treeRepr	sweetsyntax/engine/ast.html#treeRepr,Node	proc treeRepr(n: Node): string		224
+nim	dumpTree	sweetsyntax/engine/ast.html#dumpTree,Node,int	proc dumpTree(n: Node; indent = 0): string		243
+nim	dumpTree	sweetsyntax/engine/ast.html#dumpTree,OpenAstProgram	proc dumpTree(program: OpenAstProgram): string		252
+nimgrp	stamp	sweetsyntax/engine/ast.html#stamp-procs-all	proc		199
+nimgrp	[]	sweetsyntax/engine/ast.html#[]-procs-all	proc		112
+nimgrp	dumptree	sweetsyntax/engine/ast.html#dumpTree-procs-all	proc		243
+nimgrp	newident	sweetsyntax/engine/ast.html#newIdent-procs-all	proc		183
+nimgrp	newfunction	sweetsyntax/engine/ast.html#newFunction-procs-all	proc		175
+nimgrp	add	sweetsyntax/engine/ast.html#add-procs-all	proc		142
