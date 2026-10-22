@@ -88,8 +88,9 @@ type
         ## For non-leaf nodes, we store their children in a sequence.
         ## The interpretation of these children depends on the node kind
 
-  OpenAstProgram* = ref object
-    ## The root of the AST, representing an entire program or module
+  OpenAstProgram* {.acyclic.} = ref object
+    ## The root of the AST, representing an entire program or module.
+    ## Acyclic like Node: programs own nodes, nodes never point back.
     nodes*: seq[Node]
       ## The root of the AST, containing a sequence of top-level
       ## nodes (e.g., statements or declarations)

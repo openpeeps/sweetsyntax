@@ -105,14 +105,25 @@ type
       # `expect_regex_after` keywords after which a `/` may start a regex
     lastTokKind*: SweetTokenKind
       # kind of the last significant token returned by `getToken`
-    lastTokValue*: string
-      # lexeme of the last significant token returned by `getToken`
+    lastTokStart*, lastTokStop*: int
+      # span of the last significant token's lexeme in the input (-1 when
+      # no significant token has been produced yet). The text itself is
+      # materialized lazily (regex heuristic, compat accessor) instead of
+      # copied on every token.
     openTag*: Option[string]
     closeTag*: Option[string]
     features*: set[LanguageFeature]
     allOps*: seq[string]
+    allOpsByFirst*: Table[char, seq[string]]
+      # `allOps` grouped by first character, built once per lexer init so
+      # the greedy operator/delimiter scanners probe a handful of
+      # candidates instead of the whole vocabulary per character.
     filters*: seq[SweetFilter]
     enableFilters: bool
+    enableAttrs*: bool
+      # when false, `makeRange` skips TextMate attr lookups (renderer-only
+      # metadata the parser never reads), saving a lexeme copy plus two
+      # table probes per identifier/punctuation token. Defaults to true.
     filtersReady: bool
     filterHits: seq[FilterHit]
     filterScanIdx: int
@@ -262,7 +273,17 @@ proc skipWhitespace(l: var SweetLexer) =
   # Skips over whitespace characters and line continuations, updating position accordingly
   while true:
     if l.current in {' ', '\t', '\r'}:
-      discard l.advance()
+      # Bulk-skip blank runs (indentation): one scan updates pos/col/current
+      # instead of an `advance` call per character. `\r` never starts a
+      # newline here (`\n` resets the line below), so no line bookkeeping.
+      var p = l.pos
+      while true:
+        let c = l.charAt(p)
+        if c == ' ' or c == '\t' or c == '\r': inc p
+        else: break
+      l.col += p - l.pos
+      l.pos = p
+      l.current = l.charAt(p)
     elif l.current == '\\' and l.peek() == '\n':
       l.skipLineContinuation()
     elif l.current == '\n':
@@ -294,7 +315,7 @@ type
     expectRegex*, tagTerminated*: bool
     filterScanIdx*, filterHitsLen*: int
     lastTokKind*: SweetTokenKind
-    lastTokValue*: string
+    lastTokStart*, lastTokStop*: int
 
 proc markLexer*(l: SweetLexer): LexerMark {.inline.} =
   ## Snapshot the current scan state. Only valid while no filter
@@ -302,7 +323,8 @@ proc markLexer*(l: SweetLexer): LexerMark {.inline.} =
   LexerMark(pos: l.pos, line: l.line, col: l.col, current: l.current,
     expectRegex: l.expectRegex, tagTerminated: l.tagTerminated,
     filterScanIdx: l.filterScanIdx, filterHitsLen: l.filterHits.len,
-    lastTokKind: l.lastTokKind, lastTokValue: l.lastTokValue)
+    lastTokKind: l.lastTokKind,
+    lastTokStart: l.lastTokStart, lastTokStop: l.lastTokStop)
 
 proc restoreLexer*(l: var SweetLexer, m: LexerMark) {.inline.} =
   ## Rewind the lexer to a snapshot from `markLexer`, discarding any
@@ -317,7 +339,8 @@ proc restoreLexer*(l: var SweetLexer, m: LexerMark) {.inline.} =
   l.filterScanIdx = m.filterScanIdx
   l.filterHits.setLen(m.filterHitsLen)
   l.lastTokKind = m.lastTokKind
-  l.lastTokValue = m.lastTokValue
+  l.lastTokStart = m.lastTokStart
+  l.lastTokStop = m.lastTokStop
 
 proc getFullInput*(l: SweetLexer): string =
   ## Returns full source text as string (needed for regex filters).
@@ -453,13 +476,15 @@ proc makeRange(l: SweetLexer, k: SweetTokenKind, startPos, startLine, startCol: 
   )
 
   let stopPos = l.pos
-  var lexeme =
-    if stopPos <= startPos:
-      ""
-    else:
-      l.getLexeme(startPos, stopPos)
+  # The lexeme is only materialized when a branch below needs it
+  # (comment marker stripping, renderer attr lookups). Number, string,
+  # regex and plain punctuation tokens used to pay for a copy that was
+  # immediately discarded.
   # For comments, store the comment content without the syntax markers
   if k == tkComment:
+    let lexeme =
+      if stopPos <= startPos: ""
+      else: l.getLexeme(startPos, stopPos)
     # Strip block comment markers (e.g., "/*" and "*/")
     if l.blockComment[0].len > 0 and lexeme.startsWith(l.blockComment[0]):
       result.start = startPos + l.blockComment[0].len
@@ -486,6 +511,9 @@ proc makeRange(l: SweetLexer, k: SweetTokenKind, startPos, startLine, startCol: 
       result.start = startPos
       result.stop = stopPos
   elif k == tkDocComment:
+    let lexeme =
+      if stopPos <= startPos: ""
+      else: l.getLexeme(startPos, stopPos)
     # Strip block comment syntax (e.g., "/**" and "*/")
     let startSyntax = l.blockComment[0]
     let endSyntax = l.blockComment[1]
@@ -502,13 +530,19 @@ proc makeRange(l: SweetLexer, k: SweetTokenKind, startPos, startLine, startCol: 
       result.start = startPos
       result.stop = stopPos
   elif k == tkIdentifier:
-    let identAttr = lookupAttrByLexeme(l, lexeme, true)
-    if identAttr.len > 0:
-      result.attr.addAttrOnce(identAttr)
+    # Renderer-only keyword attrs; parsing never reads them, so parsers
+    # can disable them via `enableAttrs = false` (see `initLexer`).
+    if l.enableAttrs:
+      let lexeme = l.getLexeme(startPos, stopPos)
+      let identAttr = lookupAttrByLexeme(l, lexeme, true)
+      if identAttr.len > 0:
+        result.attr.addAttrOnce(identAttr)
   elif k == tkPunct:
-    let symAttr = lookupAttrByLexeme(l, lexeme, false)
-    if symAttr.len > 0:
-      result.attr.addAttrOnce(symAttr)
+    if l.enableAttrs:
+      let lexeme = l.getLexeme(startPos, stopPos)
+      let symAttr = lookupAttrByLexeme(l, lexeme, false)
+      if symAttr.len > 0:
+        result.attr.addAttrOnce(symAttr)
   # elif k == tkRegex:
     # echo "Matched regex: '", lexeme, "' at line ", startLine, " col ", startCol
 
@@ -804,6 +838,13 @@ proc scanPercentLiteral(l: var SweetLexer, startPos, startLine, startCol: int): 
   result = l.makeRange(tkString, startPos, startLine, startCol) # unterminated
   result.attr.addAttrOnce("percent_literal")
 
+proc lastTokValue*(l: SweetLexer): string {.inline.} =
+  ## Lexeme of the last significant token ("" at start of input).
+  ## Computed on demand from the stored span; the per-token copy that
+  ## used to live here now only materializes for `/`-disambiguation.
+  if l.lastTokStart < 0: ""
+  else: l.getLexeme(l.lastTokStart, l.lastTokStop)
+
 proc regexAllowed(l: var SweetLexer): bool =
   ## Whether a `/` at the current position may open a regex literal,
   ## inferred from the previous significant token using the spec's
@@ -811,11 +852,12 @@ proc regexAllowed(l: var SweetLexer): bool =
   ## decides with the same lists, so lexer-only consumers (e.g.
   ## `highlight`) agree with the parser.
   ## At the very start of input a `/` can only be a regex.
-  if l.lastTokValue.len == 0:
+  if l.lastTokStart < 0:
     return true
-  if l.lastTokValue in l.expectRegexTokens:
+  let lastVal = l.lastTokValue()
+  if lastVal in l.expectRegexTokens:
     return true
-  if l.lastTokKind == tkIdentifier and l.lastTokValue in l.expectRegexKeywords:
+  if l.lastTokKind == tkIdentifier and lastVal in l.expectRegexKeywords:
     return true
   false
 
@@ -1264,13 +1306,14 @@ proc lexToken(l: var SweetLexer): Token =
     # Some languages define multi-char delimiters in their symbols table
     # (e.g. PHP's "::" scope resolution). Greedily match the longest known op.
     var bestOp = ""
-    for op in l.allOps:
-      if op.len > 1 and op[0] == l.current and op.len > bestOp.len:
-        var matches = true
-        for i in 0 ..< op.len:
-          if l.charAt(l.pos + i) != op[i]: matches = false; break
-        if matches:
-          bestOp = op
+    if l.allOpsByFirst.hasKey(l.current):
+      for op in l.allOpsByFirst[l.current]:
+        if op.len > 1 and op.len > bestOp.len:
+          var matches = true
+          for i in 0 ..< op.len:
+            if l.charAt(l.pos + i) != op[i]: matches = false; break
+          if matches:
+            bestOp = op
     if bestOp.len > 0:
       for i in 0 ..< bestOp.len:
         discard l.advance()
@@ -1324,17 +1367,23 @@ proc lexToken(l: var SweetLexer): Token =
 
     # Normal operator scanning (handles /=, /, >=, etc.)
     var opAccum = newStringOfCap(8)
+    # Only vocabulary entries sharing the first char can extend the match.
+    var opGroup: seq[string] = @[]
+    if l.allOpsByFirst.hasKey(l.current):
+      opGroup = l.allOpsByFirst[l.current]
     while isOperatorPunct(l.current):
       let nextCh = l.current
       # First character is always consumed; subsequent chars checked against known operators
       if opAccum.len > 0:
-        let candidate = opAccum & nextCh
         var found = false
-        for tok in l.allOps:
-          if tok.startsWith(candidate):
+        for tok in opGroup:
+          # Same test as `tok.startsWith(opAccum & nextCh)`, but the
+          # trailing char is compared first and no candidate string is built.
+          if tok.len > opAccum.len and tok[opAccum.len] == nextCh and
+             tok.startsWith(opAccum):
             found = true
             break
-        if not found and candidate != "=>":
+        if not found and not (opAccum == "=" and nextCh == '>'):
           break
       opAccum.add(nextCh)
       discard l.advance()
@@ -1347,7 +1396,8 @@ proc getToken*(l: var SweetLexer): Token =
   result = l.lexToken()
   if result.kind notin {tkEOF, tkComment, tkDocComment}:
     l.lastTokKind = result.kind
-    l.lastTokValue = l.getLexeme(result.start, result.stop)
+    l.lastTokStart = result.start
+    l.lastTokStop = result.stop
 
 proc buildAllOps(l: var SweetLexer, spec: SweetSpec) =
   ## Collect the operator/delimiter lexemes the scanners may greedily match.
@@ -1371,6 +1421,20 @@ proc buildAllOps(l: var SweetLexer, spec: SweetSpec) =
   if spec.operators.ternary != nil:
     l.allOps.add(spec.operators.ternary.token)
 
+proc buildOpsIndex(l: var SweetLexer) =
+  ## Group `allOps` by first character so the greedy operator and
+  ## delimiter scanners only probe candidates that can actually extend
+  ## the current match. Runs once per lexer init; equivalent to scanning
+  ## the whole vocabulary since every candidate starts with the same char.
+  l.allOpsByFirst = initTable[char, seq[string]]()
+  for op in l.allOps:
+    if op.len == 0: continue
+    if l.allOpsByFirst.hasKey(op[0]):
+      if op notin l.allOpsByFirst[op[0]]:
+        l.allOpsByFirst[op[0]].add(op)
+    else:
+      l.allOpsByFirst[op[0]] = @[op]
+
 proc buildRegexHints(l: var SweetLexer, spec: SweetSpec) =
   ## Seed the parser-free `/regex/` heuristic from the spec's
   ## `expect_regex_after` list. `GenericParser` decides the same thing from
@@ -1391,7 +1455,8 @@ proc buildKeywordScopes(l: var SweetLexer, spec: SweetSpec) =
     for lexeme in lexemes:
       l.keywordScopes[lexeme] = scope
 
-proc initLexerFromFile*(spec: SweetSpec, path: string, enableFilters: bool = false): SweetLexer =
+proc initLexerFromFile*(spec: SweetSpec, path: string, enableFilters: bool = false,
+    enableAttrs: bool = true): SweetLexer =
   ## Initialize lexer from a file using memfiles for efficient access.
   ## This overload accepts a SweetSpec and extracts lexer data from it.
   result = SweetLexer(
@@ -1423,6 +1488,9 @@ proc initLexerFromFile*(spec: SweetSpec, path: string, enableFilters: bool = fal
     closeTag: spec.close_tag,
     filters: spec.filters,
     enableFilters: enableFilters,
+    enableAttrs: enableAttrs,
+    lastTokStart: -1,
+    lastTokStop: -1,
     usingMemFile: true,
     filtersReady: false,
     filterHits: @[],
@@ -1442,8 +1510,10 @@ proc initLexerFromFile*(spec: SweetSpec, path: string, enableFilters: bool = fal
   result.data = cast[ptr UncheckedArray[char]](result.mf.mem)
   result.len = result.mf.size
   result.current = result.charAt(0)
+  result.buildOpsIndex()
 
-proc initLexerFromFile*(pre: SweetLexerInit, path: string, enableFilters: bool = false): SweetLexer =
+proc initLexerFromFile*(pre: SweetLexerInit, path: string, enableFilters: bool = false,
+    enableAttrs: bool = true): SweetLexer =
   ## Initialize lexer from a file using memfiles for efficient access.
   result = SweetLexer(
     input: path,
@@ -1476,6 +1546,9 @@ proc initLexerFromFile*(pre: SweetLexerInit, path: string, enableFilters: bool =
     features: pre.features,
     allOps: pre.allOps,
     enableFilters: enableFilters,
+    enableAttrs: enableAttrs,
+    lastTokStart: -1,
+    lastTokStop: -1,
     usingMemFile: true,
     filtersReady: false,
     filterHits: @[],
@@ -1484,8 +1557,10 @@ proc initLexerFromFile*(pre: SweetLexerInit, path: string, enableFilters: bool =
   result.data = cast[ptr UncheckedArray[char]](result.mf.mem)
   result.len = result.mf.size
   result.current = result.charAt(0)
+  result.buildOpsIndex()
 
-proc initLexer*(spec: SweetSpec, input: sink string, enableFilters: bool = false): SweetLexer =
+proc initLexer*(spec: SweetSpec, input: sink string, enableFilters: bool = false,
+    enableAttrs: bool = true): SweetLexer =
   ## Initialize lexer from raw source text (SweetSpec-based, backward compat).
   result = SweetLexer(
     input: input,
@@ -1516,6 +1591,9 @@ proc initLexer*(spec: SweetSpec, input: sink string, enableFilters: bool = false
     closeTag: spec.close_tag,
     filters: spec.filters,
     enableFilters: enableFilters,
+    enableAttrs: enableAttrs,
+    lastTokStart: -1,
+    lastTokStop: -1,
     filtersReady: false,
     filterHits: @[],
     filterScanIdx: 0
@@ -1533,8 +1611,10 @@ proc initLexer*(spec: SweetSpec, input: sink string, enableFilters: bool = false
   result.buildKeywordScopes(spec)
   if result.len > 0:
     result.current = result.charAt(0)
+  result.buildOpsIndex()
 
-proc initLexer*(pre: SweetLexerInit, input: sink string, enableFilters: bool = false): SweetLexer =
+proc initLexer*(pre: SweetLexerInit, input: sink string, enableFilters: bool = false,
+    enableAttrs: bool = true): SweetLexer =
   ## Initialize lexer from raw source text, this is efficient for small inputs
   result = SweetLexer(
     input: input,
@@ -1567,19 +1647,24 @@ proc initLexer*(pre: SweetLexerInit, input: sink string, enableFilters: bool = f
     features: pre.features,
     allOps: pre.allOps,
     enableFilters: enableFilters,
+    enableAttrs: enableAttrs,
+    lastTokStart: -1,
+    lastTokStop: -1,
     filtersReady: false,
     filterHits: @[],
     filterScanIdx: 0
   )
   if result.len > 0:
     result.current = result.charAt(0)
+  result.buildOpsIndex()
 
-proc initLexerFromMemFile*(spec: SweetSpec, mf: MemFile, path: string = "", enableFilters: bool = false): SweetLexer =
+proc initLexerFromMemFile*(spec: SweetSpec, mf: MemFile, path: string = "",
+    enableFilters: bool = false, enableAttrs: bool = true): SweetLexer =
   ## Initialize lexer from an already-opened MemFile (e.g. from Flysystem's
   ## `readStream`). Zero-copy: the returned lexer borrows `mf.mem`.
   if mf.size == 0 or mf.mem.isNil:
     var empty = ""
-    result = initLexer(spec, empty, enableFilters)
+    result = initLexer(spec, empty, enableFilters, enableAttrs)
     return
   result = SweetLexer(
     input: path,
@@ -1608,6 +1693,9 @@ proc initLexerFromMemFile*(spec: SweetSpec, mf: MemFile, path: string = "", enab
     closeTag: spec.close_tag,
     filters: spec.filters,
     enableFilters: enableFilters,
+    enableAttrs: enableAttrs,
+    lastTokStart: -1,
+    lastTokStop: -1,
     usingMemFile: true,
     filtersReady: false,
     filterHits: @[],
@@ -1625,6 +1713,7 @@ proc initLexerFromMemFile*(spec: SweetSpec, mf: MemFile, path: string = "", enab
   result.buildRegexHints(spec)
   result.buildKeywordScopes(spec)
   result.current = result.charAt(0)
+  result.buildOpsIndex()
 
 proc resetLexer*(l: SweetLexer) =
   ## Rewind the lexer to offset 0 so its token stream can be consumed again.
@@ -1638,7 +1727,8 @@ proc resetLexer*(l: SweetLexer) =
   l.expectRegex = false
   l.tagTerminated = false
   l.lastTokKind = tkEOF
-  l.lastTokValue = ""
+  l.lastTokStart = -1
+  l.lastTokStop = -1
   l.current = if l.len > 0: l.charAt(0) else: '\0'
 
 proc closeLexer*(l: var SweetLexer) =

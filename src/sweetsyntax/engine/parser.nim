@@ -615,6 +615,16 @@ proc parseCommaExpr*(p: var GenericParser): Node =
       commaExpr.children.add(parseExpression(p))
     result = commaExpr
 
+proc isExprStopOp(op, blockClose: string): bool {.inline.} =
+  ## `parseExpression` loop terminators: single-char closers/separators
+  ## plus the (possibly multi-char) block closer. Replaces a per-iteration
+  ## 7-element array literal (allocation + up to 7 string compares).
+  (op.len == 1 and op[0] in {')', ']', '}', ';', ',', ':'}) or op == blockClose
+
+proc isIndentStopOp(op: string): bool {.inline.} =
+  ## Indent-block loop terminators in `parseBlock`.
+  op.len == 1 and op[0] in {')', ']', '}', ';'}
+
 proc parseExpression*(p: var GenericParser, minPrec: int = 0): Node =
   # Prepend leading comments to the expression result
   var leadingComments: seq[Node]
@@ -625,7 +635,7 @@ proc parseExpression*(p: var GenericParser, minPrec: int = 0): Node =
   var lhs = parsePrefix(p, minPrec)
 
   # After-prefix expression handler hook (language-specific, e.g. Nim export marker, command call)
-  if p.expressionHandlers.hasKey("afterPrefix"):
+  if p.expressionHandlers.len > 0 and p.expressionHandlers.hasKey("afterPrefix"):
     let handled = p.expressionHandlers["afterPrefix"](p, lhs, minPrec)
     if handled != nil:
       return handled
@@ -687,7 +697,7 @@ proc parseExpression*(p: var GenericParser, minPrec: int = 0): Node =
       let op = p.curr.value
 
       # Stop tokens
-      if op in [")", "]", "}", ";", ",", ":", p.blockClose]:
+      if isExprStopOp(op, p.blockClose):
         break
       
       # Arrow function: (params) => body  or  param => body
@@ -729,10 +739,23 @@ proc parseExpression*(p: var GenericParser, minPrec: int = 0): Node =
         walk p
         continue
 
+      # One table probe serves the ternary/dot/bracket/call/generic
+      # dispatch below; the old code re-probed (hasKey + []) in every arm,
+      # up to ~8 hashes for an ordinary binary operator.
+      var infixSpecial = ""
+      var infixPrec = -1
+      var infixRightAssoc = false
+      var haveInfix = false
+      if p.infixTable.hasKey(op):
+        let e = p.infixTable[op]
+        infixSpecial = e.special
+        infixPrec = e.precedence
+        infixRightAssoc = e.assoc == rightAssoc
+        haveInfix = true
+
       # Ternary
-      if p.infixTable.hasKey(op) and p.infixTable[op].special == "ternary":
-        let prec = p.infixTable[op].precedence
-        if prec < minPrec: break
+      if haveInfix and infixSpecial == "ternary":
+        if infixPrec < minPrec: break
         let qTk = p.curr
         walk p # consume '?'
         # `: value` here is the ternary separator, not a bare-call symbol arg
@@ -745,7 +768,7 @@ proc parseExpression*(p: var GenericParser, minPrec: int = 0): Node =
           else:
             parseExpression(p, 0)
         p.expectWalk(":")
-        let elseExpr = parseExpression(p, prec) # right-assoc
+        let elseExpr = parseExpression(p, infixPrec) # right-assoc
         p.noSymbolArgCall = savedNoSymbol
         lhs = Node(kind: nkCall, children: @[
           Node(kind: nkIdent, name: "ternary").stamp(qTk), lhs, thenExpr, elseExpr]).stampFrom(lhs)
@@ -762,9 +785,8 @@ proc parseExpression*(p: var GenericParser, minPrec: int = 0): Node =
         continue
 
       # Special infix: dot access
-      if p.infixTable.hasKey(op) and p.infixTable[op].special == "dot":
-        let entry = p.infixTable[op]
-        if entry.precedence < minPrec: break
+      if haveInfix and infixSpecial == "dot":
+        if infixPrec < minPrec: break
         let opTk = p.curr
         walk p
         if p.curr.kind == tkPunct and p.curr.value == "{":
@@ -775,6 +797,7 @@ proc parseExpression*(p: var GenericParser, minPrec: int = 0): Node =
           lhs = Node(kind: nkBracketExpr, children: @[lhs, propExpr]).stampFrom(lhs)
           continue
         if p.curr.kind == tkPunct and p.curr.value == "(" and
+           p.expressionHandlers.len > 0 and
            p.expressionHandlers.hasKey("dotParen"):
           # Opt-in: `x.(...)` type assertion or similar (Go). A nil
           # return declines back to plain member access below.
@@ -787,10 +810,9 @@ proc parseExpression*(p: var GenericParser, minPrec: int = 0): Node =
         continue
 
       # Special infix: bracket access
-      if p.infixTable.hasKey(op) and p.infixTable[op].special == "bracket":
-        let entry = p.infixTable[op]
-        if entry.precedence < minPrec: break
-        if p.expressionHandlers.hasKey("bracket"):
+      if haveInfix and infixSpecial == "bracket":
+        if infixPrec < minPrec: break
+        if p.expressionHandlers.len > 0 and p.expressionHandlers.hasKey("bracket"):
           # Opt-in: language-specific index/slice/instantiation (Go).
           # A nil return declines back to the generic logic below.
           let handled = p.expressionHandlers["bracket"](p, lhs, minPrec)
@@ -831,9 +853,8 @@ proc parseExpression*(p: var GenericParser, minPrec: int = 0): Node =
         continue
 
       # Special infix: function call
-      if p.infixTable.hasKey(op) and p.infixTable[op].special == "call":
-        let entry = p.infixTable[op]
-        if entry.precedence < minPrec: break
+      if haveInfix and infixSpecial == "call":
+        if infixPrec < minPrec: break
         if p.inTypeContext: break # calls are never types; the `(` belongs
           # to an outer conversion or grouping, handled after the type
         let openTk = p.curr
@@ -883,13 +904,12 @@ proc parseExpression*(p: var GenericParser, minPrec: int = 0): Node =
         continue
 
       # Regular binary infix
-      if p.infixTable.hasKey(op):
-        let entry = p.infixTable[op]
-        if entry.precedence < minPrec: break
+      if haveInfix:
+        if infixPrec < minPrec: break
         let opTk = p.curr
         walk p
-        let nextMin = if entry.assoc == rightAssoc: entry.precedence
-                      else: entry.precedence + 1
+        let nextMin = if infixRightAssoc: infixPrec
+                      else: infixPrec + 1
         let rhs = parseExpression(p, nextMin)
         lhs = Node(kind: nkInfix,
           children: @[Node(kind: nkIdent, name: op).stamp(opTk), lhs, rhs]).stampFrom(lhs)
@@ -920,7 +940,7 @@ proc parseExpression*(p: var GenericParser, minPrec: int = 0): Node =
   # Language-specific continuation hook (e.g. Ruby bare calls, blocks, modifiers).
   # Called after the infix/postfix loop breaks; the handler consumes its own
   # continuation, so no re-entry into the loop is required.
-  if p.expressionHandlers.hasKey("infix"):
+  if p.expressionHandlers.len > 0 and p.expressionHandlers.hasKey("infix"):
     let handled = p.expressionHandlers["infix"](p, result, minPrec)
     if handled != nil:
       result = handled
@@ -939,7 +959,7 @@ proc parsePrefix(p: var GenericParser, minPrec: int = 0): Node =
   
   # Check registered prefix handlers first (language-specific overrides)
   let key = p.curr.value
-  if p.prefixHandlers.hasKey(key):
+  if p.prefixHandlers.len > 0 and p.prefixHandlers.hasKey(key):
     let entryTk = p.curr
     result = p.prefixHandlers[key](p, minPrec)
     return result.stampMissing(entryTk)
@@ -998,7 +1018,7 @@ proc parseBlock*(p: var GenericParser, indentPos: int = -1): Node =
       if p.curr.kind in {tkComment, tkDocComment}:
         result.children.add(parseCommentGeneric(p))
         continue
-      if p.curr.kind == tkPunct and p.curr.value in [")", "]", "}", ";"]:
+      if p.curr.kind == tkPunct and isIndentStopOp(p.curr.value):
         break
       result.children.add(parseStatement(p, indentPos))
   else:

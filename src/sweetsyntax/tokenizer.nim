@@ -25,14 +25,17 @@ proc getToken*[T](p: var T): TokenTuple {.inline.} =
   let token = p.lexer.getToken()
   let val = p.lexer.getTokenValue(token)
 
-  # Single lookup: symbols for punctuation, identifiers for keywords
-  if token.kind == tkPunct:
-    let ident = p.lexer.symbols.getOrDefault(val)
-    if ident.len > 0:
-      return (token.kind, ident, val, token.line, token.col, token.pos)
-  else:
-    let ident = p.lexer.identifiers.getOrDefault(val)
-    if ident.len > 0:
-      return (token.kind, ident, val, token.line, token.col, token.pos)
+  # Single lookup: symbols for punctuation, identifiers for keywords.
+  # Renderer-only metadata (nothing in the parser reads `ident`), so
+  # parsers disable it via `enableAttrs = false` (see `initLexer`).
+  if p.lexer.enableAttrs:
+    if token.kind == tkPunct:
+      let ident = p.lexer.symbols.getOrDefault(val)
+      if ident.len > 0:
+        return (token.kind, ident, val, token.line, token.col, token.pos)
+    else:
+      let ident = p.lexer.identifiers.getOrDefault(val)
+      if ident.len > 0:
+        return (token.kind, ident, val, token.line, token.col, token.pos)
 
   return (token.kind, "", val, token.line, token.col, token.pos)
