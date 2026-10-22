@@ -67,7 +67,7 @@
   expectRegex*, tagTerminated*: bool
   filterScanIdx*, filterHitsLen*: int
   lastTokKind*: SweetTokenKind
-  lastTokValue*: string">LexerMark</a></li>
+  lastTokStart*, lastTokStop*: int">LexerMark</a></li>
 <li><a class="reference" href="#SweetLexer" title="SweetLexer = ref object
   len*: int
   line*, col*, pos*: int
@@ -93,12 +93,14 @@
   expectRegexTokens*: HashSet[string]
   expectRegexKeywords*: HashSet[string]
   lastTokKind*: SweetTokenKind
-  lastTokValue*: string
+  lastTokStart*, lastTokStop*: int
   openTag*: Option[string]
   closeTag*: Option[string]
   features*: set[LanguageFeature]
   allOps*: seq[string]
+  allOpsByFirst*: Table[char, seq[string]]
   filters*: seq[SweetFilter]
+  enableAttrs*: bool
   expectRegex*: bool
   tagTerminated*: bool
   symbolsRev*, identifiersRev*: Table[string, string] ## lazily-built reverse tables (attr -&gt; lexeme) for reversed YAML styles
@@ -156,19 +158,31 @@
 
 </ul>
 <ul class="simple nested-toc-section">initLexer
-  <li><a class="reference" href="#initLexer%2CSweetLexerInit%2Csinkstring%2Cbool" title="initLexer(pre: SweetLexerInit; input: sink string; enableFilters: bool = false): SweetLexer">initLexer(pre: SweetLexerInit; input: sink string; enableFilters: bool = false): SweetLexer</a></li>
-<li><a class="reference" href="#initLexer%2CSweetSpec%2Csinkstring%2Cbool" title="initLexer(spec: SweetSpec; input: sink string; enableFilters: bool = false): SweetLexer">initLexer(spec: SweetSpec; input: sink string; enableFilters: bool = false): SweetLexer</a></li>
+  <li><a class="reference" href="#initLexer%2CSweetLexerInit%2Csinkstring%2Cbool%2Cbool" title="initLexer(pre: SweetLexerInit; input: sink string; enableFilters: bool = false;
+          enableAttrs: bool = true): SweetLexer">initLexer(pre: SweetLexerInit; input: sink string; enableFilters: bool = false;
+          enableAttrs: bool = true): SweetLexer</a></li>
+<li><a class="reference" href="#initLexer%2CSweetSpec%2Csinkstring%2Cbool%2Cbool" title="initLexer(spec: SweetSpec; input: sink string; enableFilters: bool = false;
+          enableAttrs: bool = true): SweetLexer">initLexer(spec: SweetSpec; input: sink string; enableFilters: bool = false;
+          enableAttrs: bool = true): SweetLexer</a></li>
 
 </ul>
 <ul class="simple nested-toc-section">initLexerFromFile
-  <li><a class="reference" href="#initLexerFromFile%2CSweetLexerInit%2Cstring%2Cbool" title="initLexerFromFile(pre: SweetLexerInit; path: string; enableFilters: bool = false): SweetLexer">initLexerFromFile(pre: SweetLexerInit; path: string; enableFilters: bool = false): SweetLexer</a></li>
-<li><a class="reference" href="#initLexerFromFile%2CSweetSpec%2Cstring%2Cbool" title="initLexerFromFile(spec: SweetSpec; path: string; enableFilters: bool = false): SweetLexer">initLexerFromFile(spec: SweetSpec; path: string; enableFilters: bool = false): SweetLexer</a></li>
+  <li><a class="reference" href="#initLexerFromFile%2CSweetLexerInit%2Cstring%2Cbool%2Cbool" title="initLexerFromFile(pre: SweetLexerInit; path: string;
+                  enableFilters: bool = false; enableAttrs: bool = true): SweetLexer">initLexerFromFile(pre: SweetLexerInit; path: string;
+                  enableFilters: bool = false; enableAttrs: bool = true): SweetLexer</a></li>
+<li><a class="reference" href="#initLexerFromFile%2CSweetSpec%2Cstring%2Cbool%2Cbool" title="initLexerFromFile(spec: SweetSpec; path: string; enableFilters: bool = false;
+                  enableAttrs: bool = true): SweetLexer">initLexerFromFile(spec: SweetSpec; path: string; enableFilters: bool = false;
+                  enableAttrs: bool = true): SweetLexer</a></li>
 
 </ul>
 <ul class="simple nested-toc-section">initLexerFromMemFile
-  <li><a class="reference" href="#initLexerFromMemFile%2CSweetSpec%2CMemFile%2Cstring%2Cbool" title="initLexerFromMemFile(spec: SweetSpec; mf: MemFile; path: string = &quot;&quot;;
-                     enableFilters: bool = false): SweetLexer">initLexerFromMemFile(spec: SweetSpec; mf: MemFile; path: string = &quot;&quot;;
-                     enableFilters: bool = false): SweetLexer</a></li>
+  <li><a class="reference" href="#initLexerFromMemFile%2CSweetSpec%2CMemFile%2Cstring%2Cbool%2Cbool" title="initLexerFromMemFile(spec: SweetSpec; mf: MemFile; path: string = &quot;&quot;;
+                     enableFilters: bool = false; enableAttrs: bool = true): SweetLexer">initLexerFromMemFile(spec: SweetSpec; mf: MemFile; path: string = &quot;&quot;;
+                     enableFilters: bool = false; enableAttrs: bool = true): SweetLexer</a></li>
+
+</ul>
+<ul class="simple nested-toc-section">lastTokValue
+  <li><a class="reference" href="#lastTokValue%2CSweetLexer" title="lastTokValue(l: SweetLexer): string">lastTokValue(l: SweetLexer): string</a></li>
 
 </ul>
 <ul class="simple nested-toc-section">markLexer
@@ -212,7 +226,7 @@
   <span class="Identifier">expectRegex</span><span class="Operator">*</span><span class="Other">,</span> <span class="Identifier">tagTerminated</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">bool</span>
   <span class="Identifier">filterScanIdx</span><span class="Operator">*</span><span class="Other">,</span> <span class="Identifier">filterHitsLen</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">int</span>
   <span class="Identifier">lastTokKind</span><span class="Operator">*</span><span class="Other">:</span> <a href="#SweetTokenKind"><span class="Identifier">SweetTokenKind</span></a>
-  <span class="Identifier">lastTokValue</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">string</span></pre></dt>
+  <span class="Identifier">lastTokStart</span><span class="Operator">*</span><span class="Other">,</span> <span class="Identifier">lastTokStop</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">int</span></pre></dt>
   <dd>
     
     Opaque snapshot of the lexer's mutable scan state, for read-only lookahead (e.g. the C cast-vs-group paren scan).
@@ -245,12 +259,14 @@
   <span class="Identifier">expectRegexTokens</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">HashSet</span><span class="Other">[</span><span class="Identifier">string</span><span class="Other">]</span>
   <span class="Identifier">expectRegexKeywords</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">HashSet</span><span class="Other">[</span><span class="Identifier">string</span><span class="Other">]</span>
   <span class="Identifier">lastTokKind</span><span class="Operator">*</span><span class="Other">:</span> <a href="#SweetTokenKind"><span class="Identifier">SweetTokenKind</span></a>
-  <span class="Identifier">lastTokValue</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">string</span>
+  <span class="Identifier">lastTokStart</span><span class="Operator">*</span><span class="Other">,</span> <span class="Identifier">lastTokStop</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">int</span>
   <span class="Identifier">openTag</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">Option</span><span class="Other">[</span><span class="Identifier">string</span><span class="Other">]</span>
   <span class="Identifier">closeTag</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">Option</span><span class="Other">[</span><span class="Identifier">string</span><span class="Other">]</span>
   <span class="Identifier">features</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">set</span><span class="Other">[</span><a href="config.html#LanguageFeature"><span class="Identifier">LanguageFeature</span></a><span class="Other">]</span>
   <span class="Identifier">allOps</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">seq</span><span class="Other">[</span><span class="Identifier">string</span><span class="Other">]</span>
+  <span class="Identifier">allOpsByFirst</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">Table</span><span class="Other">[</span><span class="Identifier">char</span><span class="Other">,</span> <span class="Identifier">seq</span><span class="Other">[</span><span class="Identifier">string</span><span class="Other">]</span><span class="Other">]</span>
   <span class="Identifier">filters</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">seq</span><span class="Other">[</span><a href="config.html#SweetFilter"><span class="Identifier">SweetFilter</span></a><span class="Other">]</span>
+  <span class="Identifier">enableAttrs</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">bool</span>
   <span class="Identifier">expectRegex</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">bool</span>
   <span class="Identifier">tagTerminated</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">bool</span>
   <span class="Identifier">symbolsRev</span><span class="Operator">*</span><span class="Other">,</span> <span class="Identifier">identifiersRev</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">Table</span><span class="Other">[</span><span class="Identifier">string</span><span class="Other">,</span> <span class="Identifier">string</span><span class="Other">]</span> <span class="Comment">## lazily-built reverse tables (attr -&gt; lexeme) for reversed YAML styles</span>
@@ -388,19 +404,20 @@
 
 </div>
 <div id="initLexer-procs-all">
-  <div id="initLexer,SweetLexerInit,sinkstring,bool">
-  <dt><pre><span class="Keyword">proc</span> <a href="#initLexer%2CSweetLexerInit%2Csinkstring%2Cbool"><span class="Identifier">initLexer</span></a><span class="Other">(</span><span class="Identifier">pre</span><span class="Other">:</span> <a href="config.html#SweetLexerInit"><span class="Identifier">SweetLexerInit</span></a><span class="Other">;</span> <span class="Identifier">input</span><span class="Other">:</span> <span class="Identifier">sink</span> <span class="Identifier">string</span><span class="Other">;</span>
-               <span class="Identifier">enableFilters</span><span class="Other">:</span> <span class="Identifier">bool</span> <span class="Other">=</span> <span class="Identifier">false</span><span class="Other">)</span><span class="Other">:</span> <a href="#SweetLexer"><span class="Identifier">SweetLexer</span></a> {.<span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span>
-    <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
+  <div id="initLexer,SweetLexerInit,sinkstring,bool,bool">
+  <dt><pre><span class="Keyword">proc</span> <a href="#initLexer%2CSweetLexerInit%2Csinkstring%2Cbool%2Cbool"><span class="Identifier">initLexer</span></a><span class="Other">(</span><span class="Identifier">pre</span><span class="Other">:</span> <a href="config.html#SweetLexerInit"><span class="Identifier">SweetLexerInit</span></a><span class="Other">;</span> <span class="Identifier">input</span><span class="Other">:</span> <span class="Identifier">sink</span> <span class="Identifier">string</span><span class="Other">;</span>
+               <span class="Identifier">enableFilters</span><span class="Other">:</span> <span class="Identifier">bool</span> <span class="Other">=</span> <span class="Identifier">false</span><span class="Other">;</span> <span class="Identifier">enableAttrs</span><span class="Other">:</span> <span class="Identifier">bool</span> <span class="Other">=</span> <span class="Identifier">true</span><span class="Other">)</span><span class="Other">:</span> <a href="#SweetLexer"><span class="Identifier">SweetLexer</span></a> {.
+    <span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">KeyError</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
   <dd>
     
     Initialize lexer from raw source text, this is efficient for small inputs
     
   </dd>
 </div>
-<div id="initLexer,SweetSpec,sinkstring,bool">
-  <dt><pre><span class="Keyword">proc</span> <a href="#initLexer%2CSweetSpec%2Csinkstring%2Cbool"><span class="Identifier">initLexer</span></a><span class="Other">(</span><span class="Identifier">spec</span><span class="Other">:</span> <a href="config.html#SweetSpec"><span class="Identifier">SweetSpec</span></a><span class="Other">;</span> <span class="Identifier">input</span><span class="Other">:</span> <span class="Identifier">sink</span> <span class="Identifier">string</span><span class="Other">;</span> <span class="Identifier">enableFilters</span><span class="Other">:</span> <span class="Identifier">bool</span> <span class="Other">=</span> <span class="Identifier">false</span><span class="Other">)</span><span class="Other">:</span> <a href="#SweetLexer"><span class="Identifier">SweetLexer</span></a> {.
-    <span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">KeyError</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
+<div id="initLexer,SweetSpec,sinkstring,bool,bool">
+  <dt><pre><span class="Keyword">proc</span> <a href="#initLexer%2CSweetSpec%2Csinkstring%2Cbool%2Cbool"><span class="Identifier">initLexer</span></a><span class="Other">(</span><span class="Identifier">spec</span><span class="Other">:</span> <a href="config.html#SweetSpec"><span class="Identifier">SweetSpec</span></a><span class="Other">;</span> <span class="Identifier">input</span><span class="Other">:</span> <span class="Identifier">sink</span> <span class="Identifier">string</span><span class="Other">;</span> <span class="Identifier">enableFilters</span><span class="Other">:</span> <span class="Identifier">bool</span> <span class="Other">=</span> <span class="Identifier">false</span><span class="Other">;</span>
+               <span class="Identifier">enableAttrs</span><span class="Other">:</span> <span class="Identifier">bool</span> <span class="Other">=</span> <span class="Identifier">true</span><span class="Other">)</span><span class="Other">:</span> <a href="#SweetLexer"><span class="Identifier">SweetLexer</span></a> {.<span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">KeyError</span><span class="Other">]</span><span class="Other">,</span>
+    <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
   <dd>
     
     Initialize lexer from raw source text (SweetSpec-based, backward compat).
@@ -410,19 +427,19 @@
 
 </div>
 <div id="initLexerFromFile-procs-all">
-  <div id="initLexerFromFile,SweetLexerInit,string,bool">
-  <dt><pre><span class="Keyword">proc</span> <a href="#initLexerFromFile%2CSweetLexerInit%2Cstring%2Cbool"><span class="Identifier">initLexerFromFile</span></a><span class="Other">(</span><span class="Identifier">pre</span><span class="Other">:</span> <a href="config.html#SweetLexerInit"><span class="Identifier">SweetLexerInit</span></a><span class="Other">;</span> <span class="Identifier">path</span><span class="Other">:</span> <span class="Identifier">string</span><span class="Other">;</span>
-                       <span class="Identifier">enableFilters</span><span class="Other">:</span> <span class="Identifier">bool</span> <span class="Other">=</span> <span class="Identifier">false</span><span class="Other">)</span><span class="Other">:</span> <a href="#SweetLexer"><span class="Identifier">SweetLexer</span></a> {.
-    <span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">IOError</span><span class="Other">,</span> <span class="Identifier">OSError</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
+  <div id="initLexerFromFile,SweetLexerInit,string,bool,bool">
+  <dt><pre><span class="Keyword">proc</span> <a href="#initLexerFromFile%2CSweetLexerInit%2Cstring%2Cbool%2Cbool"><span class="Identifier">initLexerFromFile</span></a><span class="Other">(</span><span class="Identifier">pre</span><span class="Other">:</span> <a href="config.html#SweetLexerInit"><span class="Identifier">SweetLexerInit</span></a><span class="Other">;</span> <span class="Identifier">path</span><span class="Other">:</span> <span class="Identifier">string</span><span class="Other">;</span>
+                       <span class="Identifier">enableFilters</span><span class="Other">:</span> <span class="Identifier">bool</span> <span class="Other">=</span> <span class="Identifier">false</span><span class="Other">;</span> <span class="Identifier">enableAttrs</span><span class="Other">:</span> <span class="Identifier">bool</span> <span class="Other">=</span> <span class="Identifier">true</span><span class="Other">)</span><span class="Other">:</span> <a href="#SweetLexer"><span class="Identifier">SweetLexer</span></a> {.
+    <span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">IOError</span><span class="Other">,</span> <span class="Identifier">OSError</span><span class="Other">,</span> <span class="Identifier">KeyError</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
   <dd>
     
     Initialize lexer from a file using memfiles for efficient access.
     
   </dd>
 </div>
-<div id="initLexerFromFile,SweetSpec,string,bool">
-  <dt><pre><span class="Keyword">proc</span> <a href="#initLexerFromFile%2CSweetSpec%2Cstring%2Cbool"><span class="Identifier">initLexerFromFile</span></a><span class="Other">(</span><span class="Identifier">spec</span><span class="Other">:</span> <a href="config.html#SweetSpec"><span class="Identifier">SweetSpec</span></a><span class="Other">;</span> <span class="Identifier">path</span><span class="Other">:</span> <span class="Identifier">string</span><span class="Other">;</span>
-                       <span class="Identifier">enableFilters</span><span class="Other">:</span> <span class="Identifier">bool</span> <span class="Other">=</span> <span class="Identifier">false</span><span class="Other">)</span><span class="Other">:</span> <a href="#SweetLexer"><span class="Identifier">SweetLexer</span></a> {.
+<div id="initLexerFromFile,SweetSpec,string,bool,bool">
+  <dt><pre><span class="Keyword">proc</span> <a href="#initLexerFromFile%2CSweetSpec%2Cstring%2Cbool%2Cbool"><span class="Identifier">initLexerFromFile</span></a><span class="Other">(</span><span class="Identifier">spec</span><span class="Other">:</span> <a href="config.html#SweetSpec"><span class="Identifier">SweetSpec</span></a><span class="Other">;</span> <span class="Identifier">path</span><span class="Other">:</span> <span class="Identifier">string</span><span class="Other">;</span>
+                       <span class="Identifier">enableFilters</span><span class="Other">:</span> <span class="Identifier">bool</span> <span class="Other">=</span> <span class="Identifier">false</span><span class="Other">;</span> <span class="Identifier">enableAttrs</span><span class="Other">:</span> <span class="Identifier">bool</span> <span class="Other">=</span> <span class="Identifier">true</span><span class="Other">)</span><span class="Other">:</span> <a href="#SweetLexer"><span class="Identifier">SweetLexer</span></a> {.
     <span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">IOError</span><span class="Other">,</span> <span class="Identifier">OSError</span><span class="Other">,</span> <span class="Identifier">KeyError</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
   <dd>
     
@@ -433,13 +450,25 @@
 
 </div>
 <div id="initLexerFromMemFile-procs-all">
-  <div id="initLexerFromMemFile,SweetSpec,MemFile,string,bool">
-  <dt><pre><span class="Keyword">proc</span> <a href="#initLexerFromMemFile%2CSweetSpec%2CMemFile%2Cstring%2Cbool"><span class="Identifier">initLexerFromMemFile</span></a><span class="Other">(</span><span class="Identifier">spec</span><span class="Other">:</span> <a href="config.html#SweetSpec"><span class="Identifier">SweetSpec</span></a><span class="Other">;</span> <span class="Identifier">mf</span><span class="Other">:</span> <span class="Identifier">MemFile</span><span class="Other">;</span> <span class="Identifier">path</span><span class="Other">:</span> <span class="Identifier">string</span> <span class="Other">=</span> <span class="StringLit">&quot;&quot;</span><span class="Other">;</span>
-                          <span class="Identifier">enableFilters</span><span class="Other">:</span> <span class="Identifier">bool</span> <span class="Other">=</span> <span class="Identifier">false</span><span class="Other">)</span><span class="Other">:</span> <a href="#SweetLexer"><span class="Identifier">SweetLexer</span></a> {.
+  <div id="initLexerFromMemFile,SweetSpec,MemFile,string,bool,bool">
+  <dt><pre><span class="Keyword">proc</span> <a href="#initLexerFromMemFile%2CSweetSpec%2CMemFile%2Cstring%2Cbool%2Cbool"><span class="Identifier">initLexerFromMemFile</span></a><span class="Other">(</span><span class="Identifier">spec</span><span class="Other">:</span> <a href="config.html#SweetSpec"><span class="Identifier">SweetSpec</span></a><span class="Other">;</span> <span class="Identifier">mf</span><span class="Other">:</span> <span class="Identifier">MemFile</span><span class="Other">;</span> <span class="Identifier">path</span><span class="Other">:</span> <span class="Identifier">string</span> <span class="Other">=</span> <span class="StringLit">&quot;&quot;</span><span class="Other">;</span>
+                          <span class="Identifier">enableFilters</span><span class="Other">:</span> <span class="Identifier">bool</span> <span class="Other">=</span> <span class="Identifier">false</span><span class="Other">;</span> <span class="Identifier">enableAttrs</span><span class="Other">:</span> <span class="Identifier">bool</span> <span class="Other">=</span> <span class="Identifier">true</span><span class="Other">)</span><span class="Other">:</span> <a href="#SweetLexer"><span class="Identifier">SweetLexer</span></a> {.
     <span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">KeyError</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
   <dd>
     
     Initialize lexer from an already-opened MemFile (e.g. from Flysystem's <tt class="docutils literal"><span class="pre"><span class="Identifier">readStream</span></span></tt>). Zero-copy: the returned lexer borrows <tt class="docutils literal"><span class="pre"><span class="Identifier">mf</span><span class="Operator">.</span><span class="Identifier">mem</span></span></tt>.
+    
+  </dd>
+</div>
+
+</div>
+<div id="lastTokValue-procs-all">
+  <div id="lastTokValue,SweetLexer">
+  <dt><pre><span class="Keyword">proc</span> <a href="#lastTokValue%2CSweetLexer"><span class="Identifier">lastTokValue</span></a><span class="Other">(</span><span class="Identifier">l</span><span class="Other">:</span> <a href="#SweetLexer"><span class="Identifier">SweetLexer</span></a><span class="Other">)</span><span class="Other">:</span> <span class="Identifier">string</span> {.<span class="Identifier">inline</span><span class="Other">,</span> <span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span>
+    <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
+  <dd>
+    
+    Lexeme of the last significant token (&quot;&quot; at start of input). Computed on demand from the stored span; the per-token copy that used to live here now only materializes for <tt class="docutils literal"><span class="pre"><span class="Operator">/</span></span></tt>-disambiguation.
     
   </dd>
 </div>
@@ -490,7 +519,7 @@
       <div class="twelve-columns footer">
         <span class="nim-sprite"></span>
         <br>
-        <small style="color: var(--hint);">Made with Nim. Generated: 2026-10-21 16:00:55 UTC</small>
+        <small style="color: var(--hint);">Made with Nim. Generated: 2026-10-22 11:49:41 UTC</small>
       </div>
     </div>
   </div>

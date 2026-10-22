@@ -102,7 +102,7 @@
   nkImaginary ## Imaginary literal (Go `1i`, `1.5i`, `0x1p-2i`): raw source
               ## text, e.g. `&quot;1.5i&quot;`. A string payload like bigint (parsing
               ## hex-float mantissas is a language quirk, not AST business).">NodeKind</a></li>
-<li><a class="reference" href="#OpenAstProgram" title="OpenAstProgram = ref object
+<li><a class="reference" href="#OpenAstProgram" title="OpenAstProgram {.acyclic.} = ref object
   nodes*: seq[Node] ## The root of the AST, containing a sequence of top-level
                     ## nodes (e.g., statements or declarations)">OpenAstProgram</a></li>
 
@@ -298,12 +298,12 @@
   </dd>
 </div>
 <div id="OpenAstProgram">
-  <dt><pre><a href="#OpenAstProgram"><span class="Identifier">OpenAstProgram</span></a> <span class="Other">=</span> <span class="Keyword">ref</span> <span class="Keyword">object</span>
+  <dt><pre><a href="#OpenAstProgram"><span class="Identifier">OpenAstProgram</span></a> {.<span class="Identifier">acyclic</span>.} <span class="Other">=</span> <span class="Keyword">ref</span> <span class="Keyword">object</span>
   <span class="Identifier">nodes</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">seq</span><span class="Other">[</span><a href="#Node"><span class="Identifier">Node</span></a><span class="Other">]</span> <span class="Comment">## The root of the AST, containing a sequence of top-level</span>
                     <span class="Comment">## nodes (e.g., statements or declarations)</span></pre></dt>
   <dd>
     
-    The root of the AST, representing an entire program or module
+    The root of the AST, representing an entire program or module. Acyclic like Node: programs own nodes, nodes never point back.
     
   </dd>
 </div>
@@ -617,7 +617,7 @@
       <div class="twelve-columns footer">
         <span class="nim-sprite"></span>
         <br>
-        <small style="color: var(--hint);">Made with Nim. Generated: 2026-10-21 16:00:55 UTC</small>
+        <small style="color: var(--hint);">Made with Nim. Generated: 2026-10-22 11:49:41 UTC</small>
       </div>
     </div>
   </div>

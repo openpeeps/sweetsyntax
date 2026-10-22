@@ -319,21 +319,29 @@
           </ul></dd>
 <dt><a name="initLexer" href="#initLexer"><span>initLexer:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
-          data-doc-search-tag="sweetlexer: proc initLexer(pre: SweetLexerInit; input: sink string; enableFilters: bool = false): SweetLexer" href="sweetsyntax/sweetlexer.html#initLexer%2CSweetLexerInit%2Csinkstring%2Cbool">sweetlexer: proc initLexer(pre: SweetLexerInit; input: sink string; enableFilters: bool = false): SweetLexer</a></li>
+          data-doc-search-tag="sweetlexer: proc initLexer(pre: SweetLexerInit; input: sink string; enableFilters: bool = false;
+          enableAttrs: bool = true): SweetLexer" href="sweetsyntax/sweetlexer.html#initLexer%2CSweetLexerInit%2Csinkstring%2Cbool%2Cbool">sweetlexer: proc initLexer(pre: SweetLexerInit; input: sink string; enableFilters: bool = false;
+          enableAttrs: bool = true): SweetLexer</a></li>
           <li><a class="reference external"
-          data-doc-search-tag="sweetlexer: proc initLexer(spec: SweetSpec; input: sink string; enableFilters: bool = false): SweetLexer" href="sweetsyntax/sweetlexer.html#initLexer%2CSweetSpec%2Csinkstring%2Cbool">sweetlexer: proc initLexer(spec: SweetSpec; input: sink string; enableFilters: bool = false): SweetLexer</a></li>
+          data-doc-search-tag="sweetlexer: proc initLexer(spec: SweetSpec; input: sink string; enableFilters: bool = false;
+          enableAttrs: bool = true): SweetLexer" href="sweetsyntax/sweetlexer.html#initLexer%2CSweetSpec%2Csinkstring%2Cbool%2Cbool">sweetlexer: proc initLexer(spec: SweetSpec; input: sink string; enableFilters: bool = false;
+          enableAttrs: bool = true): SweetLexer</a></li>
           </ul></dd>
 <dt><a name="initLexerFromFile" href="#initLexerFromFile"><span>initLexerFromFile:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
-          data-doc-search-tag="sweetlexer: proc initLexerFromFile(pre: SweetLexerInit; path: string; enableFilters: bool = false): SweetLexer" href="sweetsyntax/sweetlexer.html#initLexerFromFile%2CSweetLexerInit%2Cstring%2Cbool">sweetlexer: proc initLexerFromFile(pre: SweetLexerInit; path: string; enableFilters: bool = false): SweetLexer</a></li>
+          data-doc-search-tag="sweetlexer: proc initLexerFromFile(pre: SweetLexerInit; path: string;
+                  enableFilters: bool = false; enableAttrs: bool = true): SweetLexer" href="sweetsyntax/sweetlexer.html#initLexerFromFile%2CSweetLexerInit%2Cstring%2Cbool%2Cbool">sweetlexer: proc initLexerFromFile(pre: SweetLexerInit; path: string;
+                  enableFilters: bool = false; enableAttrs: bool = true): SweetLexer</a></li>
           <li><a class="reference external"
-          data-doc-search-tag="sweetlexer: proc initLexerFromFile(spec: SweetSpec; path: string; enableFilters: bool = false): SweetLexer" href="sweetsyntax/sweetlexer.html#initLexerFromFile%2CSweetSpec%2Cstring%2Cbool">sweetlexer: proc initLexerFromFile(spec: SweetSpec; path: string; enableFilters: bool = false): SweetLexer</a></li>
+          data-doc-search-tag="sweetlexer: proc initLexerFromFile(spec: SweetSpec; path: string; enableFilters: bool = false;
+                  enableAttrs: bool = true): SweetLexer" href="sweetsyntax/sweetlexer.html#initLexerFromFile%2CSweetSpec%2Cstring%2Cbool%2Cbool">sweetlexer: proc initLexerFromFile(spec: SweetSpec; path: string; enableFilters: bool = false;
+                  enableAttrs: bool = true): SweetLexer</a></li>
           </ul></dd>
 <dt><a name="initLexerFromMemFile" href="#initLexerFromMemFile"><span>initLexerFromMemFile:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
           data-doc-search-tag="sweetlexer: proc initLexerFromMemFile(spec: SweetSpec; mf: MemFile; path: string = &quot;&quot;;
-                     enableFilters: bool = false): SweetLexer" href="sweetsyntax/sweetlexer.html#initLexerFromMemFile%2CSweetSpec%2CMemFile%2Cstring%2Cbool">sweetlexer: proc initLexerFromMemFile(spec: SweetSpec; mf: MemFile; path: string = &quot;&quot;;
-                     enableFilters: bool = false): SweetLexer</a></li>
+                     enableFilters: bool = false; enableAttrs: bool = true): SweetLexer" href="sweetsyntax/sweetlexer.html#initLexerFromMemFile%2CSweetSpec%2CMemFile%2Cstring%2Cbool%2Cbool">sweetlexer: proc initLexerFromMemFile(spec: SweetSpec; mf: MemFile; path: string = &quot;&quot;;
+                     enableFilters: bool = false; enableAttrs: bool = true): SweetLexer</a></li>
           </ul></dd>
 <dt><a name="items" href="#items"><span>items:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
@@ -378,6 +386,10 @@
 <dt><a name="LanguageFeature" href="#LanguageFeature"><span>LanguageFeature:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
           data-doc-search-tag="config: enum LanguageFeature" href="sweetsyntax/config.html#LanguageFeature">config: enum LanguageFeature</a></li>
+          </ul></dd>
+<dt><a name="lastTokValue" href="#lastTokValue"><span>lastTokValue:</span></a></dt><dd><ul class="simple">
+<li><a class="reference external"
+          data-doc-search-tag="sweetlexer: proc lastTokValue(l: SweetLexer): string" href="sweetsyntax/sweetlexer.html#lastTokValue%2CSweetLexer">sweetlexer: proc lastTokValue(l: SweetLexer): string</a></li>
           </ul></dd>
 <dt><a name="LeafNodes" href="#LeafNodes"><span>LeafNodes:</span></a></dt><dd><ul class="simple">
 <li><a class="reference external"
@@ -1007,7 +1019,7 @@
       <div class="twelve-columns footer">
         <span class="nim-sprite"></span>
         <br>
-        <small style="color: var(--hint);">Made with Nim. Generated: 2026-10-21 16:00:56 UTC</small>
+        <small style="color: var(--hint);">Made with Nim. Generated: 2026-10-22 11:49:42 UTC</small>
       </div>
     </div>
   </div>
