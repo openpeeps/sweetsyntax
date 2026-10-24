@@ -1,0 +1,33 @@
+{
+  "name": "@openpeeps/sweetsyntax",
+  "version": "0.2.3",
+  "description": "Node.js native bindings for sweetsyntax (highlighting + AST parsing)",
+  "main": "index.js",
+  "types": "index.d.ts",
+  "files": [
+    "index.js",
+    "index.d.ts",
+    "scripts/place-binary.js",
+    "bin/"
+  ],
+  "scripts": {
+    "build": "cd ../.. && denim build src/sweetsyntax.nim --cmake -y && node addons/sweetsyntax_napi/scripts/place-binary.js",
+    "test": "node --test test/*.test.js"
+  },
+  "license": "LGPL-3.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/openpeeps/sweetsyntax.git"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "os": [
+    "darwin",
+    "linux"
+  ],
+  "cpu": [
+    "arm64",
+    "x64"
+  ]
+}

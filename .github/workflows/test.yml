@@ -7,3 +7,19 @@ jobs:
       cache: false
       nim-version: "2.2.10"
       test-flags: "-d:release"
+
+  napi:
+    name: napi addon
+    uses: nimbase/setup-nim-action/.github/workflows/test.yml@main
+    with:
+      nim-version: '2.2.x'
+      os: '[{"os":"ubuntu-latest"},{"os":"macos-latest"}]'
+      pre-install-command: >-
+        npm install -g cmake-js ||
+        (npm install --prefix "$HOME/.cmake-js" cmake-js &&
+        echo "$HOME/.cmake-js/bin" >> "$GITHUB_PATH")
+      pre-test-command: >-
+        cd .. && nimble install denim &&
+        cd sweetsyntax && denim build src/sweetsyntax.nim --cmake -y &&
+        node addons/sweetsyntax_napi/scripts/place-binary.js &&
+        npm test --prefix addons/sweetsyntax_napi

@@ -12,12 +12,20 @@
 ## syntax highlighters, domain-specific languages, bundlers, minifiers, obfuscators, linters,
 ## or any sweet tool that requires a structured representation of source code.
 
+when defined(napibuild):
+  # Node.js native addon entry point. Built separately via
+  # `denim build src/sweetsyntax.nim --cmake -y` so the library itself
+  # gains no denim dependency and zero overhead.
+  import denim
+  include ./sweetsyntax/private/napi_convert
+  include ./sweetsyntax/private/napi_bridge
+
 import ./sweetsyntax/[config, sweetlexer]
 import ./sweetsyntax/engine/[ast, parser]
 import ./sweetsyntax/renderers/highlight
 export config, sweetlexer, ast, parser, highlight
 
-when isMainModule:
+when isMainModule and not defined(napibuild):
   import std/[tables, os, parseopt, strutils]
   import pkg/openparser/json
   import ./sweetsyntax/languages/[js, nim, c, php, ruby, go]
