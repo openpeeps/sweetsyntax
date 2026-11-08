@@ -2,8 +2,8 @@ name: JavaScript
 extension: 
   - js
   - jsx
-  - ts
-  - tsx
+  - mjs
+  - cjs
 
 inline_comment: '//'
 block_comment:

@@ -28,7 +28,7 @@ export config, sweetlexer, ast, parser, highlight
 when isMainModule and not defined(napibuild):
   import std/[tables, os, parseopt, strutils]
   import pkg/openparser/json
-  import ./sweetsyntax/languages/[js, nim, c, php, ruby, go]
+  import ./sweetsyntax/languages/[js, ts, nim, c, php, ruby, go]
 
   const versionStr = "0.2.1"
 
@@ -85,8 +85,11 @@ when isMainModule and not defined(napibuild):
     ## Apple Clang on ARM64 rejects
     ## (`error: initializer element is not a compile-time constant`).
     case ext
-    of "js", "jsx", "ts", "tsx":
+    of "js", "jsx":
       result = (js.jsHandlers, {featAsync, featArrowFn, featGenerators,
+                                featLabeledStmt, featTemplateLit})
+    of "ts", "tsx":
+      result = (ts.tsHandlers, {featAsync, featArrowFn, featGenerators,
                                 featLabeledStmt, featTemplateLit})
     of "nim", "nims":
       result = (nim.nimHandlers, {})

@@ -6,13 +6,16 @@ import ../tokenizer
 import ../sweetlexer
 import ../engine/[ast, parser]
 import ../renderers/highlight
-import ../languages/[js, nim, c, php, ruby, go]
+import ../languages/[js, ts, nim, c, php, ruby, go]
 
 proc languageHandlers(ext: string): (ParsingCallback, set[LanguageFeature]) =
   let e = ext.strip(chars = {'.'}).toLowerAscii()
   case e
-  of "js", "jsx", "mjs", "cjs", "ts", "tsx", "mts", "cts", "dts":
+  of "js", "jsx", "mjs", "cjs":
     result = (js.jsHandlers, {featAsync, featArrowFn, featGenerators,
+                              featLabeledStmt, featTemplateLit})
+  of "ts", "tsx", "mts", "cts", "dts":
+    result = (ts.tsHandlers, {featAsync, featArrowFn, featGenerators,
                               featLabeledStmt, featTemplateLit})
   of "nim", "nims":
     result = (nim.nimHandlers, {})
@@ -33,6 +36,7 @@ proc parseCode(code, ext: string): OpenAstProgram =
   let (handler, features) = languageHandlers(ext)
   var p = compile(syntax.spec)
   p.features = p.features + features
+  p.isTSX = ext.strip(chars = {'.'}).toLowerAscii() == "tsx"
   if handler != nil: handler(p)
   p.lexer = initLexer(syntax.spec, code)
   p.curr = p.getToken()

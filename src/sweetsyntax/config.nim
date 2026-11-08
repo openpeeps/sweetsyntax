@@ -533,3 +533,56 @@ proc getKnownSyntax*(knownSyntax: KnownSyntax): SweetSyntax =
   ## Get a predefined syntax by name, e.g. getKnownSyntax(js) returns the JavaScript syntax
   result = SweetSyntax(spec: parseYAML(knownSyntaxTable[$knownSyntax], SweetSpec))
   # echo toJson(result)
+
+proc knownSyntaxForExt*(ext: string): KnownSyntax =
+  ## Resolve a file extension to its `KnownSyntax`, handling aliases that
+  ## `parseEnum[KnownSyntax]` cannot (`tsx` vs `ts = "ts"`, `jsx` vs `js`,
+  ## `mjs`/`cjs`, `di`, `csx`, ...). Falls back to `parseEnum` so single-
+  ## value extensions (`go`, `swift`, `yaml`, ...) keep working.
+  let key = ext.strip(chars = {'.'}).toLowerAscii()
+  case key
+  of "js", "jsx", "mjs", "cjs": return KnownSyntax.js
+  of "ts", "tsx", "mts", "cts", "dts": return KnownSyntax.ts
+  of "py", "pyw": return KnownSyntax.py
+  of "nim", "nims": return KnownSyntax.nim
+  of "c", "h", "c99", "c11", "c17", "c23": return KnownSyntax.c
+  of "cpp", "cc", "cxx", "c++", "hpp", "hh", "hxx", "h++",
+     "inl", "ipp", "tcc": return KnownSyntax.cpp
+  of "rs": return KnownSyntax.rust
+  of "rb", "ruby", "rake", "gemspec": return KnownSyntax.ruby
+  of "php", "phtml", "php3", "php4", "php5", "phps": return KnownSyntax.php
+  of "go": return KnownSyntax.go
+  of "d", "di": return KnownSyntax.d
+  of "swift": return KnownSyntax.swift
+  of "m", "mm": return KnownSyntax.objc
+  of "java": return KnownSyntax.java
+  of "cs", "csx": return KnownSyntax.csharp
+  of "kt", "kts": return KnownSyntax.kotlin
+  of "pl", "pm", "pod", "plx", "t": return KnownSyntax.perl
+  of "ml", "mli": return KnownSyntax.ocaml
+  of "lua": return KnownSyntax.lua
+  of "hs", "lhs": return KnownSyntax.haskell
+  of "zig", "zon": return KnownSyntax.zig
+  of "cr", "crystal": return KnownSyntax.crystal
+  of "css": return KnownSyntax.css
+  of "md", "markdown", "mdown", "mkd": return KnownSyntax.md
+  of "yaml", "yml": return KnownSyntax.yaml
+  of "json": return KnownSyntax.json
+  of "toml": return KnownSyntax.toml
+  of "csv", "tsv": return KnownSyntax.csv
+  of "html", "htm", "xhtml": return KnownSyntax.html
+  of "xml", "xsd", "xsl", "xslt", "svg", "plist", "pom": return KnownSyntax.xml
+  of "sh", "bash", "zsh", "ksh", "ash": return KnownSyntax.shell
+  of "ini", "cfg", "conf", "properties", "env": return KnownSyntax.ini
+  of "mak", "mk", "make": return KnownSyntax.make
+  of "cmake": return KnownSyntax.cmake
+  of "dockerfile": return KnownSyntax.docker
+  of "nginx": return KnownSyntax.nginx
+  of "service", "socket", "timer", "target", "mount", "path",
+     "slice", "scope", "device", "automount", "swap": return KnownSyntax.systemd
+  of "j2", "jinja", "jinja2", "twig": return KnownSyntax.jinja2
+  of "hbs", "handlebars", "mustache": return KnownSyntax.handlebars
+  of "liquid": return KnownSyntax.liquid
+  of "ejs": return KnownSyntax.ejs
+  of "htaccess", "apache": return KnownSyntax.apache
+  else: return parseEnum[KnownSyntax](key)

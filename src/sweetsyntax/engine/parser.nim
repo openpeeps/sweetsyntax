@@ -94,6 +94,12 @@ type
       ## Inside a `(...)` group (set by parseGroupExpr): a `;` separates
       ## group items, so item parsers must not consume it as their own
       ## statement terminator (Nim `if (let x = ...; x):`, Ruby `(a; b)`).
+    isTSX*: bool
+      ## True when parsing a `.tsx` source. Only the driver knows the file
+      ## extension (the spec covers `ts/tsx/mts/cts/dts` alike), so
+      ## `parseScript` and test harnesses set this. TypeScript uses it for
+      ## the one extension-dependent rule: angle-bracket assertions
+      ## (`<T>x`) are forbidden in `.tsx` (JSX clash), `as` is required.
 
   
   OpenAstParsingError* = object of CatchableError
@@ -256,7 +262,7 @@ proc parseIntLiteral(p: var GenericParser, raw, stem: string,
       error(p, "Invalid integer literal '" & raw & "'")
     result = Node(kind: nkLitBigInt, valBigInt: raw).stamp(tk)
 
-proc parseLiteral(p: var GenericParser, minPrec: int = 0): Node =
+proc parseLiteral*(p: var GenericParser, minPrec: int = 0): Node =
   ## Handles int, float, string, hex, octal, binary, bigint literals
   case p.curr.kind
   of tkInt:
@@ -909,6 +915,16 @@ proc parseExpression*(p: var GenericParser, minPrec: int = 0): Node =
       # Regular binary infix
       if haveInfix:
         if infixPrec < minPrec: break
+        # Language-specific override for this operator (e.g. TypeScript parses
+        # the rhs of `as`/`satisfies` as a type, not a value expression).
+        # The handler consumes the operator and rhs itself and returns the
+        # combined node; a nil return declines back to the default binary
+        # path below (used by speculative handlers like TS generic calls).
+        if p.expressionHandlers.len > 0 and p.expressionHandlers.hasKey("infix:" & op):
+          let custom = p.expressionHandlers["infix:" & op](p, lhs, infixPrec)
+          if custom != nil:
+            lhs = custom
+            continue
         let opTk = p.curr
         walk p
         let nextMin = if infixRightAssoc: infixPrec
@@ -926,6 +942,12 @@ proc parseExpression*(p: var GenericParser, minPrec: int = 0): Node =
       if p.infixTable.hasKey(key):
         let entry = p.infixTable[key]
         if entry.precedence < minPrec: break
+        # Same language-specific override as the punct path above.
+        if p.expressionHandlers.len > 0 and p.expressionHandlers.hasKey("infix:" & key):
+          let custom = p.expressionHandlers["infix:" & key](p, lhs, entry.precedence)
+          if custom != nil:
+            lhs = custom
+            continue
         let opTk = p.curr
         walk p
         let nextMin = if entry.assoc == rightAssoc: entry.precedence
@@ -1330,8 +1352,9 @@ proc parseScript*(path: string, parsingCallback: ParsingCallback = nil,
             features: set[LanguageFeature] = {}): OpenAstProgram {.discardable.} =
   ## Parse a script from the given file path using the compiled syntax specification.
   let ext = path.splitFile().ext
-  let syntax = getKnownSyntax(parseEnum[KnownSyntax](ext[1..^1]))
+  let syntax = getKnownSyntax(knownSyntaxForExt(ext))
   var p = compile(syntax.spec)
+  p.isTSX = ext.strip(chars = {'.'}).toLowerAscii() == "tsx"
   p.features = p.features + features
   if parsingCallback != nil: parsingCallback(p)
   

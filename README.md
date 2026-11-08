@@ -20,7 +20,7 @@
 - Tree-sitter code folding
 - JSON-based AST generator / indent-based dump tree
 - ANSI, HTML and JSON-LD Renderers
-- **Parsers** (lexer + Pratt parser + AST + validation) for: C, Go, JavaScript, Nim, PHP, Ruby — plus TypeScript, which reuses the JavaScript handlers
+- **Parsers** (lexer + Pratt parser + AST + validation) for: C, Go, JavaScript, TypeScript, Nim, PHP, Ruby
 - **Highlight-only** (lexer + renderers, no parser, no AST) for: C++, Crystal, C#, D lang, Haskell, Java, Kotlin, Lua, Objective-C, OCaml, Perl, Python, Rust, Swift, Zig, Apache, CMake, CSV, CSS, Dockerfile, EJS, Handlebars, HTML, INI, Jinja2, JSON, Liquid, Makefile, Markdown, Nginx, Shell, systemd, TOML, XML and YAML
 - Every one of those also highlights through the lexer alone, so broken or half-written code still renders — see [Unified highlight](#unified-highlight)
 - Resolves language by extension or by well-known filename (`Dockerfile`, `Makefile`, `CMakeLists.txt`, `.env`)

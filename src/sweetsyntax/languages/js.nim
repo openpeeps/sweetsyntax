@@ -399,6 +399,7 @@ proc jsHandlers*(p: var GenericParser) =
       # Static block: static { ... }
       if p.curr.kind == tkIdentifier and p.curr.value == "static" and
          p.next.kind == tkPunct and p.next.value == "{":
+        walk p # consume `static`
         body.children.add(Node(kind: nkStatement,
           children: @[Node(kind: nkIdent, name: "static-block"), parseBlock(p)]))
         continue

@@ -185,7 +185,7 @@ features:
 operators:
   prefix:
     - tokens: ["+", "-", "!", "~", "++", "--"]
-    - tokens: ["typeof", "void", "delete"]
+    - tokens: ["typeof", "void", "delete", "await"]
       is_keyword: true
     - tokens: ["..."]
       handler: spread
@@ -193,7 +193,12 @@ operators:
   postfix:
     - tokens: ["++", "--"]
     - tokens: ["!"]
-      handler: non_null_assertion
+      # NOTE: no `handler:` here. `PostfixGroup` has no handler field and
+      # openparser silently merges every following `- ...` item (the whole
+      # `infix:` list, then `statements:`) into `postfix` when one is
+      # present — the parser spec then compiles with zero statements.
+      # The engine ignores postfix handlers anyway (`!` is wired through
+      # `postfixOps` alone).
 
   infix:
     - precedence: 1
@@ -280,7 +285,7 @@ statements:
     handler: continue
   try_stmt:
     keyword: "try"
-    handler: try_catch
+    handler: try_js
   switch_stmt:
     keyword: "switch"
     handler: switch
@@ -318,6 +323,12 @@ statements:
   using_decl:
     keyword: "using"
     handler: using
+  yield_stmt:
+    keyword: "yield"
+    handler: yield
+  async_decl:
+    keyword: "async"
+    handler: async_function
 
   expect_regex_after:
     tokens: ["=", "+=", "-=", "*=", "/=", "%=", "(", "[", "{", ",", ";", ":", "!", "~", "&&", "||", "??", "?", "=>"]
