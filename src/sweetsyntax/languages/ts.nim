@@ -1428,28 +1428,81 @@ proc tsHandlers*(p: var GenericParser) =
       closerEnd = consumeTypeCloser(p)
     else:
       error(p, "Expected '>' after generic parameters")
-    p.stripSince(eraseFrom, upto = closerEnd)
     skipTSComments(p)
     if p.curr.kind == tkPunct and p.curr.value == "(":
-      # Generic arrow: `<T>(x: T): R => body`.
-      let params = parseTSParams(p)
-      let ret = parseTSReturnType(p)
-      skipTSComments(p)
-      p.expectWalk("=>")
-      skipTSComments(p)
-      let body = if p.curr.kind == tkPunct and p.curr.value == "{":
-                   parseBlock(p)
-                 else:
-                   parseExpression(p, 0)
-      return Node(kind: nkFunction,
-        children: @[generics, params, ret, body]).stamp(ltTk)
+      # Ambiguous: generic arrow `<T>(x: T): R => body` or assertion
+      # over a parenthesized operand `<T>(x)`. Try the arrow first;
+      # without `=>` it is an assertion (mirroring tsc).
+      let mark = (lex: markLexer(p.lexer), prev: p.prev, curr: p.curr, next: p.next)
+      let slen = p.stripSpans.len
+      var arrowFn: Node = nil
+      try:
+        let params = parseTSParams(p)
+        let ret = parseTSReturnType(p)
+        skipTSComments(p)
+        if p.curr.kind == tkPunct and p.curr.value == "=>":
+          walk p # consume `=>`
+          skipTSComments(p)
+          let body = if p.curr.kind == tkPunct and p.curr.value == "{":
+                       parseBlock(p)
+                     else:
+                       parseExpression(p, 0)
+          arrowFn = Node(kind: nkFunction,
+            children: @[generics, params, ret, body]).stamp(ltTk)
+      except OpenAstParsingError:
+        discard
+      if arrowFn != nil:
+        p.stripSince(eraseFrom, upto = closerEnd)
+        return arrowFn
+      restoreLexer(p.lexer, mark.lex)
+      p.prev = mark.prev
+      p.curr = mark.curr
+      p.next = mark.next
+      p.stripSpans.setLen(slen)
     # Otherwise it was an assertion `<T>x` (single plain parameter only).
     if multi or firstConstraint.kind != nkEmpty or firstDefault.kind != nkEmpty:
       error(p, "Expected '(' and '=>' after generic parameters")
     if p.isTSX:
       error(p, "Angle-bracket assertions are not allowed in .tsx files; use `as`")
+    p.stripSince(eraseFrom, upto = closerEnd)
     let operand = parseExpression(p, 13)
     return Node(kind: nkCast, children: @[first, operand]).stamp(ltTk)
+
+  prefixHandler p, "(":
+    ## Typed arrow parameters: `(x: T): R => body`. Speculative: parse
+    ## as TS params and commit only on `)` + optional return type +
+    ## `=>`; otherwise rewind for the default group parse. (Plain
+    ## untyped arrows never take this path: `parseTSParamsRest` rejects
+    ## their contents and the group parse runs untouched.)
+    let mark = (lex: markLexer(p.lexer), prev: p.prev, curr: p.curr, next: p.next)
+    let slen = p.stripSpans.len
+    var arrowFn: Node = nil
+    try:
+      walk p # consume `(`
+      let params = parseTSParamsRest(p)
+      var ret = newEmptyNode()
+      if p.curr.kind == tkPunct and p.curr.value == ":":
+        ret = parseTSReturnType(p)
+      skipTSComments(p)
+      if p.curr.kind == tkPunct and p.curr.value == "=>":
+        walk p # consume `=>`
+        skipTSComments(p)
+        let body = if p.curr.kind == tkPunct and p.curr.value == "{":
+                     parseBlock(p)
+                   else:
+                     parseExpression(p, 0)
+        arrowFn = Node(kind: nkFunction,
+          children: @[newEmptyNode(), params, ret, body])
+    except OpenAstParsingError:
+      discard
+    if arrowFn != nil:
+      return arrowFn
+    restoreLexer(p.lexer, mark.lex)
+    p.prev = mark.prev
+    p.curr = mark.curr
+    p.next = mark.next
+    p.stripSpans.setLen(slen)
+    return parseGroupExpr(p)
 
   prefixHandler p, "new":
     ## `new` with optional generic arguments. `new Foo < bar` stays a

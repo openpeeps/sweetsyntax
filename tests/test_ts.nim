@@ -167,6 +167,12 @@ suite "TypeScript expressions":
       discard parseTS("let x = <string>y;", isTSX = true)
     check parseTS("let x = y as string;", isTSX = true).kind == nkStatement
 
+  test "assertion over parenthesized operand":
+    for code in ["let y = <string>(a);", "let y = <string>(a + b);"]:
+      let n = parseTS(code)
+      check n.kind == nkStatement
+      check n.children[^1].children[^1].kind == nkCast
+
   test "generic arrows":
     let n = parseTS("const f = <T>(x: T): T => x;")
     check n.kind == nkStatement
