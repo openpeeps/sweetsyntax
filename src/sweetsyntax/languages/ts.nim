@@ -1844,9 +1844,56 @@ proc tsHandlers*(p: var GenericParser) =
         of nkLitInt: keyName = $key.valInt
         else: discard
         if p.curr.kind == tkPunct and p.curr.value == "{":
+          let bracePos = p.markPos()
           fnBody = parseBlock(p)
           if keyName.len > 0:
             bodiedKeys.add(keyName)
+          # Constructor parameter properties (`constructor(private x)`)
+          # need `this.x = x` assignments: replace the `{` with itself
+          # plus the assignments.
+          if keyName == "constructor" and not dropMember:
+            var propNames: seq[string] = @[]
+            var propBad = false
+            for entry in params.children:
+              if entry.kind != nkStatement or entry.children.len < 2 or
+                  entry.children[0].kind != nkIdent or
+                  entry.children[0].name != "param":
+                continue
+              let last = entry.children[^1]
+              var flagEnd = entry.children.len - 1
+              var nm: Node = nil
+              if last.kind == nkIdentDefs and last.children.len > 0:
+                if last.children[0].kind == nkIdent:
+                  nm = last.children[0]
+                else:
+                  propBad = true
+              elif entry.children.len >= 4 and
+                  entry.children[^3].kind == nkIdent:
+                nm = entry.children[^3]
+                flagEnd = entry.children.len - 3
+              else:
+                continue
+              var isProp = false
+              for fi in 1 ..< flagEnd:
+                let f = entry.children[fi]
+                if f.kind == nkIdent and f.name in ["public", "private",
+                    "protected", "readonly"]:
+                  isProp = true
+                  break
+              if isProp:
+                if nm != nil:
+                  propNames.add(nm.name)
+                else:
+                  propBad = true
+            if propBad:
+              p.stripError(memberFrom,
+                "Destructured constructor parameter properties are not supported (TypeScript v1)")
+            elif propNames.len > 0:
+              var synth = "{"
+              for pn in propNames:
+                synth.add("\nthis." & pn & " = " & pn & ";")
+              p.stripSpans.add(StripSpan(kind: skReplace,
+                span: bracePos ..< bracePos + 1, text: synth))
         else:
           p.walkOpt(";")
           if dropMember:
@@ -2142,6 +2189,8 @@ proc tsHandlers*(p: var GenericParser) =
       enumMembers.add(em)
       p.walkOpt(",")
     p.expectWalk("}")
+    if p.curr.kind == tkPunct and p.curr.value == ";":
+      walk p # a trailing `;` belongs to the declaration
     result.children.add(body)
     if name.kind == nkIdent:
       p.stripSpans.add(StripSpan(kind: skEnum,
@@ -2167,6 +2216,8 @@ proc tsHandlers*(p: var GenericParser) =
       children: @[Node(kind: nkIdent, name: kw).stamp(kwTk), name])
     if p.curr.kind == tkPunct and p.curr.value == "{":
       result.children.add(parseBlock(p))
+      if p.curr.kind == tkPunct and p.curr.value == ";":
+        walk p # a trailing `;` belongs to the declaration
       let path = if name.kind == nkLitString: @[] else: dottedPath(name)
       p.stripSpans.add(StripSpan(kind: skNamespace,
         span: nsFrom ..< p.consumedEnd(), path: path))
@@ -2193,6 +2244,8 @@ proc tsHandlers*(p: var GenericParser) =
       children: @[Node(kind: nkIdent, name: "module").stamp(kwTk), name])
     if p.curr.kind == tkPunct and p.curr.value == "{":
       result.children.add(parseBlock(p))
+      if p.curr.kind == tkPunct and p.curr.value == ";":
+        walk p # a trailing `;` belongs to the declaration
       let path = if name.kind == nkLitString: @[] else: dottedPath(name)
       p.stripSpans.add(StripSpan(kind: skNamespace,
         span: modFrom ..< p.consumedEnd(), path: path))

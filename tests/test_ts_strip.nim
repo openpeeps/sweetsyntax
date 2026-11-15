@@ -123,3 +123,12 @@ suite "TypeScript lowering spans":
   test "catch annotations erase":
     check slices("try {} catch (e: any) {}") ==
       @[(skErase, ": any")]
+
+  test "constructor parameter properties synthesize assignments":
+    let spans = parseSpans("class C { constructor(private x: number, readonly y = 1) {} }")
+    var found = false
+    for s in spans:
+      if s.kind == skReplace and s.text.contains("this.x = x"):
+        found = true
+        check s.text.contains("this.y = y")
+    check found
