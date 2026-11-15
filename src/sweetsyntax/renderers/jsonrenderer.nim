@@ -98,6 +98,12 @@ proc scopeForToken*(lexer: SweetLexer, tok: Token): string =
         result = lexer.keywordScopes[value]
       else:
         result = "keyword"
+    elif value.len > 0 and value[0] in {'A'..'Z'}:
+      # Leading-uppercase identifiers are type-like in every C-family language
+      # (Nim `type SweetTokenKind`, `var User = 0`). Scope them as types so
+      # themes can paint them distinctly from lowercase variables. Keywords
+      # stay first: `NULL`, `nil` etc. keep their constant scopes.
+      result = "entity.name.type"
     else:
       result = "variable"
   of tkEOF: result = "source"

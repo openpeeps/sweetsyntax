@@ -136,11 +136,39 @@ identifiers:
   await: "await"
   spawn: "spawn"
   parallel: "parallel"
+  # Builtin types (scoped as storage.type below, not plain variables)
+  array: "array"
+  auto: "auto"
+  bool: "bool"
+  byte: "byte"
+  char: "char"
+  cstring: "cstring"
+  float: "float"
+  float32: "float32"
+  float64: "float64"
+  int: "int"
+  int8: "int8"
+  int16: "int16"
+  int32: "int32"
+  int64: "int64"
+  openArray: "openArray"
+  pointer: "pointer"
+  range: "range"
+  seq: "seq"
+  set: "set"
+  string: "string"
+  uint: "uint"
+  uint8: "uint8"
+  uint16: "uint16"
+  uint32: "uint32"
+  uint64: "uint64"
+  void: "void"
 
 # Keyword scopes give a keyword its TextMate scope. These live here so that
 # each spec owns its own vocabulary and the renderer holds none of it; any
 # identifier left out below still highlights, as a plain `keyword`.
 keyword_scopes:
+  storage.type: ["array", "auto", "bool", "byte", "char", "cstring", "float", "float32", "float64", "int", "int8", "int16", "int32", "int64", "openArray", "pointer", "range", "seq", "set", "string", "uint", "uint8", "uint16", "uint32", "uint64", "void"]
   storage.modifier: ["let", "var", "const", "static", "out"]
   keyword.control: ["if", "elif", "else", "case", "of", "when", "while", "for", "return", "break", "continue", "yield", "raise", "try", "except", "finally", "block", "end", "defer", "discard", "do"]
   keyword.operator: ["and", "or", "not", "xor", "div", "mod", "shl", "shr", "in", "is", "isnot", "notin"]

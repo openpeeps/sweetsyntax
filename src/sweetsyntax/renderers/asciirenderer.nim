@@ -41,6 +41,7 @@ proc colorForToken(lexer: SweetLexer, tok: Token): string =
   if scope.startsWith("meta.preprocessor"): return "\e[35m"                # magenta (#if, #import)
   if scope.startsWith("entity.name.tag"): return "\e[36;1m"                # bold cyan
   if scope.startsWith("entity.other.attribute-name"): return "\e[33m"      # yellow (attributes)
+  if scope.startsWith("entity.name.type"): return "\e[34;1m"                   # bold blue (Uppercase types)
   if scope.startsWith("keyword.control"): return "\e[35;1m"                # bold magenta
   if scope.startsWith("keyword.operator"): return "\e[37m"                 # white
   if scope.startsWith("storage.type"): return "\e[34;1m"                   # bold blue
