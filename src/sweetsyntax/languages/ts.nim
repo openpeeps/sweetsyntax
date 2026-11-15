@@ -1067,10 +1067,10 @@ proc parseTSReturnType(p: var GenericParser): Node =
 
 proc isOverloadImplAhead(p: var GenericParser, name: string): bool =
   ## Speculative check: does a same-name function *implementation* (a body
-  ## block) follow the current position? Used to tell overload signatures
-  ## (dropped) from implementation-less declarations (an error).
-  ## `export` / `default` / `async` prefixes are skipped. Restores all
-  ## parser/lexer state either way; drops trial spans.
+  ## block) follow the current position? Consecutive overload signatures
+  ## are skipped over; `export` / `default` / `async` prefixes are allowed
+  ## per declaration. Restores all parser/lexer state either way; drops
+  ## trial spans.
   let mark = (lex: markLexer(p.lexer), prev: p.prev, curr: p.curr, next: p.next)
   let slen = p.stripSpans.len
   template restore() =
@@ -1080,39 +1080,45 @@ proc isOverloadImplAhead(p: var GenericParser, name: string): bool =
     p.next = mark.next
     p.stripSpans.setLen(slen)
   try:
-    while p.curr.kind in {tkComment, tkDocComment}:
-      walk p
-    while p.curr.kind == tkIdentifier and p.curr.value in ["export", "default"]:
-      walk p
+    while true:
       while p.curr.kind in {tkComment, tkDocComment}:
         walk p
-    if p.curr.kind == tkIdentifier and p.curr.value == "async" and
-        p.next.kind == tkIdentifier and p.next.value == "function":
-      walk p
-    if not (p.curr.kind == tkIdentifier and p.curr.value == "function"):
-      restore()
-      return false
-    walk p
-    if p.curr.kind == tkPunct and p.curr.value == "*":
-      walk p
-    if p.curr.kind == tkIdentifier:
-      if p.curr.value != name:
+      while p.curr.kind == tkIdentifier and p.curr.value in ["export", "default"]:
+        walk p
+        while p.curr.kind in {tkComment, tkDocComment}:
+          walk p
+      if p.curr.kind == tkIdentifier and p.curr.value == "async" and
+          p.next.kind == tkIdentifier and p.next.value == "function":
+        walk p
+      if not (p.curr.kind == tkIdentifier and p.curr.value == "function"):
         restore()
         return false
       walk p
-    elif name.len > 0:
-      restore()
-      return false
-    if p.curr.kind == tkPunct and p.curr.value == "<":
-      discard parseTSGenericParams(p)
-    if not (p.curr.kind == tkPunct and p.curr.value == "("):
-      restore()
-      return false
-    discard parseTSParams(p)
-    discard parseTSReturnType(p)
-    while p.curr.kind in {tkComment, tkDocComment}:
-      walk p
-    result = p.curr.kind == tkPunct and p.curr.value == "{"
+      if p.curr.kind == tkPunct and p.curr.value == "*":
+        walk p
+      if p.curr.kind == tkIdentifier:
+        if p.curr.value != name:
+          restore()
+          return false
+        walk p
+      elif name.len > 0:
+        restore()
+        return false
+      if p.curr.kind == tkPunct and p.curr.value == "<":
+        discard parseTSGenericParams(p)
+      if not (p.curr.kind == tkPunct and p.curr.value == "("):
+        restore()
+        return false
+      discard parseTSParams(p)
+      discard parseTSReturnType(p)
+      while p.curr.kind in {tkComment, tkDocComment}:
+        walk p
+      if p.curr.kind == tkPunct and p.curr.value == "{":
+        result = true
+        break
+      # Another bodiless signature: keep scanning for the implementation.
+      if p.curr.kind == tkPunct and p.curr.value == ";":
+        walk p
   except OpenAstParsingError:
     result = false
   restore()
@@ -1768,7 +1774,7 @@ proc tsHandlers*(p: var GenericParser) =
       children: @[Node(kind: nkIdent, name: "class"), name, generics, parent, impls])
     p.expectWalk("{")
     let body = Node(kind: nkBlock)
-    var bodiedKeys: seq[string] = @[]
+    var bodiedKeys: seq[(string, int)] = @[]
     var pendingBodiless: seq[(string, int, int)] = @[]
     while not (p.curr.kind == tkPunct and p.curr.value == "}"):
       if p.curr.kind == tkEOF:
@@ -1900,7 +1906,7 @@ proc tsHandlers*(p: var GenericParser) =
           let bracePos = p.markPos()
           fnBody = parseBlock(p)
           if keyName.len > 0:
-            bodiedKeys.add(keyName)
+            bodiedKeys.add((keyName, memberFrom))
           # Constructor parameter properties (`constructor(private x)`)
           # need `this.x = x` assignments: replace the `{` with itself
           # plus the assignments.
@@ -1992,7 +1998,12 @@ proc tsHandlers*(p: var GenericParser) =
     # this body: drop the signature, or record a missing-implementation
     # error. (Abstract/declare members were erased inline above.)
     for (keyName, sigFrom, sigEnd) in pendingBodiless:
-      if keyName in bodiedKeys:
+      var hasImpl = false
+      for (bk, bpos) in bodiedKeys:
+        if bk == keyName and bpos > sigEnd:
+          hasImpl = true
+          break
+      if hasImpl:
         if sigEnd > sigFrom:
           p.stripSpans.add(StripSpan(kind: skErase, span: sigFrom ..< sigEnd))
       else:

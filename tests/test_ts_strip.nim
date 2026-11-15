@@ -57,6 +57,11 @@ suite "TypeScript lowering spans":
     check slices("function f(x: string): void; function f(x: any) { }") ==
       @[(skErase, ": string"), (skErase, ": void"),
         (skErase, "function f(x: string): void;"), (skErase, ": any")]
+    check slices("function f(x: string): void; function f(x: number): void; function f(x: any) { }") ==
+      @[(skErase, ": string"), (skErase, ": void"),
+        (skErase, "function f(x: string): void;"),
+        (skErase, ": number"), (skErase, ": void"),
+        (skErase, "function f(x: number): void;"), (skErase, ": any")]
     let bad = parseSpans("function f(x: string): void;")
     check bad.len == 3
     check bad[^1].kind == skError
