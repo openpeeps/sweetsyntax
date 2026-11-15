@@ -93,16 +93,30 @@ proc skipTSComments(p: var GenericParser) {.inline.} =
   while p.curr.kind in {tkComment, tkDocComment}:
     discard parseCommentGeneric(p)
 
-proc consumeTypeCloser(p: var GenericParser) =
-  ## Consume one `>` worth of closer. Generic nesting lexes `>>` / `>>>`
-  ## as single shift tokens, so split them in place instead of walking:
-  ## the outer level still sees (and consumes) its own `>`.
+proc consumeTypeCloser(p: var GenericParser): int =
+  ## Consume one `>` worth of closer and return the byte end of the full
+  ## closer token. Generic nesting lexes `>>` / `>>>` as single shift
+  ## tokens, so split them in place instead of walking: the outer level
+  ## still sees (and consumes) its own `>`. Split extents are remembered
+  ## per token start (first split wins: the innermost, fullest extent),
+  ## because the mutated token understates its length and a later walk
+  ## would otherwise miss the remainder.
   if p.curr.kind == tkPunct and p.curr.value == ">":
+    let pos = p.curr.pos
     walk p
+    result = max(p.consumedEnd(), p.closerEnds.getOrDefault(pos, -1))
   elif p.curr.kind == tkPunct and p.curr.value == ">>":
+    let pos = p.curr.pos
+    if not p.closerEnds.hasKey(pos):
+      p.closerEnds[pos] = pos + 2
     p.curr.value = ">"
+    result = pos + 2
   elif p.curr.kind == tkPunct and p.curr.value == ">>>":
+    let pos = p.curr.pos
+    if not p.closerEnds.hasKey(pos):
+      p.closerEnds[pos] = pos + 3
     p.curr.value = ">>"
+    result = pos + 3
   else:
     error(p, "Expected '>' to close generic arguments")
 
@@ -118,12 +132,105 @@ proc parseTSQualifiedName(p: var GenericParser): Node =
       result = Node(kind: nkDotExpr, children: @[result, part]).stampFrom(result)
     walk p
 
+proc dottedPath(n: Node): seq[string] =
+  ## Flatten a qualified name (`A.B.C`) to its path. Empty when any part
+  ## is not a plain identifier.
+  var cur = n
+  var rev: seq[string] = @[]
+  while cur != nil and cur.kind == nkDotExpr and cur.children.len == 2:
+    if cur.children[1].kind != nkIdent:
+      return @[]
+    rev.add(cur.children[1].name)
+    cur = cur.children[0]
+  if cur != nil and cur.kind == nkIdent:
+    rev.add(cur.name)
+    result = rev
+    for i in 0 ..< result.len div 2:
+      swap(result[i], result[result.len - 1 - i])
+  else:
+    result = @[]
+
+proc patternIdents(n: Node): seq[string] =
+  ## Bound names in a destructuring pattern. Shape-aware: values of
+  ## pairs, pattern slots of IdentDefs, elements of array patterns and
+  ## spread inners are bound; defaults and computed keys are not.
+  if n.isNil:
+    return @[]
+  case n.kind
+  of nkIdent:
+    result = @[n.name]
+  of nkIdentDefs:
+    if n.children.len > 0:
+      result = patternIdents(n.children[0])
+  of nkColonExpr:
+    if n.children.len > 1:
+      result = patternIdents(n.children[1])
+  of nkBlock, nkArrayLit:
+    for c in n.children:
+      result.add(patternIdents(c))
+  of nkPrefix:
+    for i in 1 ..< n.children.len:
+      result.add(patternIdents(n.children[i]))
+  of nkInfix:
+    # `a = default`: the lhs binds. (Any other infix cannot appear in
+    # a pattern; ignore it.)
+    if n.children.len > 1 and n.children[0].kind == nkIdent and
+        n.children[0].name == "=":
+      result = patternIdents(n.children[1])
+  of nkPostfix:
+    if n.children.len > 0:
+      result = patternIdents(n.children[0])
+  else:
+    discard
+
+proc exportDeclNames(n: Node): seq[string] =
+  ## Exported binding names of a declaration node (for `export ...`
+  ## inside namespaces: `N.<name> = <name>` assignments).
+  if n.isNil:
+    return @[]
+  case n.kind
+  of nkFunction:
+    if n.children.len > 2 and n.children[2].kind == nkIdent:
+      result = @[n.children[2].name]
+  of nkStatement:
+    if n.children.len == 0 or n.children[0].kind != nkIdent:
+      return @[]
+    case n.children[0].name
+    of "var", "let", "const":
+      for i in 1 ..< n.children.len:
+        let e = n.children[i]
+        if e.kind == nkIdent:
+          result.add(e.name)
+        else:
+          result.add(patternIdents(e))
+    of "class", "enum", "type":
+      if n.children.len > 1 and n.children[1].kind == nkIdent:
+        result = @[n.children[1].name]
+    of "namespace", "module":
+      if n.children.len > 1:
+        let path = dottedPath(n.children[1])
+        if path.len > 0:
+          result = @[path[^1]]
+    of "declare", "abstract":
+      if n.children.len > 1:
+        result = exportDeclNames(n.children[1])
+    else:
+      # abstract methods, overloads...: no namespace assignment.
+      discard
+  of nkInterface:
+    if n.children.len > 0 and n.children[0].kind == nkIdent:
+      result = @[n.children[0].name]
+  else:
+    discard
+
 proc parseTSGenericArgs(p: var GenericParser): seq[Node] =
   ## Called with `curr == "<"`. Parses `<A, B<C>>` into type nodes,
   ## handling `>>` / `>>>` splitting on the way out.
   result = @[]
+  let eraseFrom = p.markPos()
   walk p # consume `<`
   skipTSComments(p)
+  var closerEnd = -1
   while true:
     if p.curr.kind == tkEOF:
       error(p, "Unexpected EOF in generic arguments")
@@ -133,10 +240,11 @@ proc parseTSGenericArgs(p: var GenericParser): seq[Node] =
       walk p
       skipTSComments(p)
     elif p.curr.kind == tkPunct and p.curr.value in [">", ">>", ">>>"]:
-      consumeTypeCloser(p)
+      closerEnd = consumeTypeCloser(p)
       break
     else:
       error(p, "Expected ',' or '>' in generic arguments")
+  p.stripSince(eraseFrom, upto = closerEnd)
 
 proc parseTSTypeSuffixes(p: var GenericParser, base: Node): Node =
   ## Array shorthands and indexed access: `T[]`, `T[K]`, `T[K][]`, `(A|B)[K]`.
@@ -697,6 +805,7 @@ proc parseTSTupleType(p: var GenericParser): Node =
       if p.curr.kind == tkIdentifier and p.next.kind == tkPunct and
           p.next.value == "?":
         let mark = (lex: markLexer(p.lexer), prev: p.prev, curr: p.curr, next: p.next)
+        let slen = p.stripSpans.len
         let nm0 = Node(kind: nkIdent, name: p.curr.value).stamp(p.curr)
         walk p
         walk p
@@ -708,6 +817,7 @@ proc parseTSTupleType(p: var GenericParser): Node =
             children: @[nm0, Node(kind: nkIdent, name: "?").stamp(qTk)]).stampFrom(nm0)
           item = Node(kind: nkColonExpr, children: @[onm, ty]).stampFrom(nm0)
         else:
+          p.stripSpans.setLen(slen)
           restoreLexer(p.lexer, mark.lex)
           p.prev = mark.prev
           p.curr = mark.curr
@@ -728,8 +838,10 @@ proc parseTSGenericParams(p: var GenericParser): Node =
   ## Called with `curr == "<"`. Parses `<T, U extends C = D>` into
   ## `nkIdentDefs` of `nkIdentDefs [name, constraintOrEmpty, defaultOrEmpty]`.
   result = Node(kind: nkIdentDefs).stamp(p.curr)
+  let eraseFrom = p.markPos()
   walk p # consume `<`
   skipTSComments(p)
+  var closerEnd = -1
   while true:
     if p.curr.kind == tkEOF:
       error(p, "Unexpected EOF in generic parameters")
@@ -754,10 +866,11 @@ proc parseTSGenericParams(p: var GenericParser): Node =
       walk p
       skipTSComments(p)
     elif p.curr.kind == tkPunct and p.curr.value in [">", ">>", ">>>"]:
-      consumeTypeCloser(p)
+      closerEnd = consumeTypeCloser(p)
       break
     else:
       error(p, "Expected ',' or '>' in generic parameters")
+  p.stripSince(eraseFrom, upto = closerEnd)
 
 proc parseTSParamsRest(p: var GenericParser): Node =
   ## Parse function parameters after the opening `(` was consumed.
@@ -772,6 +885,20 @@ proc parseTSParamsRest(p: var GenericParser): Node =
     if p.curr.kind in {tkComment, tkDocComment}:
       discard parseCommentGeneric(p)
       continue
+    # `this: Type` parameters carry no runtime value: erase the whole
+    # entry including a following comma. (`this` takes no modifiers, so
+    # this check runs before the flags loop.)
+    if p.curr.kind == tkIdentifier and p.curr.value == "this" and
+        p.next.kind == tkPunct and p.next.value == ":":
+      let thisFrom = p.markPos()
+      walk p # consume `this`
+      walk p # consume `:`
+      discard parseTSType(p)
+      skipTSComments(p)
+      if p.curr.kind == tkPunct and p.curr.value == ",":
+        walk p
+      p.stripSince(thisFrom)
+      continue
     var flags: seq[Node] = @[]
     while p.curr.kind == tkPunct and p.curr.value == "@":
       for d in parseTSDecorators(p):
@@ -779,7 +906,7 @@ proc parseTSParamsRest(p: var GenericParser): Node =
     while p.curr.kind == tkIdentifier and p.curr.value in
         ["public", "private", "protected", "readonly", "override"]:
       flags.add(Node(kind: nkIdent, name: p.curr.value).stamp(p.curr))
-      walk p
+      p.stripCurrPast()
     if p.curr.kind == tkPunct and p.curr.value == "...":
       let dotsTk = p.curr
       walk p
@@ -788,8 +915,10 @@ proc parseTSParamsRest(p: var GenericParser): Node =
         let pattern = parseExpression(p)
         var ty = newEmptyNode()
         if p.curr.kind == tkPunct and p.curr.value == ":":
+          let tstart = p.markPos()
           walk p
           ty = parseTSType(p)
+          p.stripSince(tstart)
         inner = Node(kind: nkIdentDefs, children: @[pattern, ty, newEmptyNode()])
       else:
         expectTSIdent:
@@ -797,8 +926,10 @@ proc parseTSParamsRest(p: var GenericParser): Node =
           walk p
           var ty = newEmptyNode()
           if p.curr.kind == tkPunct and p.curr.value == ":":
+            let tstart = p.markPos()
             walk p
             ty = parseTSType(p)
+            p.stripSince(tstart)
           inner = Node(kind: nkIdentDefs, children: @[nm, ty, newEmptyNode()])
       result.children.add(Node(kind: nkPrefix,
         children: @[Node(kind: nkIdent, name: "...").stamp(dotsTk), inner]).stamp(dotsTk))
@@ -808,8 +939,10 @@ proc parseTSParamsRest(p: var GenericParser): Node =
       let pattern = parseExpression(p)
       var ty = newEmptyNode()
       if p.curr.kind == tkPunct and p.curr.value == ":":
+        let tstart = p.markPos()
         walk p
         ty = parseTSType(p)
+        p.stripSince(tstart)
       var default = newEmptyNode()
       if p.curr.kind == tkPunct and p.curr.value == "=":
         walk p
@@ -827,14 +960,17 @@ proc parseTSParamsRest(p: var GenericParser): Node =
     var nm: Node = Node(kind: nkIdent, name: p.curr.value).stamp(p.curr)
     walk p
     if p.curr.kind == tkPunct and p.curr.value == "?":
+      p.stripCurr()
       let qTk = p.curr
       walk p
       nm = Node(kind: nkPostfix,
         children: @[nm, Node(kind: nkIdent, name: "?").stamp(qTk)]).stampFrom(nm)
     var ty = newEmptyNode()
     if p.curr.kind == tkPunct and p.curr.value == ":":
+      let tstart = p.markPos()
       walk p
       ty = parseTSType(p)
+      p.stripSince(tstart)
     var default = newEmptyNode()
     if p.curr.kind == tkPunct and p.curr.value == "=":
       walk p
@@ -856,9 +992,14 @@ proc parseTSParams(p: var GenericParser): Node =
 
 proc parseTSDecorators(p: var GenericParser): seq[Node] =
   ## One or more `@expr` decorators. Each is `nkPrefix [@, target]` where
-  ## the target is a qualified name with an optional call.
+  ## the target is a qualified name with an optional call. Decorators have
+  ## no lowering (v1): record an unsupported span and let the consumer
+  ## raise with position.
   result = @[]
+  let decFrom = p.markPos()
+  var sawDec = false
   while p.curr.kind == tkPunct and p.curr.value == "@":
+    sawDec = true
     let atTk = p.curr
     walk p # consume `@`
     skipTSComments(p)
@@ -890,11 +1031,15 @@ proc parseTSDecorators(p: var GenericParser): seq[Node] =
     result.add(Node(kind: nkPrefix,
       children: @[Node(kind: nkIdent, name: "@").stamp(atTk), target]).stamp(atTk))
     skipTSComments(p)
+  if sawDec:
+    p.stripError(decFrom,
+      "Decorators are not supported (TypeScript v1: remove them or use plain JavaScript)")
 
 proc parseTSReturnType(p: var GenericParser): Node =
   ## Assertion signatures (`: asserts x is T`) or plain types after `:`.
   result = newEmptyNode()
   if p.curr.kind == tkPunct and p.curr.value == ":":
+    let tstart = p.markPos()
     walk p
     skipTSComments(p)
     if p.curr.kind == tkIdentifier and p.curr.value == "asserts":
@@ -918,11 +1063,69 @@ proc parseTSReturnType(p: var GenericParser): Node =
         result = Node(kind: nkIdent, name: "asserts").stamp(aTk)
     else:
       result = parseTSType(p)
+    p.stripSince(tstart)
 
-proc parseTSFunctionDecl(p: var GenericParser, keyword: string): Node =
+proc isOverloadImplAhead(p: var GenericParser, name: string): bool =
+  ## Speculative check: does a same-name function *implementation* (a body
+  ## block) follow the current position? Used to tell overload signatures
+  ## (dropped) from implementation-less declarations (an error).
+  ## `export` / `default` / `async` prefixes are skipped. Restores all
+  ## parser/lexer state either way; drops trial spans.
+  let mark = (lex: markLexer(p.lexer), prev: p.prev, curr: p.curr, next: p.next)
+  let slen = p.stripSpans.len
+  template restore() =
+    restoreLexer(p.lexer, mark.lex)
+    p.prev = mark.prev
+    p.curr = mark.curr
+    p.next = mark.next
+    p.stripSpans.setLen(slen)
+  try:
+    while p.curr.kind in {tkComment, tkDocComment}:
+      walk p
+    while p.curr.kind == tkIdentifier and p.curr.value in ["export", "default"]:
+      walk p
+      while p.curr.kind in {tkComment, tkDocComment}:
+        walk p
+    if p.curr.kind == tkIdentifier and p.curr.value == "async" and
+        p.next.kind == tkIdentifier and p.next.value == "function":
+      walk p
+    if not (p.curr.kind == tkIdentifier and p.curr.value == "function"):
+      restore()
+      return false
+    walk p
+    if p.curr.kind == tkPunct and p.curr.value == "*":
+      walk p
+    if p.curr.kind == tkIdentifier:
+      if p.curr.value != name:
+        restore()
+        return false
+      walk p
+    elif name.len > 0:
+      restore()
+      return false
+    if p.curr.kind == tkPunct and p.curr.value == "<":
+      discard parseTSGenericParams(p)
+    if not (p.curr.kind == tkPunct and p.curr.value == "("):
+      restore()
+      return false
+    discard parseTSParams(p)
+    discard parseTSReturnType(p)
+    while p.curr.kind in {tkComment, tkDocComment}:
+      walk p
+    result = p.curr.kind == tkPunct and p.curr.value == "{"
+  except OpenAstParsingError:
+    result = false
+  restore()
+
+proc parseTSFunctionDecl(p: var GenericParser, keyword: string,
+    fnFrom = -1): Node =
   ## Shared tail for `function` declarations (and the `function` half of
   ## `async function` / `export default function`). Mirrors
   ## `js.registerFunction`'s seven slots, with `<>` generics and overloads.
+  ## `fnFrom` is the byte offset of the declaration start (the `function`
+  ## or `async` keyword); overload signatures are erased, lone
+  ## implementation-less declarations recorded as errors.
+  let declFrom = if fnFrom >= 0: fnFrom else: p.markPos()
   result = Node(kind: nkFunction)
   result.children.add(Node(kind: nkIdent, name: keyword))
   walk p # consume `function`
@@ -953,8 +1156,27 @@ proc parseTSFunctionDecl(p: var GenericParser, keyword: string): Node =
   elif p.curr.kind == tkPunct and p.curr.value == ";":
     walk p
     result.children.add(newEmptyNode())
+    # Overload signature (dropped) or missing implementation (error).
+    var fnName = ""
+    if result.children.len > 2 and result.children[2].kind == nkIdent:
+      fnName = result.children[2].name
+    if isOverloadImplAhead(p, fnName):
+      p.stripSince(declFrom)
+    else:
+      p.stripError(declFrom,
+        "Function '" & (if fnName.len > 0: fnName else: "<anonymous>") &
+        "' lacks an implementation (overload signatures must be followed by an implementation)")
   else:
     result.children.add(newEmptyNode())
+    var fnName = ""
+    if result.children.len > 2 and result.children[2].kind == nkIdent:
+      fnName = result.children[2].name
+    if isOverloadImplAhead(p, fnName):
+      p.stripSince(declFrom)
+    else:
+      p.stripError(declFrom,
+        "Function '" & (if fnName.len > 0: fnName else: "<anonymous>") &
+        "' lacks an implementation (overload signatures must be followed by an implementation)")
 
 proc parseTSObjectLiteral(p: var GenericParser, minPrec: int = 0): Node =
   ## Object literals with typed methods: `{ m<T>(x: T): R { … }, async
@@ -1066,6 +1288,7 @@ proc isGenericCallAhead(p: var GenericParser): bool =
   ## Speculative check: does `curr == "<"` open generic arguments followed
   ## by a call paren (`f<T>(x)`)? Restores all parser/lexer state either way.
   let mark = (lex: markLexer(p.lexer), prev: p.prev, curr: p.curr, next: p.next)
+  let slen = p.stripSpans.len
   template restore() =
     restoreLexer(p.lexer, mark.lex)
     p.prev = mark.prev
@@ -1077,25 +1300,32 @@ proc isGenericCallAhead(p: var GenericParser): bool =
     result = p.curr.kind == tkPunct and p.curr.value == "("
   except OpenAstParsingError:
     result = false
+  # Speculation always rewinds: drop any spans the trial parse recorded.
+  p.stripSpans.setLen(slen)
   restore()
 
 proc tsHandlers*(p: var GenericParser) =
   ## Register TypeScript statement, prefix and expression handlers on top
   ## of the JavaScript ones.
   jsHandlers(p)
+  p.stripPostfix.incl("!")
   p.braceHandler = parseTSObjectLiteral
 
   exprHandler p, "infix:as":
     let opTk = p.curr
+    let eraseFrom = p.markPos()
     walk p # consume `as`
     let rhs = parseTSType(p)
+    p.stripSince(eraseFrom)
     result = Node(kind: nkInfix,
       children: @[Node(kind: nkIdent, name: "as").stamp(opTk), lhs, rhs]).stampFrom(lhs)
 
   exprHandler p, "infix:satisfies":
     let opTk = p.curr
+    let eraseFrom = p.markPos()
     walk p # consume `satisfies`
     let rhs = parseTSType(p)
+    p.stripSince(eraseFrom)
     result = Node(kind: nkInfix,
       children: @[Node(kind: nkIdent, name: "satisfies").stamp(opTk),
                   lhs, rhs]).stampFrom(lhs)
@@ -1125,6 +1355,8 @@ proc tsHandlers*(p: var GenericParser) =
     ## is needed — but `.tsx` forbids assertions (they clash with JSX),
     ## mirroring tsc.
     let ltTk = p.curr
+    let eraseFrom = p.markPos()
+    var closerEnd = -1
     walk p # consume `<`
     skipTSComments(p)
     if p.curr.kind == tkPunct and p.curr.value == ">":
@@ -1153,6 +1385,7 @@ proc tsHandlers*(p: var GenericParser) =
           let more = parseTSGenericArgs(p)
           refNode = Node(kind: nkBracketExpr, children: @[refNode] & more).stampFrom(refNode)
       p.expectWalk(">")
+      p.stripSince(eraseFrom)
       let operand = parseExpression(p, 13)
       return Node(kind: nkCast, children: @[refNode, operand]).stamp(ltTk)
     # Generic parameter list (each may carry `extends` / `=`).
@@ -1192,9 +1425,10 @@ proc tsHandlers*(p: var GenericParser) =
       generics.children.add(Node(kind: nkIdentDefs,
         children: @[nm, constraint, default]))
     if p.curr.kind == tkPunct and p.curr.value in [">", ">>", ">>>"]:
-      consumeTypeCloser(p)
+      closerEnd = consumeTypeCloser(p)
     else:
       error(p, "Expected '>' after generic parameters")
+    p.stripSince(eraseFrom, upto = closerEnd)
     skipTSComments(p)
     if p.curr.kind == tkPunct and p.curr.value == "(":
       # Generic arrow: `<T>(x: T): R => body`.
@@ -1232,6 +1466,7 @@ proc tsHandlers*(p: var GenericParser) =
       skipTSComments(p)
       if p.curr.kind == tkPunct and p.curr.value == "<":
         let mark = (lex: markLexer(p.lexer), prev: p.prev, curr: p.curr, next: p.next)
+        let slen = p.stripSpans.len
         var args: seq[Node] = @[]
         var ok = false
         try:
@@ -1240,6 +1475,7 @@ proc tsHandlers*(p: var GenericParser) =
         except OpenAstParsingError:
           ok = false
         if not ok:
+          p.stripSpans.setLen(slen)
           restoreLexer(p.lexer, mark.lex)
           p.prev = mark.prev
           p.curr = mark.curr
@@ -1272,6 +1508,58 @@ proc tsHandlers*(p: var GenericParser) =
       result = Node(kind: nkPrefix,
         children: @[Node(kind: nkIdent, name: "new").stamp(newTk), base]).stamp(newTk)
 
+  stmtHandler p, "try_js":
+    ## Same as the JS `try`/`catch`/`finally`, plus an optional catch
+    ## parameter annotation (`catch (e: any)`, the only forms tsc allows).
+    walk p # consume 'try'
+    if not (p.curr.kind == tkPunct and p.curr.value == "{"):
+      error(p, "Expected '{' after 'try'")
+    result = Node(kind: nkStatement)
+    result.children.add(Node(kind: nkIdent, name: "try"))
+    result.children.add(parseBlock(p))
+    while true:
+      while p.curr.kind in {tkComment, tkDocComment}:
+        discard parseCommentGeneric(p)
+      if p.curr.kind == tkIdentifier and p.curr.value == "catch":
+        walk p
+        var param = newEmptyNode()
+        if p.curr.kind == tkPunct and p.curr.value == "(":
+          walk p
+          if p.curr.kind == tkIdentifier:
+            param = Node(kind: nkIdent, name: p.curr.value).stamp(p.curr)
+            walk p
+            if p.curr.kind == tkPunct and p.curr.value == ":":
+              let tstart = p.markPos()
+              walk p
+              discard parseTSType(p)
+              p.stripSince(tstart)
+          elif p.curr.kind == tkPunct and p.curr.value == "{":
+            # destructured catch param — keep the raw braces
+            var depth = 0
+            let startPos = p.lexer.pos
+            while true:
+              if p.curr.kind == tkEOF: error(p, "Unexpected EOF in catch parameter")
+              if p.curr.kind == tkPunct and p.curr.value == "{": inc depth
+              elif p.curr.kind == tkPunct and p.curr.value == "}":
+                dec depth
+                if depth == 0: break
+              walk p
+            param = Node(kind: nkLitString,
+              valStr: "{" & p.lexer.getLexeme(startPos + 1, p.lexer.pos - 1) & "}")
+          p.expectWalk(")")
+        if not (p.curr.kind == tkPunct and p.curr.value == "{"):
+          error(p, "Expected '{' after 'catch'")
+        result.children.add(Node(kind: nkStatement,
+          children: @[Node(kind: nkIdent, name: "except"), param, parseBlock(p)]))
+      elif p.curr.kind == tkIdentifier and p.curr.value == "finally":
+        walk p
+        if not (p.curr.kind == tkPunct and p.curr.value == "{"):
+          error(p, "Expected '{' after 'finally'")
+        result.children.add(Node(kind: nkStatement,
+          children: @[Node(kind: nkIdent, name: "finally"), parseBlock(p)]))
+      else:
+        break
+
   stmtHandler p, "declarator":
     ## `let` / `var` / `const` with full type annotations, `!` definite
     ## assignment and `const enum` delegation. `as const` still parses:
@@ -1281,8 +1569,14 @@ proc tsHandlers*(p: var GenericParser) =
     if p.curr.kind == tkIdentifier and p.curr.value == "const" and
         p.next.kind == tkIdentifier and p.next.value == "enum":
       let constTk = p.curr
+      let constFrom = p.markPos()
       walk p # consume `const`
       let enumNode = p.stmtHandlers["enum"](p)
+      # `const enum` lowers like `enum`; extend the recorded span over
+      # the `const` prefix so no modifier is left behind.
+      if p.stripSpans.len > 0 and p.stripSpans[^1].kind == skEnum and
+          p.stripSpans[^1].span.a >= constFrom:
+        p.stripSpans[^1].span.a = constFrom
       result = Node(kind: nkStatement,
         children: @[Node(kind: nkIdent, name: "const").stamp(constTk), enumNode]).stamp(constTk)
       return
@@ -1297,8 +1591,10 @@ proc tsHandlers*(p: var GenericParser) =
         let pattern = parseExpression(p, 1)
         var ty = newEmptyNode()
         if p.curr.kind == tkPunct and p.curr.value == ":":
+          let tstart = p.markPos()
           walk p
           ty = parseTSType(p)
+          p.stripSince(tstart)
         var init = newEmptyNode()
         if p.curr.kind == tkPunct and p.curr.value == "=":
           walk p
@@ -1311,14 +1607,17 @@ proc tsHandlers*(p: var GenericParser) =
         var nm: Node = Node(kind: nkIdent, name: p.curr.value).stamp(p.curr)
         walk p
         if p.curr.kind == tkPunct and p.curr.value == "!":
+          p.stripCurr()
           let bTk = p.curr
           walk p
           nm = Node(kind: nkPostfix,
             children: @[nm, Node(kind: nkIdent, name: "!").stamp(bTk)]).stampFrom(nm)
         var ty = newEmptyNode()
         if p.curr.kind == tkPunct and p.curr.value == ":":
+          let tstart = p.markPos()
           walk p
           ty = parseTSType(p)
+          p.stripSince(tstart)
         var init = newEmptyNode()
         if p.curr.kind == tkPunct and p.curr.value == "=":
           walk p
@@ -1336,10 +1635,11 @@ proc tsHandlers*(p: var GenericParser) =
 
   stmtHandler p, "async_function":
     ## `async function f<T>() {}` or typed/generic async arrows.
+    let asyncFrom = p.markPos()
     walk p # consume `async`
     skipTSComments(p)
     if p.curr.kind == tkIdentifier and p.curr.value == "function":
-      let fn = parseTSFunctionDecl(p, "function")
+      let fn = parseTSFunctionDecl(p, "function", asyncFrom)
       result = Node(kind: nkStatement)
       result.children.add(Node(kind: nkIdent, name: "async"))
       result.children.add(fn)
@@ -1399,6 +1699,7 @@ proc tsHandlers*(p: var GenericParser) =
       skipTSComments(p)
     var impls = newEmptyNode()
     if p.curr.kind == tkIdentifier and p.curr.value == "implements":
+      let implFrom = p.markPos()
       walk p
       skipTSComments(p)
       impls = Node(kind: nkIdentDefs)
@@ -1409,10 +1710,13 @@ proc tsHandlers*(p: var GenericParser) =
           walk p
           skipTSComments(p)
         else: break
+      p.stripSince(implFrom)
     result = Node(kind: nkStatement,
       children: @[Node(kind: nkIdent, name: "class"), name, generics, parent, impls])
     p.expectWalk("{")
     let body = Node(kind: nkBlock)
+    var bodiedKeys: seq[string] = @[]
+    var pendingBodiless: seq[(string, int, int)] = @[]
     while not (p.curr.kind == tkPunct and p.curr.value == "}"):
       if p.curr.kind == tkEOF:
         error(p, "Unexpected EOF in class body")
@@ -1429,11 +1733,13 @@ proc tsHandlers*(p: var GenericParser) =
           children: @[Node(kind: nkIdent, name: "static-block"), parseBlock(p)]))
         continue
       var decs: seq[Node] = @[]
+      let memberFrom = p.markPos()
       while p.curr.kind == tkPunct and p.curr.value == "@":
         for d in parseTSDecorators(p):
           decs.add(d)
         skipTSComments(p)
       var flags: seq[Node] = @[]
+      var dropMember = false
       while true:
         if p.curr.kind == tkPunct and p.curr.value == "*":
           flags.add(Node(kind: nkIdent, name: "*"))
@@ -1453,8 +1759,17 @@ proc tsHandlers*(p: var GenericParser) =
             (nxt.kind == tkPunct and nxt.value in ["(", "=", ";", "}", ":", "?", "!"]) or
             (nxt.kind == tkIdentifier and nxt.value in ["=", ":"])
           if isName: break
-          flags.add(Node(kind: nkIdent, name: p.curr.value).stamp(p.curr))
-          walk p
+          if p.curr.value in ["declare", "abstract"]:
+            # Ambient or abstract members have no runtime shape here:
+            # the whole member is erased below.
+            dropMember = true
+          let flagName = p.curr.value
+          let flagTk = p.curr
+          if p.curr.value notin ["static", "async", "get", "set"]:
+            p.stripCurrPast()
+          else:
+            walk p
+          flags.add(Node(kind: nkIdent, name: flagName).stamp(flagTk))
           continue
         break
       # Index signature: `[k: string]: T`.
@@ -1482,6 +1797,7 @@ proc tsHandlers*(p: var GenericParser) =
           p.expectWalk(":")
           let valTy = parseTSType(p)
           p.walkOpt(";")
+          p.stripSince(memberFrom)
           var idx = Node(kind: nkStatement,
             children: @[Node(kind: nkIdent, name: "index"),
                         Node(kind: nkIdentDefs, children: @[nm, keyTy]), valTy])
@@ -1509,6 +1825,7 @@ proc tsHandlers*(p: var GenericParser) =
           key = Node(kind: nkIdent, name: p.curr.value).stamp(p.curr)
         walk p
       if p.curr.kind == tkPunct and p.curr.value in ["?", "!"]:
+        p.stripCurr()
         let mTk = p.curr
         walk p
         key = Node(kind: nkPostfix,
@@ -1520,10 +1837,26 @@ proc tsHandlers*(p: var GenericParser) =
         let params = parseTSParams(p)
         let ret = parseTSReturnType(p)
         var fnBody = newEmptyNode()
+        var keyName = ""
+        case key.kind
+        of nkIdent: keyName = key.name
+        of nkLitString: keyName = key.valStr
+        of nkLitInt: keyName = $key.valInt
+        else: discard
         if p.curr.kind == tkPunct and p.curr.value == "{":
           fnBody = parseBlock(p)
+          if keyName.len > 0:
+            bodiedKeys.add(keyName)
         else:
           p.walkOpt(";")
+          if dropMember:
+            p.stripSince(memberFrom)
+          elif keyName.len > 0:
+            pendingBodiless.add((keyName, memberFrom, p.consumedEnd()))
+          else:
+            # Computed keys cannot be matched to an implementation here.
+            p.stripError(memberFrom,
+              "Computed method lacks an implementation")
         let fnNode = Node(kind: nkFunction,
           children: flags & @[methGenerics, params, ret, fnBody])
         var member = Node(kind: nkColonExpr, children: @[key, fnNode])
@@ -1534,13 +1867,17 @@ proc tsHandlers*(p: var GenericParser) =
       else:
         var ty = newEmptyNode()
         if p.curr.kind == tkPunct and p.curr.value == ":":
+          let tstart = p.markPos()
           walk p
           ty = parseTSType(p)
+          p.stripSince(tstart)
         var init = newEmptyNode()
         if p.curr.kind == tkPunct and p.curr.value == "=":
           walk p
           init = parseExpression(p)
         p.walkOpt(";")
+        if dropMember:
+          p.stripSince(memberFrom)
         var fieldStmt = Node(kind: nkStatement)
         fieldStmt.children.add(Node(kind: nkIdent, name: "field"))
         fieldStmt.children.add(flags)
@@ -1551,6 +1888,18 @@ proc tsHandlers*(p: var GenericParser) =
           fieldStmt = Node(kind: nkPragmaBlock,
             children: @[Node(kind: nkBlock, children: decs), fieldStmt])
         body.children.add(fieldStmt)
+    # Overload signatures resolve against same-key implementations in
+    # this body: drop the signature, or record a missing-implementation
+    # error. (Abstract/declare members were erased inline above.)
+    for (keyName, sigFrom, sigEnd) in pendingBodiless:
+      if keyName in bodiedKeys:
+        if sigEnd > sigFrom:
+          p.stripSpans.add(StripSpan(kind: skErase, span: sigFrom ..< sigEnd))
+      else:
+        p.stripSpans.add(StripSpan(kind: skError,
+          span: sigFrom ..< max(sigEnd, sigFrom),
+          text: "Method '" & keyName &
+          "' lacks an implementation (overload signatures must be followed by an implementation)"))
     p.expectWalk("}")
     result.children.add(body)
     if leadingDecs.len > 0:
@@ -1583,8 +1932,10 @@ proc tsHandlers*(p: var GenericParser) =
           let pattern = parseExpression(p)
           var ty = newEmptyNode()
           if p.curr.kind == tkPunct and p.curr.value == ":":
+            let tstart = p.markPos()
             walk p
             ty = parseTSType(p)
+            p.stripSince(tstart)
           var init = newEmptyNode()
           if p.curr.kind == tkPunct and p.curr.value == "=":
             walk p
@@ -1597,14 +1948,17 @@ proc tsHandlers*(p: var GenericParser) =
           var nm: Node = Node(kind: nkIdent, name: p.curr.value).stamp(p.curr)
           walk p
           if p.curr.kind == tkPunct and p.curr.value == "!":
+            p.stripCurr()
             let bTk = p.curr
             walk p
             nm = Node(kind: nkPostfix,
               children: @[nm, Node(kind: nkIdent, name: "!").stamp(bTk)]).stampFrom(nm)
           var ty = newEmptyNode()
           if p.curr.kind == tkPunct and p.curr.value == ":":
+            let tstart = p.markPos()
             walk p
             ty = parseTSType(p)
+            p.stripSince(tstart)
           var init = newEmptyNode()
           if p.curr.kind == tkPunct and p.curr.value == "=":
             walk p
@@ -1668,6 +2022,7 @@ proc tsHandlers*(p: var GenericParser) =
       error(p, "Expected ';', 'in', or 'of' in for loop")
 
   stmtHandler p, "type_alias":
+    let aliasFrom = p.markPos()
     walk p # consume `type`
     skipTSComments(p)
     expectTSIdent:
@@ -1685,8 +2040,10 @@ proc tsHandlers*(p: var GenericParser) =
     skipTSComments(p)
     result.children.add(parseTSType(p))
     p.walkOpt(";")
+    p.stripSince(aliasFrom)
 
   stmtHandler p, "interface":
+    let ifaceFrom = p.markPos()
     walk p # consume `interface`
     skipTSComments(p)
     expectTSIdent:
@@ -1720,8 +2077,10 @@ proc tsHandlers*(p: var GenericParser) =
     if p.curr.kind != tkPunct or p.curr.value != "{":
       error(p, "Expected '{' after interface header")
     result.children.add(parseTSObjectType(p))
+    p.stripSince(ifaceFrom)
 
   stmtHandler p, "enum":
+    let enumFrom = p.markPos()
     walk p # consume `enum`
     skipTSComments(p)
     var name: Node
@@ -1735,6 +2094,7 @@ proc tsHandlers*(p: var GenericParser) =
     skipTSComments(p)
     p.expectWalk("{")
     let body = Node(kind: nkBlock)
+    var enumMembers: seq[EnumMember] = @[]
     while not (p.curr.kind == tkPunct and p.curr.value == "}"):
       if p.curr.kind == tkEOF:
         error(p, "Unexpected EOF in enum")
@@ -1745,6 +2105,7 @@ proc tsHandlers*(p: var GenericParser) =
         walk p
         continue
       var member: Node
+      let mstart = p.markPos()
       if p.curr.kind == tkString:
         member = Node(kind: nkLitString, valStr: p.curr.value).stamp(p.curr)
         walk p
@@ -1753,18 +2114,46 @@ proc tsHandlers*(p: var GenericParser) =
           member = Node(kind: nkIdent, name: p.curr.value).stamp(p.curr)
         walk p
       var init = newEmptyNode()
+      var em = EnumMember(line: member.ln)
+      if member.kind == nkLitString:
+        em.strName = true
+        em.nameSpan = mstart ..< p.consumedEnd()
+      else:
+        em.name = member.name
       if p.curr.kind == tkPunct and p.curr.value == "=":
         walk p
+        let istart = p.markPos()
         init = parseExpression(p)
+        let iend = p.consumedEnd()
+        case init.kind
+        of nkLitInt:
+          em.initKind = ikInt
+          em.intVal = init.valInt
+          em.initSpan = istart ..< iend
+        of nkLitString:
+          em.initKind = ikStr
+          em.strVal = init.valStr
+          em.initSpan = istart ..< iend
+        else:
+          em.initKind = ikExpr
+          em.initSpan = istart ..< iend
       body.children.add(Node(kind: nkIdentDefs,
         children: @[member, newEmptyNode(), init]))
+      enumMembers.add(em)
       p.walkOpt(",")
     p.expectWalk("}")
     result.children.add(body)
+    if name.kind == nkIdent:
+      p.stripSpans.add(StripSpan(kind: skEnum,
+        span: enumFrom ..< p.consumedEnd(),
+        text: name.name, members: enumMembers))
+    # Anonymous enums only occur with `export default` (rejected as ESM
+    # downstream); leave them untouched.
 
   stmtHandler p, "namespace":
     let kwTk = p.curr
     let kw = p.curr.value
+    let nsFrom = p.markPos()
     walk p # consume `namespace` / `module`
     skipTSComments(p)
     var name: Node
@@ -1778,14 +2167,19 @@ proc tsHandlers*(p: var GenericParser) =
       children: @[Node(kind: nkIdent, name: kw).stamp(kwTk), name])
     if p.curr.kind == tkPunct and p.curr.value == "{":
       result.children.add(parseBlock(p))
+      let path = if name.kind == nkLitString: @[] else: dottedPath(name)
+      p.stripSpans.add(StripSpan(kind: skNamespace,
+        span: nsFrom ..< p.consumedEnd(), path: path))
     elif p.curr.kind == tkPunct and p.curr.value == ";":
       walk p
       result.children.add(newEmptyNode())
+      p.stripSince(nsFrom)
     else:
       result.children.add(newEmptyNode())
 
   stmtHandler p, "module":
     let kwTk = p.curr
+    let modFrom = p.markPos()
     walk p # consume `module`
     skipTSComments(p)
     var name: Node
@@ -1799,14 +2193,19 @@ proc tsHandlers*(p: var GenericParser) =
       children: @[Node(kind: nkIdent, name: "module").stamp(kwTk), name])
     if p.curr.kind == tkPunct and p.curr.value == "{":
       result.children.add(parseBlock(p))
+      let path = if name.kind == nkLitString: @[] else: dottedPath(name)
+      p.stripSpans.add(StripSpan(kind: skNamespace,
+        span: modFrom ..< p.consumedEnd(), path: path))
     elif p.curr.kind == tkPunct and p.curr.value == ";":
       walk p
       result.children.add(newEmptyNode())
+      p.stripSince(modFrom)
     else:
       result.children.add(newEmptyNode())
 
   stmtHandler p, "declare":
     let decTk = p.curr
+    let decFrom = p.markPos()
     walk p # consume `declare`
     skipTSComments(p)
     if p.curr.kind == tkIdentifier and p.curr.value == "global":
@@ -1820,27 +2219,34 @@ proc tsHandlers*(p: var GenericParser) =
         result.children.add(parseBlock(p))
       else:
         result.children.add(newEmptyNode())
+      p.stripSince(decFrom)
       return
     if p.curr.kind == tkIdentifier and p.stmtKeywords.hasKey(p.curr.value):
       let decl = p.stmtHandlers[p.stmtKeywords[p.curr.value]](p)
       result = Node(kind: nkStatement,
         children: @[Node(kind: nkIdent, name: "declare").stamp(decTk), decl]).stamp(decTk)
+      p.stripSince(decFrom)
     else:
       error(p, "Expected declaration after 'declare'")
 
   stmtHandler p, "abstract_class":
     let absTk = p.curr
+    let absFrom = p.markPos()
     walk p # consume `abstract`
     skipTSComments(p)
     if p.curr.kind == tkIdentifier and p.curr.value == "class":
+      let classStart = p.markPos()
       let classNode = p.stmtHandlers["class"](p)
       result = Node(kind: nkStatement,
         children: @[Node(kind: nkIdent, name: "abstract").stamp(absTk), classNode]).stamp(absTk)
+      if classStart > absFrom:
+        p.stripSpans.add(StripSpan(kind: skErase, span: absFrom ..< classStart))
     else:
       error(p, "Expected 'class' after 'abstract'")
 
   stmtHandler p, "using":
     let usingTk = p.curr
+    let usingFrom = p.markPos()
     walk p # consume `using`
     skipTSComments(p)
     expectTSIdent:
@@ -1848,21 +2254,28 @@ proc tsHandlers*(p: var GenericParser) =
       walk p
       var ty = newEmptyNode()
       if p.curr.kind == tkPunct and p.curr.value == ":":
+        let tstart = p.markPos()
         walk p
         ty = parseTSType(p)
+        p.stripSince(tstart)
       p.expectWalk("=")
       let init = parseExpression(p)
       result = Node(kind: nkStatement,
         children: @[Node(kind: nkIdent, name: "using").stamp(usingTk),
                     Node(kind: nkIdentDefs, children: @[nm, ty, init])]).stamp(usingTk)
       p.walkOpt(";")
+      # `using` (5 chars) and `const` (5 chars) swap exactly.
+      p.stripSpans.add(StripSpan(kind: skReplace,
+        span: usingFrom ..< usingFrom + 5, text: "const"))
 
   stmtHandler p, "import":
     ## `import type ...` plus the full JS import grammar underneath.
+    let impFrom = p.markPos()
     walk p # consume `import`
     skipTSComments(p)
     result = Node(kind: nkImport)
     var typeOnly = false
+    var importAssign = false
     if p.curr.kind == tkIdentifier and p.curr.value == "type" and
         not (p.next.kind == tkPunct and p.next.value in [",", "="]):
       # `import type X from` / `import type {…}` / `import type * as` —
@@ -1929,12 +2342,31 @@ proc tsHandlers*(p: var GenericParser) =
       let defaultName = Node(kind: nkIdent, name: p.curr.value).stamp(p.curr)
       walk p
       if p.curr.kind == tkPunct and p.curr.value == "=":
-        # `import x = A.B.C` (import-assignment).
+        # `import x = A.B.C` (import-assignment) or
+        # `import x = require("m")` (external module reference).
+        importAssign = true
         let eqTk = p.curr
         walk p
         result.children.add(defaultName)
         result.children.add(Node(kind: nkIdent, name: "=").stamp(eqTk))
-        result.children.add(parseTSQualifiedName(p))
+        var rhs = parseTSQualifiedName(p)
+        skipTSComments(p)
+        if rhs.kind == nkIdent and rhs.name == "require" and
+            p.curr.kind == tkPunct and p.curr.value == "(":
+          let openTk = p.curr
+          walk p
+          let call = Node(kind: nkCall, children: @[rhs]).stamp(openTk)
+          while not (p.curr.kind == tkPunct and p.curr.value == ")"):
+            if p.curr.kind == tkEOF:
+              error(p, "Unexpected EOF in import")
+            if p.curr.kind in {tkComment, tkDocComment}:
+              call.children.add(parseCommentGeneric(p))
+              continue
+            call.children.add(parseExpression(p, 0))
+            p.walkOpt(",")
+          p.expectWalk(")")
+          rhs = call
+        result.children.add(rhs)
         p.walkOpt(";")
       elif p.curr.kind == tkIdentifier and p.curr.value == "from":
         result.children.add(defaultName)
@@ -2004,10 +2436,16 @@ proc tsHandlers*(p: var GenericParser) =
       error(p, "Unexpected token in import")
     if typeOnly:
       result.children.add(Node(kind: nkIdent, name: "type"))
+      p.stripSince(impFrom)
+    elif importAssign:
+      # `import` (6 chars) and `const ` (6 chars) swap exactly.
+      p.stripSpans.add(StripSpan(kind: skReplace,
+        span: impFrom ..< impFrom + 6, text: "const "))
 
   stmtHandler p, "export":
     ## `export type …`, `export = …` plus the JS export grammar and
     ## delegation to TS declaration handlers.
+    let expFrom = p.markPos()
     walk p # consume `export`
     skipTSComments(p)
     result = Node(kind: nkStatement)
@@ -2019,11 +2457,12 @@ proc tsHandlers*(p: var GenericParser) =
       walk p
       skipTSComments(p)
     if p.curr.kind == tkPunct and p.curr.value == "=":
-      let eqTk = p.curr
       walk p
-      result.children.add(Node(kind: nkIdent, name: "=").stamp(eqTk))
+      result.children.add(Node(kind: nkIdent, name: "="))
       result.children.add(parseExpression(p))
       p.walkOpt(";")
+      p.stripSpans.add(StripSpan(kind: skExportEq,
+        span: expFrom ..< p.consumedEnd()))
       return
     if p.curr.kind == tkIdentifier and p.curr.value == "default":
       walk p
@@ -2034,14 +2473,30 @@ proc tsHandlers*(p: var GenericParser) =
           (p.curr.kind == tkIdentifier and p.stmtKeywords.hasKey(p.curr.value)):
         let h = p.stmtKeywords[p.curr.value]
         if p.stmtHandlers.hasKey(h):
-          result.children.add(p.stmtHandlers[h](p))
+          let declStart = p.markPos()
+          let decl = p.stmtHandlers[h](p)
+          result.children.add(decl)
+          if h in ["type_alias", "interface", "declare"] and
+              p.stripSpans.len > 0 and
+              p.stripSpans[^1].kind == skErase and
+              p.stripSpans[^1].span.a == declStart:
+            # Type-only declarations vanish with `export default`.
+            p.stripSpans[^1].span.a = expFrom
+          else:
+            p.stripSpans.add(StripSpan(kind: skExportKw,
+              span: expFrom ..< expFrom + 6, names: exportDeclNames(decl),
+              defaultExport: true))
           return
       result.children.add(parseExpression(p))
       p.walkOpt(";")
+      p.stripSpans.add(StripSpan(kind: skExportKw,
+        span: expFrom ..< expFrom + 6, defaultExport: true))
       return
     if p.curr.kind == tkPunct and p.curr.value == "{":
+      let listFrom = p.markPos()
       walk p
       let named = Node(kind: nkIdentDefs)
+      var pairs: seq[string] = @[]
       while not (p.curr.kind == tkPunct and p.curr.value == "}"):
         if p.curr.kind == tkEOF:
           error(p, "Unexpected EOF in export")
@@ -2054,24 +2509,40 @@ proc tsHandlers*(p: var GenericParser) =
           if p.curr.kind == tkIdentifier and p.curr.value == "as":
             walk p
             expectTSIdent:
+              let alias = p.curr.value
               named.children.add(Node(kind: nkInfix,
-                children: @[Node(kind: nkIdent, name: "as"),
-                            nm, Node(kind: nkIdent, name: p.curr.value).stamp(p.curr)]))
+                children: @[Node(kind: nkIdent, name: "as"), nm,
+                            Node(kind: nkIdent, name: alias).stamp(p.curr)]))
+              pairs.add(nm.name)
+              pairs.add(alias)
             walk p
           else:
             named.children.add(nm)
+            pairs.add(nm.name)
+            pairs.add(nm.name)
         p.walkOpt(",")
       p.expectWalk("}")
       result.children.add(named)
+      var fromMod = ""
       if p.curr.kind == tkIdentifier and p.curr.value == "from":
         walk p
         if p.curr.kind != tkString:
           error(p, "Expected module string after 'from'")
+        fromMod = p.curr.value
         result.children.add(Node(kind: nkLitString, valStr: p.curr.value).stamp(p.curr))
         walk p
       if typeOnly:
         result.children.add(Node(kind: nkIdent, name: "type"))
+      else:
+        # Keyword + list lower only inside namespaces; elsewhere ESM.
+        p.stripSpans.add(StripSpan(kind: skExportKw,
+          span: expFrom ..< expFrom + 6))
+        p.stripSpans.add(StripSpan(kind: skExportList,
+          span: listFrom ..< p.consumedEnd(), names: pairs,
+          text: fromMod))
       p.walkOpt(";")
+      if typeOnly:
+        p.stripSince(expFrom)
       return
     if p.curr.kind == tkPunct and p.curr.value == "*":
       walk p
@@ -2085,27 +2556,50 @@ proc tsHandlers*(p: var GenericParser) =
         walk p
       else:
         result.children.add(Node(kind: nkIdent, name: "*"))
+      var fromMod = ""
       if p.curr.kind == tkIdentifier and p.curr.value == "from":
         walk p
         if p.curr.kind != tkString:
           error(p, "Expected module string after 'from'")
+        fromMod = p.curr.value
         result.children.add(Node(kind: nkLitString, valStr: p.curr.value).stamp(p.curr))
         walk p
       if typeOnly:
         result.children.add(Node(kind: nkIdent, name: "type"))
+      else:
+        p.stripSpans.add(StripSpan(kind: skExportKw,
+          span: expFrom ..< expFrom + 6))
+        p.stripSpans.add(StripSpan(kind: skExportList,
+          span: expFrom ..< p.consumedEnd(), text: fromMod))
       p.walkOpt(";")
+      if typeOnly:
+        p.stripSince(expFrom)
       return
     if p.curr.kind == tkIdentifier and p.curr.value in
         ["function", "class", "interface", "type", "enum",
          "namespace", "module", "declare", "abstract",
          "var", "let", "const"]:
       let h = p.stmtKeywords[p.curr.value]
-      result.children.add(p.stmtHandlers[h](p))
+      let declStart = p.markPos()
+      let decl = p.stmtHandlers[h](p)
+      result.children.add(decl)
+      if h in ["type_alias", "interface", "declare"] and
+          p.stripSpans.len > 0 and
+          p.stripSpans[^1].kind == skErase and
+          p.stripSpans[^1].span.a == declStart:
+        # Type-only declarations vanish with their `export` keyword.
+        p.stripSpans[^1].span.a = expFrom
+      else:
+        p.stripSpans.add(StripSpan(kind: skExportKw,
+          span: expFrom ..< expFrom + 6, names: exportDeclNames(decl)))
       return
     expectTSIdent:
       result.children.add(Node(kind: nkIdent, name: p.curr.value).stamp(p.curr))
     walk p
     p.walkOpt(";")
+    p.stripSpans.add(StripSpan(kind: skExportKw,
+      span: expFrom ..< expFrom + 6,
+      names: @[result.children[^1].name]))
 
 proc parseTypeScript*(path: string): OpenAstProgram =
   ## Parse a TypeScript file (`.ts` / `.tsx`; `.tsx` additionally rejects

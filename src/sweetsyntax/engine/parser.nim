@@ -28,6 +28,67 @@ type
   StmtHandler* = proc(p: var GenericParser, parentCol: int = -1): Node {.closure.}
   ExpressionHandler* = proc(p: var GenericParser, lhs: Node, minPrec: int): Node {.nimcall.}
 
+  StripKind* = enum
+    ## How a recorded source span must be treated by a lowering consumer
+    ## (e.g. a TypeScript-to-JavaScript transpiler).
+    skErase
+      ## Blank the span (type annotations, modifiers, type-only
+      ## declarations). Newlines survive so line numbers are preserved.
+    skReplace
+      ## Splice `text` over the span (`using` -> `const`, `import =`).
+    skEnum
+      ## Lower a TS enum to tsc-style assignments. Payload: `members`.
+    skNamespace
+      ## Lower a TS namespace/module to an IIFE. Payload: `path`.
+      ## Exported members come from child skExportKw/skExportList spans.
+    skExportKw
+      ## An `export` keyword. Blanked only inside an skNamespace
+      ## replacement (payload `names` get `N.x = x` assignments);
+      ## left alone elsewhere so module-syntax stays an ESM error.
+    skExportList
+      ## `export {a, b as c}` (no `from`). Inside a namespace lowers to
+      ## assignments; elsewhere it stays ESM.
+    skExportEq
+      ## `export = <expr>`: lowers to `module.exports = <expr>` (child
+      ## erasures apply to the expression first).
+    skError
+      ## Unsupported construct (decorators, implementation-less
+      ## overload). Payload `text` is the diagnostic; consumers raise.
+
+  EnumInitKind* = enum
+    ikAuto, ikInt, ikStr, ikExpr
+
+  EnumMember* = object
+    ## One enum member for skEnum lowering.
+    name*: string
+    strName*: bool
+    line*: int
+    nameSpan*: Slice[int]
+      ## Source range of a string-literal member name (verbatim, quotes
+      ## included), for identifier names use `name`.
+    initKind*: EnumInitKind
+    intVal*: int64
+    strVal*: string
+    initSpan*: Slice[int]
+      ## Source range of an initializer (verbatim slice for ikStr/ikExpr;
+      ## unset for ikAuto/ikInt), stop exclusive.
+
+  StripSpan* = object
+    kind*: StripKind
+    span*: Slice[int]
+      ## Byte range, stop exclusive.
+    text*: string
+      ## skReplace splice / skError diagnostic / skExportList `from`
+      ## module / skEnum name.
+    names*: seq[string]
+      ## skExportKw/skExportList exported (alias) names.
+    defaultExport*: bool
+      ## skExportKw for an `export default` form (illegal in namespaces).
+    path*: seq[string]
+      ## skNamespace dotted path (`A.B` -> @["A", "B"]).
+    members*: seq[EnumMember]
+      ## skEnum members.
+
   GenericParser* = object
     lexer*: SweetLexer
     prev*, curr*, next*: TokenTuple
@@ -100,8 +161,20 @@ type
       ## `parseScript` and test harnesses set this. TypeScript uses it for
       ## the one extension-dependent rule: angle-bracket assertions
       ## (`<T>x`) are forbidden in `.tsx` (JSX clash), `as` is required.
+    stripPostfix*: HashSet[string]
+      ## Postfix operators a language wants erased at the source level
+      ## (TypeScript `!`): the marker is recorded as an erase span, the
+      ## operand stays. Empty by default; the engine never sets it.
+    closerEnds*: Table[int, int]
+      ## Byte ends of split generic closers by token start. `>>`/`>>>`
+      ## split in place (the remainder still reads as closers), so the
+      ## mutated token understates its extent; first split wins, which is
+      ## always the innermost level and hence the fullest extent.
+    stripSpans*: seq[StripSpan]
+      ## Lowering spans recorded by language handlers (TypeScript): source
+      ## byte ranges to erase, replace or expand. Empty for languages
+      ## that do not record any; the engine records postfix erasures above.
 
-  
   OpenAstParsingError* = object of CatchableError
 
 #
@@ -143,6 +216,50 @@ proc expectWalk*(p: var GenericParser, val: string, msg: string = "") =
     let emsg = if msg.len > 0: msg
                else: "Expected '" & val & "', got '" & p.curr.value & "'"
     error(p, emsg)
+
+#
+# Lowering-span helpers (TypeScript type-stripping)
+#
+proc markPos*(p: GenericParser): int {.inline.} =
+  ## Byte offset of the current token start. Record before parsing a
+  ## construct whose source must later be erased or replaced.
+  p.curr.pos
+
+proc consumedEnd*(p: GenericParser): int {.inline.} =
+  ## Byte offset just past the last consumed token. The two-token
+  ## lookahead means the lexer's own last-token mark already covers
+  ## not-yet-consumed input, so span ends must use this instead.
+  p.prev.pos + p.prev.value.len
+
+proc stripSince*(p: var GenericParser, start: int, upto = -1) {.inline.} =
+  ## Record an erase span from `start` to the end of the last consumed
+  ## token. Call right after the construct is parsed; `upto` floors the
+  ## end for generic closers, which split `>>`/`>>>` in place
+  ## without walking.
+  let stop = max(p.consumedEnd(), upto)
+  if stop > start:
+    p.stripSpans.add(StripSpan(kind: skErase, span: start ..< stop))
+
+proc stripCurr*(p: var GenericParser) {.inline.} =
+  ## Record an erase span over just the current token (a modifier, `?`,
+  ## `!`). The caller still walks past it.
+  let stop = p.curr.pos + p.curr.value.len
+  if stop > p.curr.pos:
+    p.stripSpans.add(StripSpan(kind: skErase, span: p.curr.pos ..< stop))
+
+proc stripCurrPast*(p: var GenericParser) {.inline.} =
+  ## Consume the current token and erase through to the next token start
+  ## (eating inter-token comments, which is fine inside erased regions).
+  let start = p.curr.pos
+  walk p
+  if p.curr.pos > start:
+    p.stripSpans.add(StripSpan(kind: skErase, span: start ..< p.curr.pos))
+
+proc stripError*(p: var GenericParser, start: int, msg: string) {.inline.} =
+  ## Record an unsupported-construct diagnostic at `start`..consumed end.
+  let stop = p.consumedEnd()
+  p.stripSpans.add(StripSpan(kind: skError,
+    span: start ..< max(stop, start), text: msg))
 
 #
 # Pratt parser core
@@ -745,6 +862,10 @@ proc parseExpression*(p: var GenericParser, minPrec: int = 0): Node =
         let opTk = p.curr
         lhs = Node(kind: nkPostfix,
           children: @[lhs, Node(kind: nkIdent, name: op).stamp(opTk)]).stampFrom(lhs)
+        if op in p.stripPostfix:
+          # Language-requested erasure (TypeScript `!` non-null
+          # assertion): blank the marker, keep the operand.
+          p.stripCurr()
         walk p
         continue
 
