@@ -284,7 +284,8 @@ proc skipWhitespace(l: var SweetLexer) =
       l.col += p - l.pos
       l.pos = p
       l.current = l.charAt(p)
-    elif l.current == '\\' and l.peek() == '\n':
+    elif l.current == '\\' and (l.peek() == '\n' or
+        (l.peek() == '\r' and l.peek(2) == '\n')):
       l.skipLineContinuation()
     elif l.current == '\n':
       discard l.advance()

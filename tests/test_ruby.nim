@@ -1,4 +1,4 @@
-import std/[unittest, os]
+import std/[unittest, os, strutils]
 import ../src/sweetsyntax
 import ../src/sweetsyntax/tokenizer
 import ../src/sweetsyntax/languages/ruby as rubyHandlersMod
@@ -207,3 +207,21 @@ suite "Ruby parser":
   test "vagrant bundler.rb fixture parses":
     let nodes = parseRubyFile(rubyFixtureDir / "vagrant_bundler.rb")
     check nodes.len > 10
+
+  test "crlf line endings parse like lf":
+    # Windows checkouts carry CRLF: `\<CRLF>` continuations must splice
+    # exactly like `\<LF>`.
+    let lf = readFile(rubyFixtureDir / "vagrant_bundler.rb")
+    let crlf = lf.replace("\n", "\r\n")
+    let syntax = getKnownSyntax(KnownSyntax.ruby)
+    proc parseAll(code: string): int =
+      var p = compile(syntax.spec)
+      p.lexer = initLexer(syntax.spec, code)
+      rubyHandlersMod.rubyHandlers(p)
+      p.curr = p.getToken()
+      p.next = p.getToken()
+      while p.curr.kind != tkEOF:
+        discard parseStatement(p)
+        inc result
+    check parseAll(crlf) == parseAll(lf)
+    check parseAll(crlf) > 10
