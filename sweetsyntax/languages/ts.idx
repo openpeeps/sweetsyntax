@@ -1,0 +1,3 @@
+nimTitle	ts	sweetsyntax/languages/ts.html	module sweetsyntax/languages/ts		0
+nim	tsHandlers	sweetsyntax/languages/ts.html#tsHandlers,GenericParser	proc tsHandlers(p: var GenericParser)		1313
+nim	parseTypeScript	sweetsyntax/languages/ts.html#parseTypeScript,string	proc parseTypeScript(path: string): OpenAstProgram		2721

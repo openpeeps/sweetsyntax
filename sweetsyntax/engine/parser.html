@@ -16,10 +16,10 @@
 <link rel="icon" type="image/png" sizes="32x32" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAABmJLR0QA/wD/AP+gvaeTAAAACXBIWXMAAA3XAAAN1wFCKJt4AAAAB3RJTUUH4QQQEwksSS9ZWwAAAk1JREFUWMPtll2ITVEUx39nn/O7Y5qR8f05wtCUUr6ZIS++8pEnkZInPImneaCQ5METNdOkeFBKUhMPRIkHKfEuUZSUlGlKPN2TrgfncpvmnntnmlEyq1Z7t89/rf9a6+y99oZxGZf/XeIq61EdtgKXgdXA0xrYAvBjOIF1AI9zvjcC74BSpndrJPkBWDScTF8Aa4E3wDlgHbASaANmVqlcCnwHvgDvgVfAJ+AikAAvgfVZwLnSVZHZaOuKoQi3ZOMi4NkYkpe1p4J7A8BpYAD49hfIy/oqG0+hLomiKP2L5L+1ubn5115S+3OAn4EnwBlgMzCjyt6ZAnQCJ4A7wOs88iRJHvw50HoujuPBoCKwHWiosy8MdfZnAdcHk8dxXFJ3VQbQlCTJvRBCGdRbD4M6uc5glpY3eAihpN5S5w12diSEcCCEcKUO4ljdr15T76ur1FDDLIQQ3qv71EdDOe3Kxj3leRXyk+pxdWnFWod6Wt2bY3de3aSuUHcPBVimHs7mK9WrmeOF6lR1o9qnzskh2ar2qm1qizpfXaPeVGdlmGN5pb09qMxz1Xb1kLqgzn1RyH7JUXW52lr5e/Kqi9qpto7V1atuUzfnARrV7jEib1T76gG2qxdGmXyiekkt1GswPTtek0aBfJp6YySGBfWg2tPQ0FAYgf1stUfdmdcjarbYJEniKIq6gY/Aw+zWHAC+p2labGpqiorFYgGYCEzN7oQdQClN07O1/EfDyGgC0ALMBdYAi4FyK+4H3gLPsxfR1zRNi+NP7nH5J+QntnXe5B5mpfQAAAAASUVORK5CYII=">
 
 <!-- CSS -->
-<link rel="stylesheet" type="text/css" href="../../nimdoc.out.css?v=2.2.12">
+<link rel="stylesheet" type="text/css" href="../../nimdoc.out.css?v=2.4.0">
 
 <!-- JS -->
-<script type="text/javascript" src="../../dochack.js?v=2.2.12"></script>
+<script type="text/javascript" src="../../dochack.js?v=2.4.0"></script>
 </head>
 <body>
   <div class="document" id="documentId">
@@ -31,28 +31,34 @@
       <div class="row">
   <div class="three columns">
     <div class="theme-select-wrapper">
-      <label for="theme-select">Theme:&nbsp;</label>
-      <select id="theme-select" onchange="setTheme(this.value)">
-        <option value="auto">🌗 Match OS</option>
-        <option value="dark">🌑 Dark</option>
-        <option value="light">🌕 Light</option>
-      </select>
-    </div>
+  <label for="theme-select">Theme:&nbsp;</label>
+  <select id="theme-select" onchange="setTheme(this.value)">
+    <option value="auto">🌗 Match OS</option>
+    <option value="dark">🌑 Dark</option>
+    <option value="light">🌕 Light</option>
+  </select>
+</div>
+
     <div id="global-links">
-      <ul class="simple">
-        <li><a id="indexLink" href="../../theindex.html">Index</a></li>
-      </ul>
-    </div>
-    <div id="searchInputDiv">
-      Search: <input type="search" id="searchInput" oninput="search()"/>
-    </div>
-    <div>
-      Group by:
-      <select onchange="groupBy(this.value)">
-        <option value="section">Section</option>
-        <option value="type">Type</option>
-      </select>
-    </div>
+  
+  <ul class="simple">
+  <li><a id="indexLink" href="../../theindex.html">Index</a></li>
+</ul>
+
+</div>
+
+      <div id="searchInputDiv">
+  Search: <input type="search" id="searchInput" oninput="search()"/>
+</div>
+
+    <div class="search-groupby">
+  Group by:
+  <select onchange="groupBy(this.value)">
+    <option value="section">Section</option>
+    <option value="type">Type</option>
+  </select>
+</div>
+
     <ul class="simple simple-toc" id="toc-list">
   <li>
   <a class="reference reference-toplevel" href="#6" id="56">Imports</a>
@@ -61,7 +67,20 @@
   <details open>
     <summary><a class="reference reference-toplevel" href="#7" id="57">Types</a></summary>
     <ul class="simple simple-toc-section">
-      <li><a class="reference" href="#ExpressionHandler" title="ExpressionHandler = proc (p: var GenericParser; lhs: Node; minPrec: int): Node {.
+      <li><a class="reference" href="#EnumInitKind" title="EnumInitKind = enum
+  ikAuto, ikInt, ikStr, ikExpr">EnumInitKind</a></li>
+<li><a class="reference" href="#EnumMember" title="EnumMember = object
+  name*: string
+  strName*: bool
+  line*: int
+  nameSpan*: Slice[int] ## Source range of a string-literal member name (verbatim, quotes
+                        ## included), for identifier names use `name`.
+  initKind*: EnumInitKind
+  intVal*: int64
+  strVal*: string
+  initSpan*: Slice[int] ## Source range of an initializer (verbatim slice for ikStr/ikExpr;
+                        ## unset for ikAuto/ikInt), stop exclusive.">EnumMember</a></li>
+<li><a class="reference" href="#ExpressionHandler" title="ExpressionHandler = proc (p: var GenericParser; lhs: Node; minPrec: int): Node {.
     nimcall.}">ExpressionHandler</a></li>
 <li><a class="reference" href="#GenericParser" title="GenericParser = object
   lexer*: SweetLexer
@@ -108,11 +127,51 @@
                        ## full `[]byte`, not inside its element type).
   inParenGroup*: bool ## Inside a `(...)` group (set by parseGroupExpr): a `;` separates
                       ## group items, so item parsers must not consume it as their own
-                      ## statement terminator (Nim `if (let x = ...; x):`, Ruby `(a; b)`).">GenericParser</a></li>
+                      ## statement terminator (Nim `if (let x = ...; x):`, Ruby `(a; b)`).
+  isTSX*: bool ## True when parsing a `.tsx` source. Only the driver knows the file
+               ## extension (the spec covers `ts/tsx/mts/cts/dts` alike), so
+               ## `parseScript` and test harnesses set this. TypeScript uses it for
+               ## the one extension-dependent rule: angle-bracket assertions
+               ## (`&lt;T&gt;x`) are forbidden in `.tsx` (JSX clash), `as` is required.
+  stripPostfix*: HashSet[string] ## Postfix operators a language wants erased at the source level
+                                 ## (TypeScript `!`): the marker is recorded as an erase span, the
+                                 ## operand stays. Empty by default; the engine never sets it.
+  closerEnds*: Table[int, int] ## Byte ends of split generic closers by token start. `&gt;&gt;`/`&gt;&gt;&gt;`
+                               ## split in place (the remainder still reads as closers), so the
+                               ## mutated token understates its extent; first split wins, which is
+                               ## always the innermost level and hence the fullest extent.
+  stripSpans*: seq[StripSpan] ## Lowering spans recorded by language handlers (TypeScript): source
+                              ## byte ranges to erase, replace or expand. Empty for languages
+                              ## that do not record any; the engine records postfix erasures above.">GenericParser</a></li>
 <li><a class="reference" href="#OpenAstParsingError" title="OpenAstParsingError = object of CatchableError">OpenAstParsingError</a></li>
 <li><a class="reference" href="#ParsingCallback" title="ParsingCallback = proc (p: var GenericParser)">ParsingCallback</a></li>
 <li><a class="reference" href="#PrefixHandler" title="PrefixHandler = proc (p: var GenericParser; minPrec: int = 0): Node {.closure.}">PrefixHandler</a></li>
 <li><a class="reference" href="#StmtHandler" title="StmtHandler = proc (p: var GenericParser; parentCol: int = -1): Node {.closure.}">StmtHandler</a></li>
+<li><a class="reference" href="#StripKind" title="StripKind = enum
+  skErase, ## Blank the span (type annotations, modifiers, type-only
+            ## declarations). Newlines survive so line numbers are preserved.
+  skReplace,                ## Splice `text` over the span (`using` -&gt; `const`, `import =`).
+  skEnum,                   ## Lower a TS enum to tsc-style assignments. Payload: `members`.
+  skNamespace, ## Lower a TS namespace/module to an IIFE. Payload: `path`.
+                ## Exported members come from child skExportKw/skExportList spans.
+  skExportKw, ## An `export` keyword. Blanked only inside an skNamespace
+               ## replacement (payload `names` get `N.x = x` assignments);
+               ## left alone elsewhere so module-syntax stays an ESM error.
+  skExportList, ## `export {a, b as c}` (no `from`). Inside a namespace lowers to
+                 ## assignments; elsewhere it stays ESM.
+  skExportEq, ## `export = &lt;expr&gt;`: lowers to `module.exports = &lt;expr&gt;` (child
+               ## erasures apply to the expression first).
+  skError ## Unsupported construct (decorators, implementation-less
+          ## overload). Payload `text` is the diagnostic; consumers raise.">StripKind</a></li>
+<li><a class="reference" href="#StripSpan" title="StripSpan = object
+  kind*: StripKind
+  span*: Slice[int]          ## Byte range, stop exclusive.
+  text*: string ## skReplace splice / skError diagnostic / skExportList `from`
+                ## module / skEnum name.
+  names*: seq[string]        ## skExportKw/skExportList exported (alias) names.
+  defaultExport*: bool       ## skExportKw for an `export default` form (illegal in namespaces).
+  path*: seq[string]         ## skNamespace dotted path (`A.B` -&gt; @[&quot;A&quot;, &quot;B&quot;]).
+  members*: seq[EnumMember]  ## skEnum members.">StripSpan</a></li>
 
     </ul>
   </details>
@@ -129,6 +188,10 @@
   <li><a class="reference" href="#compile%2CSweetSpec" title="compile(spec: SweetSpec): GenericParser">compile(spec: SweetSpec): GenericParser</a></li>
 
 </ul>
+<ul class="simple nested-toc-section">consumedEnd
+  <li><a class="reference" href="#consumedEnd%2CGenericParser" title="consumedEnd(p: GenericParser): int">consumedEnd(p: GenericParser): int</a></li>
+
+</ul>
 <ul class="simple nested-toc-section">error
   <li><a class="reference" href="#error%2CGenericParser%2Cstring" title="error(p: var GenericParser; msg: string)">error(p: var GenericParser; msg: string)</a></li>
 
@@ -139,6 +202,10 @@
 </ul>
 <ul class="simple nested-toc-section">expectWalk
   <li><a class="reference" href="#expectWalk%2CGenericParser%2Cstring%2Cstring" title="expectWalk(p: var GenericParser; val: string; msg: string = &quot;&quot;)">expectWalk(p: var GenericParser; val: string; msg: string = &quot;&quot;)</a></li>
+
+</ul>
+<ul class="simple nested-toc-section">markPos
+  <li><a class="reference" href="#markPos%2CGenericParser" title="markPos(p: GenericParser): int">markPos(p: GenericParser): int</a></li>
 
 </ul>
 <ul class="simple nested-toc-section">parseArrayLiteral
@@ -173,6 +240,10 @@
   <li><a class="reference" href="#parseIndentBlock%2CGenericParser" title="parseIndentBlock(p: var GenericParser): Node">parseIndentBlock(p: var GenericParser): Node</a></li>
 
 </ul>
+<ul class="simple nested-toc-section">parseLiteral
+  <li><a class="reference" href="#parseLiteral%2CGenericParser%2Cint" title="parseLiteral(p: var GenericParser; minPrec: int = 0): Node">parseLiteral(p: var GenericParser; minPrec: int = 0): Node</a></li>
+
+</ul>
 <ul class="simple nested-toc-section">parseObjectLiteral
   <li><a class="reference" href="#parseObjectLiteral%2CGenericParser%2Cint" title="parseObjectLiteral(p: var GenericParser; minPrec: int = 0): Node">parseObjectLiteral(p: var GenericParser; minPrec: int = 0): Node</a></li>
 
@@ -189,6 +260,22 @@
 </ul>
 <ul class="simple nested-toc-section">stampMissing
   <li><a class="reference" href="#stampMissing%2CNode%2CTokenTuple" title="stampMissing(n: Node; tk: TokenTuple): Node">stampMissing(n: Node; tk: TokenTuple): Node</a></li>
+
+</ul>
+<ul class="simple nested-toc-section">stripCurr
+  <li><a class="reference" href="#stripCurr%2CGenericParser" title="stripCurr(p: var GenericParser)">stripCurr(p: var GenericParser)</a></li>
+
+</ul>
+<ul class="simple nested-toc-section">stripCurrPast
+  <li><a class="reference" href="#stripCurrPast%2CGenericParser" title="stripCurrPast(p: var GenericParser)">stripCurrPast(p: var GenericParser)</a></li>
+
+</ul>
+<ul class="simple nested-toc-section">stripError
+  <li><a class="reference" href="#stripError%2CGenericParser%2Cint%2Cstring" title="stripError(p: var GenericParser; start: int; msg: string)">stripError(p: var GenericParser; start: int; msg: string)</a></li>
+
+</ul>
+<ul class="simple nested-toc-section">stripSince
+  <li><a class="reference" href="#stripSince%2CGenericParser%2Cint%2Cint" title="stripSince(p: var GenericParser; start: int; upto = -1)">stripSince(p: var GenericParser; start: int; upto = -1)</a></li>
 
 </ul>
 <ul class="simple nested-toc-section">walk
@@ -249,7 +336,34 @@
 <div class="section" id="7">
   <h1><a class="toc-backref" href="#7">Types</a></h1>
   <dl class="item">
-    <div id="ExpressionHandler">
+    <div id="EnumInitKind">
+  <dt><pre><a href="#EnumInitKind"><span class="Identifier">EnumInitKind</span></a> <span class="Other">=</span> <span class="Keyword">enum</span>
+  <span class="Identifier">ikAuto</span><span class="Other">,</span> <span class="Identifier">ikInt</span><span class="Other">,</span> <span class="Identifier">ikStr</span><span class="Other">,</span> <span class="Identifier">ikExpr</span></pre></dt>
+  <dd>
+    
+    
+    
+  </dd>
+</div>
+<div id="EnumMember">
+  <dt><pre><a href="#EnumMember"><span class="Identifier">EnumMember</span></a> <span class="Other">=</span> <span class="Keyword">object</span>
+  <span class="Identifier">name</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">string</span>
+  <span class="Identifier">strName</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">bool</span>
+  <span class="Identifier">line</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">int</span>
+  <span class="Identifier">nameSpan</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">Slice</span><span class="Other">[</span><span class="Identifier">int</span><span class="Other">]</span> <span class="Comment">## Source range of a string-literal member name (verbatim, quotes</span>
+                        <span class="Comment">## included), for identifier names use `name`.</span>
+  <span class="Identifier">initKind</span><span class="Operator">*</span><span class="Other">:</span> <a href="#EnumInitKind"><span class="Identifier">EnumInitKind</span></a>
+  <span class="Identifier">intVal</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">int64</span>
+  <span class="Identifier">strVal</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">string</span>
+  <span class="Identifier">initSpan</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">Slice</span><span class="Other">[</span><span class="Identifier">int</span><span class="Other">]</span> <span class="Comment">## Source range of an initializer (verbatim slice for ikStr/ikExpr;</span>
+                        <span class="Comment">## unset for ikAuto/ikInt), stop exclusive.</span></pre></dt>
+  <dd>
+    
+    One enum member for skEnum lowering.
+    
+  </dd>
+</div>
+<div id="ExpressionHandler">
   <dt><pre><a href="#ExpressionHandler"><span class="Identifier">ExpressionHandler</span></a> <span class="Other">=</span> <span class="Keyword">proc</span> <span class="Other">(</span><span class="Identifier">p</span><span class="Other">:</span> <span class="Keyword">var</span> <a href="#GenericParser"><span class="Identifier">GenericParser</span></a><span class="Other">;</span> <span class="Identifier">lhs</span><span class="Other">:</span> <a href="ast.html#Node"><span class="Identifier">Node</span></a><span class="Other">;</span> <span class="Identifier">minPrec</span><span class="Other">:</span> <span class="Identifier">int</span><span class="Other">)</span><span class="Other">:</span> <a href="ast.html#Node"><span class="Identifier">Node</span></a> {.
     <span class="Identifier">nimcall</span>.}</pre></dt>
   <dd>
@@ -304,7 +418,22 @@
                        <span class="Comment">## full `[]byte`, not inside its element type).</span>
   <span class="Identifier">inParenGroup</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">bool</span> <span class="Comment">## Inside a `(...)` group (set by parseGroupExpr): a `;` separates</span>
                       <span class="Comment">## group items, so item parsers must not consume it as their own</span>
-                      <span class="Comment">## statement terminator (Nim `if (let x = ...; x):`, Ruby `(a; b)`).</span></pre></dt>
+                      <span class="Comment">## statement terminator (Nim `if (let x = ...; x):`, Ruby `(a; b)`).</span>
+  <span class="Identifier">isTSX</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">bool</span> <span class="Comment">## True when parsing a `.tsx` source. Only the driver knows the file</span>
+               <span class="Comment">## extension (the spec covers `ts/tsx/mts/cts/dts` alike), so</span>
+               <span class="Comment">## `parseScript` and test harnesses set this. TypeScript uses it for</span>
+               <span class="Comment">## the one extension-dependent rule: angle-bracket assertions</span>
+               <span class="Comment">## (`&lt;T&gt;x`) are forbidden in `.tsx` (JSX clash), `as` is required.</span>
+  <span class="Identifier">stripPostfix</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">HashSet</span><span class="Other">[</span><span class="Identifier">string</span><span class="Other">]</span> <span class="Comment">## Postfix operators a language wants erased at the source level</span>
+                                 <span class="Comment">## (TypeScript `!`): the marker is recorded as an erase span, the</span>
+                                 <span class="Comment">## operand stays. Empty by default; the engine never sets it.</span>
+  <span class="Identifier">closerEnds</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">Table</span><span class="Other">[</span><span class="Identifier">int</span><span class="Other">,</span> <span class="Identifier">int</span><span class="Other">]</span> <span class="Comment">## Byte ends of split generic closers by token start. `&gt;&gt;`/`&gt;&gt;&gt;`</span>
+                               <span class="Comment">## split in place (the remainder still reads as closers), so the</span>
+                               <span class="Comment">## mutated token understates its extent; first split wins, which is</span>
+                               <span class="Comment">## always the innermost level and hence the fullest extent.</span>
+  <span class="Identifier">stripSpans</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">seq</span><span class="Other">[</span><a href="#StripSpan"><span class="Identifier">StripSpan</span></a><span class="Other">]</span> <span class="Comment">## Lowering spans recorded by language handlers (TypeScript): source</span>
+                              <span class="Comment">## byte ranges to erase, replace or expand. Empty for languages</span>
+                              <span class="Comment">## that do not record any; the engine records postfix erasures above.</span></pre></dt>
   <dd>
     
     
@@ -343,6 +472,45 @@
     
   </dd>
 </div>
+<div id="StripKind">
+  <dt><pre><a href="#StripKind"><span class="Identifier">StripKind</span></a> <span class="Other">=</span> <span class="Keyword">enum</span>
+  <span class="Identifier">skErase</span><span class="Other">,</span> <span class="Comment">## Blank the span (type annotations, modifiers, type-only</span>
+            <span class="Comment">## declarations). Newlines survive so line numbers are preserved.</span>
+  <span class="Identifier">skReplace</span><span class="Other">,</span>                <span class="Comment">## Splice `text` over the span (`using` -&gt; `const`, `import =`).</span>
+  <span class="Identifier">skEnum</span><span class="Other">,</span>                   <span class="Comment">## Lower a TS enum to tsc-style assignments. Payload: `members`.</span>
+  <span class="Identifier">skNamespace</span><span class="Other">,</span> <span class="Comment">## Lower a TS namespace/module to an IIFE. Payload: `path`.</span>
+                <span class="Comment">## Exported members come from child skExportKw/skExportList spans.</span>
+  <span class="Identifier">skExportKw</span><span class="Other">,</span> <span class="Comment">## An `export` keyword. Blanked only inside an skNamespace</span>
+               <span class="Comment">## replacement (payload `names` get `N.x = x` assignments);</span>
+               <span class="Comment">## left alone elsewhere so module-syntax stays an ESM error.</span>
+  <span class="Identifier">skExportList</span><span class="Other">,</span> <span class="Comment">## `export {a, b as c}` (no `from`). Inside a namespace lowers to</span>
+                 <span class="Comment">## assignments; elsewhere it stays ESM.</span>
+  <span class="Identifier">skExportEq</span><span class="Other">,</span> <span class="Comment">## `export = &lt;expr&gt;`: lowers to `module.exports = &lt;expr&gt;` (child</span>
+               <span class="Comment">## erasures apply to the expression first).</span>
+  <span class="Identifier">skError</span> <span class="Comment">## Unsupported construct (decorators, implementation-less</span>
+          <span class="Comment">## overload). Payload `text` is the diagnostic; consumers raise.</span></pre></dt>
+  <dd>
+    
+    How a recorded source span must be treated by a lowering consumer (e.g. a TypeScript-to-JavaScript transpiler).
+    
+  </dd>
+</div>
+<div id="StripSpan">
+  <dt><pre><a href="#StripSpan"><span class="Identifier">StripSpan</span></a> <span class="Other">=</span> <span class="Keyword">object</span>
+  <span class="Identifier">kind</span><span class="Operator">*</span><span class="Other">:</span> <a href="#StripKind"><span class="Identifier">StripKind</span></a>
+  <span class="Identifier">span</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">Slice</span><span class="Other">[</span><span class="Identifier">int</span><span class="Other">]</span>          <span class="Comment">## Byte range, stop exclusive.</span>
+  <span class="Identifier">text</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">string</span> <span class="Comment">## skReplace splice / skError diagnostic / skExportList `from`</span>
+                <span class="Comment">## module / skEnum name.</span>
+  <span class="Identifier">names</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">seq</span><span class="Other">[</span><span class="Identifier">string</span><span class="Other">]</span>        <span class="Comment">## skExportKw/skExportList exported (alias) names.</span>
+  <span class="Identifier">defaultExport</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">bool</span>       <span class="Comment">## skExportKw for an `export default` form (illegal in namespaces).</span>
+  <span class="Identifier">path</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">seq</span><span class="Other">[</span><span class="Identifier">string</span><span class="Other">]</span>         <span class="Comment">## skNamespace dotted path (`A.B` -&gt; @[&quot;A&quot;, &quot;B&quot;]).</span>
+  <span class="Identifier">members</span><span class="Operator">*</span><span class="Other">:</span> <span class="Identifier">seq</span><span class="Other">[</span><a href="#EnumMember"><span class="Identifier">EnumMember</span></a><span class="Other">]</span>  <span class="Comment">## skEnum members.</span></pre></dt>
+  <dd>
+    
+    
+    
+  </dd>
+</div>
 
   </dl>
 </div>
@@ -370,6 +538,18 @@
     <p>Build a GenericParser from a specification file.</p>
 <p>This function processes the configuration and populates the parser's lookup tables for infix operators, statement keywords, block delimiters, and feature flags. The resulting <tt class="docutils literal"><span class="pre"><span class="Identifier">GenericParser</span></span></tt> is then ready to be used for parsing source code according to the defined syntax</p>
 
+    
+  </dd>
+</div>
+
+</div>
+<div id="consumedEnd-procs-all">
+  <div id="consumedEnd,GenericParser">
+  <dt><pre><span class="Keyword">proc</span> <a href="#consumedEnd%2CGenericParser"><span class="Identifier">consumedEnd</span></a><span class="Other">(</span><span class="Identifier">p</span><span class="Other">:</span> <a href="#GenericParser"><span class="Identifier">GenericParser</span></a><span class="Other">)</span><span class="Other">:</span> <span class="Identifier">int</span> {.<span class="Identifier">inline</span><span class="Other">,</span> <span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span>
+    <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
+  <dd>
+    
+    Byte offset just past the last consumed token. The two-token lookahead means the lexer's own last-token mark already covers not-yet-consumed input, so span ends must use this instead.
     
   </dd>
 </div>
@@ -407,6 +587,17 @@
   <dd>
     
     
+    
+  </dd>
+</div>
+
+</div>
+<div id="markPos-procs-all">
+  <div id="markPos,GenericParser">
+  <dt><pre><span class="Keyword">proc</span> <a href="#markPos%2CGenericParser"><span class="Identifier">markPos</span></a><span class="Other">(</span><span class="Identifier">p</span><span class="Other">:</span> <a href="#GenericParser"><span class="Identifier">GenericParser</span></a><span class="Other">)</span><span class="Other">:</span> <span class="Identifier">int</span> {.<span class="Identifier">inline</span><span class="Other">,</span> <span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
+  <dd>
+    
+    Byte offset of the current token start. Record before parsing a construct whose source must later be erased or replaced.
     
   </dd>
 </div>
@@ -515,6 +706,19 @@
 </div>
 
 </div>
+<div id="parseLiteral-procs-all">
+  <div id="parseLiteral,GenericParser,int">
+  <dt><pre><span class="Keyword">proc</span> <a href="#parseLiteral%2CGenericParser%2Cint"><span class="Identifier">parseLiteral</span></a><span class="Other">(</span><span class="Identifier">p</span><span class="Other">:</span> <span class="Keyword">var</span> <a href="#GenericParser"><span class="Identifier">GenericParser</span></a><span class="Other">;</span> <span class="Identifier">minPrec</span><span class="Other">:</span> <span class="Identifier">int</span> <span class="Other">=</span> <span class="DecNumber">0</span><span class="Other">)</span><span class="Other">:</span> <a href="ast.html#Node"><span class="Identifier">Node</span></a> {.<span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span>
+    <span class="Identifier">Exception</span><span class="Other">,</span> <span class="Identifier">OpenAstParsingError</span><span class="Other">,</span> <span class="Identifier">IOError</span><span class="Other">,</span> <span class="Identifier">DynasmError</span><span class="Other">,</span> <span class="Identifier">ValueError</span><span class="Other">,</span> <span class="Identifier">KeyError</span><span class="Other">,</span>
+    <span class="Identifier">OpenAstParsingError</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">RootEffect</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
+  <dd>
+    
+    Handles int, float, string, hex, octal, binary, bigint literals
+    
+  </dd>
+</div>
+
+</div>
 <div id="parseObjectLiteral-procs-all">
   <div id="parseObjectLiteral,GenericParser,int">
   <dt><pre><span class="Keyword">proc</span> <a href="#parseObjectLiteral%2CGenericParser%2Cint"><span class="Identifier">parseObjectLiteral</span></a><span class="Other">(</span><span class="Identifier">p</span><span class="Other">:</span> <span class="Keyword">var</span> <a href="#GenericParser"><span class="Identifier">GenericParser</span></a><span class="Other">;</span> <span class="Identifier">minPrec</span><span class="Other">:</span> <span class="Identifier">int</span> <span class="Other">=</span> <span class="DecNumber">0</span><span class="Other">)</span><span class="Other">:</span> <a href="ast.html#Node"><span class="Identifier">Node</span></a> {.<span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span>
@@ -563,6 +767,54 @@
   <dd>
     
     Generic fallback: if a language handler forgot to stamp its root node, anchor it at the token where the construct started instead of leaving <tt class="docutils literal"><span class="pre"><span class="Identifier">ln</span><span class="Punctuation">:</span> <span class="DecNumber">0</span><span class="Punctuation">,</span> <span class="Identifier">col</span><span class="Punctuation">:</span> <span class="DecNumber">0</span></span></tt>. Handlers that stamp precisely are untouched.
+    
+  </dd>
+</div>
+
+</div>
+<div id="stripCurr-procs-all">
+  <div id="stripCurr,GenericParser">
+  <dt><pre><span class="Keyword">proc</span> <a href="#stripCurr%2CGenericParser"><span class="Identifier">stripCurr</span></a><span class="Other">(</span><span class="Identifier">p</span><span class="Other">:</span> <span class="Keyword">var</span> <a href="#GenericParser"><span class="Identifier">GenericParser</span></a><span class="Other">)</span> {.<span class="Identifier">inline</span><span class="Other">,</span> <span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
+  <dd>
+    
+    Record an erase span over just the current token (a modifier, <tt class="docutils literal"><span class="pre"><span class="Operator">?</span></span></tt>, <tt class="docutils literal"><span class="pre"><span class="Operator">!</span></span></tt>). The caller still walks past it.
+    
+  </dd>
+</div>
+
+</div>
+<div id="stripCurrPast-procs-all">
+  <div id="stripCurrPast,GenericParser">
+  <dt><pre><span class="Keyword">proc</span> <a href="#stripCurrPast%2CGenericParser"><span class="Identifier">stripCurrPast</span></a><span class="Other">(</span><span class="Identifier">p</span><span class="Other">:</span> <span class="Keyword">var</span> <a href="#GenericParser"><span class="Identifier">GenericParser</span></a><span class="Other">)</span> {.<span class="Identifier">inline</span><span class="Other">,</span>
+    <span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">IOError</span><span class="Other">,</span> <span class="Identifier">DynasmError</span><span class="Other">,</span> <span class="Identifier">ValueError</span><span class="Other">,</span> <span class="Identifier">KeyError</span><span class="Other">,</span> <span class="Identifier">Exception</span><span class="Other">]</span><span class="Other">,</span>
+    <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Identifier">RootEffect</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
+  <dd>
+    
+    Consume the current token and erase through to the next token start (eating inter-token comments, which is fine inside erased regions).
+    
+  </dd>
+</div>
+
+</div>
+<div id="stripError-procs-all">
+  <div id="stripError,GenericParser,int,string">
+  <dt><pre><span class="Keyword">proc</span> <a href="#stripError%2CGenericParser%2Cint%2Cstring"><span class="Identifier">stripError</span></a><span class="Other">(</span><span class="Identifier">p</span><span class="Other">:</span> <span class="Keyword">var</span> <a href="#GenericParser"><span class="Identifier">GenericParser</span></a><span class="Other">;</span> <span class="Identifier">start</span><span class="Other">:</span> <span class="Identifier">int</span><span class="Other">;</span> <span class="Identifier">msg</span><span class="Other">:</span> <span class="Identifier">string</span><span class="Other">)</span> {.<span class="Identifier">inline</span><span class="Other">,</span>
+    <span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
+  <dd>
+    
+    Record an unsupported-construct diagnostic at <tt class="docutils literal"><span class="pre"><span class="Identifier">start</span></span></tt>..consumed end.
+    
+  </dd>
+</div>
+
+</div>
+<div id="stripSince-procs-all">
+  <div id="stripSince,GenericParser,int,int">
+  <dt><pre><span class="Keyword">proc</span> <a href="#stripSince%2CGenericParser%2Cint%2Cint"><span class="Identifier">stripSince</span></a><span class="Other">(</span><span class="Identifier">p</span><span class="Other">:</span> <span class="Keyword">var</span> <a href="#GenericParser"><span class="Identifier">GenericParser</span></a><span class="Other">;</span> <span class="Identifier">start</span><span class="Other">:</span> <span class="Identifier">int</span><span class="Other">;</span> <span class="Identifier">upto</span> <span class="Other">=</span> <span class="DecNumber">-1</span><span class="Other">)</span> {.<span class="Identifier">inline</span><span class="Other">,</span>
+    <span><span class="Other pragmadots">...</span></span><span class="pragmawrap"><span class="Identifier">raises</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">tags</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span><span class="Other">,</span> <span class="Identifier">forbids</span><span class="Other">:</span> <span class="Other">[</span><span class="Other">]</span></span>.}</pre></dt>
+  <dd>
+    
+    Record an erase span from <tt class="docutils literal"><span class="pre"><span class="Identifier">start</span></span></tt> to the end of the last consumed token. Call right after the construct is parsed; <tt class="docutils literal"><span class="pre"><span class="Identifier">upto</span></span></tt> floors the end for generic closers, which split <tt class="docutils literal"><span class="pre"><span class="Operator">&gt;&gt;</span></span></tt>/<tt class="docutils literal"><span class="pre"><span class="Operator">&gt;&gt;&gt;</span></span></tt> in place without walking.
     
   </dd>
 </div>
@@ -643,7 +895,7 @@
       <div class="twelve-columns footer">
         <span class="nim-sprite"></span>
         <br>
-        <small style="color: var(--hint);">Made with Nim. Generated: 2026-10-22 13:47:09 UTC</small>
+        <small style="color: var(--hint);">Made with Nim. Generated: 2026-11-15 15:19:15 UTC</small>
       </div>
     </div>
   </div>

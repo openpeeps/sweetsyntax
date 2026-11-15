@@ -88,4 +88,5 @@ nim	parseHook	sweetsyntax/config.html#parseHook,YamlParser,FeaturesSpec	proc par
 nim	parseHook	sweetsyntax/config.html#parseHook,YamlParser,StatementSpec	proc parseHook(p: var YamlParser; v: var StatementSpec)		516
 nim	newSyntax	sweetsyntax/config.html#newSyntax,string	proc newSyntax(specPath: string): SweetSyntax		528
 nim	getKnownSyntax	sweetsyntax/config.html#getKnownSyntax,KnownSyntax	proc getKnownSyntax(knownSyntax: KnownSyntax): SweetSyntax		532
+nim	knownSyntaxForExt	sweetsyntax/config.html#knownSyntaxForExt,string	proc knownSyntaxForExt(ext: string): KnownSyntax		537
 nimgrp	parsehook	sweetsyntax/config.html#parseHook-procs-all	proc		435
